@@ -6,6 +6,7 @@ namespace ShatteredIllusion.Common.Players
 {
 	public class StartingPlayer : ModPlayer
 	{
+	//I'd like to thank Cal devs for leaving thier githubup as a reference
 		public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath)
 		{
 			if (!mediumCoreDeath)
