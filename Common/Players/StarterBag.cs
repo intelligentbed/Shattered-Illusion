@@ -34,6 +34,9 @@ namespace ShatteredIllusion.Common.Players
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SwiftnessPotion, 5);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Torch, 40);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.CopperBow, 1);
+            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.BabyBirdStaff, 1);
+            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.AmethystStaff, 1);
+            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SilverBroadsword, 1);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenArrow, 100);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenHammer, 1);
             // PLEASE ADD MAGICX STORAGE SUPPORT IDk HOW TO DO THAT PLEASE DO THAT PLEASE

@@ -8,7 +8,11 @@ Items: {
 
 	StarterBag: {
 		DisplayName: Starter Bag
-		Tooltip: ""
+		Tooltip:
+			'''
+			Right Click to open
+			Consumable
+			'''
 	}
 
 	DeleteThisLater: {
