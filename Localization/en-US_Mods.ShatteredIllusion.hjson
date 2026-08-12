@@ -19,6 +19,26 @@ Items: {
 		DisplayName: Delete This Later
 		Tooltip: ""
 	}
+
+	LivingWoodChestplate: {
+		DisplayName: Living Wood Chestplate
+		Tooltip: ""
+	}
+
+	LivingWoodHelmet: {
+		DisplayName: Living Wood Helmet
+		Tooltip: ""
+	}
+
+	LivingWoodLeggings: {
+		DisplayName: Living Wood Leggings
+		Tooltip: ""
+	}
+
+	MossTileItem: {
+		Tooltip: ""
+		DisplayName: Moss Tile Item
+	}
 }
 
 Buffs: {
@@ -27,3 +47,5 @@ Buffs: {
 		Description: Mods.overshieldprototype.Buffs.ShieldBuff.Description
 	}
 }
+
+Tiles.MossTile.MapEntry: Moss Tile
