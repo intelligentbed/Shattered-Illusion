@@ -40,18 +40,41 @@ Items: {
 
 	MossItem: {
 		Tooltip: You can still feel it moving
-		DisplayName: "[c/5AB80D:Moss]"
+		DisplayName: Moss
+	}
+
+	MossTileItem: {
+		Tooltip: ""
+		DisplayName: Moss Tile Item
+	}
+
+	FrostLeggings: {
+		DisplayName: Frost Leggings
+		Tooltip: Increases ranged damage by 1%
+	}
+
+	FrostHelmet: {
+		DisplayName: Frost Helmet
+		Tooltip: Increases ranged damage by 1%
+	}
+
+	FrostChestplate: {
+		DisplayName: Frost Chestplate
+		Tooltip: Increases ranged damage by 3%
+		SetBonus: Ranged hits inflict Frostburn
+	}
+
+	EvergreenCrystal: {
+		Tooltip: ""
+		DisplayName: Evergreen Crystal
 	}
 }
 
 Buffs: {
 	ShieldBuff: {
+		Description: Mods.ShatteredIllusion.Buffs.ShieldBuff.Description
 		DisplayName: Shield Buff
-		Description: Mods.overshieldprototype.Buffs.ShieldBuff.Description
 	}
 }
 
-Tiles: {
-	MossTile.MapEntry: Moss Tile
-	MossBlock.MapEntry: Moss Block
-}
+Tiles.MossBlock.MapEntry: Moss Block
