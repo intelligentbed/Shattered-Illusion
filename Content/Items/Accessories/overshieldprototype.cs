@@ -21,10 +21,10 @@ namespace ShatteredIllusion.Content.Items.Accessories
 
         public override void UpdateAccessory(Player player, bool hideVisual)
         {
-            // Runs every frame while equipped.
+            // Runs every frame while equipped might cause lag in the long run but im lazy
             player.GetModPlayer<ShieldPlayer>().HasShield = true;
 
-            // Movement speed penalty for wearing a heavy shield.
+            // Movement speed penalty
             player.moveSpeed -= 0.1f;
         }
 
