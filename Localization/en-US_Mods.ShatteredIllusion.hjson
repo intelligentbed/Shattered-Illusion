@@ -68,12 +68,26 @@ Items: {
 		Tooltip: ""
 		DisplayName: Evergreen Crystal
 	}
+
+	MossSoup: {
+		Tooltip:
+			'''
+			A disgusting stew only a true moss lover would enjoy
+			Increases life regeneration
+			'''
+		DisplayName: Moss Stew
+	}
 }
 
 Buffs: {
 	ShieldBuff: {
 		Description: Mods.ShatteredIllusion.Buffs.ShieldBuff.Description
 		DisplayName: Shield Buff
+	}
+
+	MossBuff: {
+		Description: Increases life regeneration by 1 hp/s
+		DisplayName: Mossed out
 	}
 }
 
