@@ -93,7 +93,7 @@ namespace ShatteredIllusion.World
                             Main.tile[i, j].TileType == TileID.Stone)
                         {
                             Main.tile[i, j].TileType =
-                                (ushort)ModContent.TileType<MossTile>();
+                                (ushort)ModContent.TileType<MossBlock>();
                         }
                     }
                 }

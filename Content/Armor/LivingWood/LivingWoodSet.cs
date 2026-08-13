@@ -1,6 +1,7 @@
 using Terraria.ModLoader;
 using Terraria;
 using Terraria.ID;
+using ShatteredIllusion.Placeables.Blocks;
 
 namespace ShatteredIllusion.Content.Armor.LivingWood
 {
@@ -24,8 +25,8 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
         {
             CreateRecipe()
                 .AddIngredient(ItemID.Wood, 10)
-                .AddIngredient(ItemID.MudBlock, 5)
                 .AddIngredient(ItemID.Emerald, 1)
+                .AddIngredient(ModContent.ItemType<MossItem>(), 10)
                 .AddTile(TileID.Anvils)
                 .Register();
         }
@@ -46,7 +47,7 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
         {
             CreateRecipe()
                 .AddIngredient(ItemID.Wood, 15)
-                .AddIngredient(ItemID.MudBlock, 5)
+                .AddIngredient(ModContent.ItemType<MossItem>(), 5)
                 .AddIngredient(ItemID.Emerald, 2)
                 .AddTile(TileID.Anvils)
                 .Register();
@@ -86,7 +87,7 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
         {
             CreateRecipe()
                 .AddIngredient(ItemID.Wood, 10)
-                .AddIngredient(ItemID.MudBlock, 5)
+                .AddIngredient(ModContent.ItemType<MossItem>(), 5)
                 .AddIngredient(ItemID.Emerald, 1)
                 .AddTile(TileID.Anvils)
                 .Register();
@@ -97,4 +98,5 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
             player.GetDamage(DamageClass.Summon) += 0.06f;
         }
     }
+
 }

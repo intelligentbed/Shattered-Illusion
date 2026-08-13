@@ -1,5 +1,3 @@
-# This file will automatically update with entries for new content after a build and reload.
-
 Items: {
 	AncientShieldItem: {
 		DisplayName: Ancient Shield Item
@@ -20,24 +18,29 @@ Items: {
 		Tooltip: ""
 	}
 
-	LivingWoodChestplate: {
-		DisplayName: Living Wood Chestplate
-		Tooltip: ""
-	}
-
 	LivingWoodHelmet: {
 		DisplayName: Living Wood Helmet
-		Tooltip: ""
+		Tooltip: Increases summon damage by 6%
+		SetBonus:
+			'''
+			Increases maximum minions by 1
+			Increases life regeneration
+			'''
+	}
+
+	LivingWoodChestplate: {
+		DisplayName: Living Wood Chestplate
+		Tooltip: Increases maximum minions by 1
 	}
 
 	LivingWoodLeggings: {
 		DisplayName: Living Wood Leggings
-		Tooltip: ""
+		Tooltip: Increases summon damage by 6%
 	}
 
-	MossTileItem: {
-		Tooltip: ""
-		DisplayName: Moss Tile Item
+	MossItem: {
+		Tooltip: You can still feel it moving
+		DisplayName: "[c/5AB80D:Moss]"
 	}
 }
 
@@ -48,4 +51,7 @@ Buffs: {
 	}
 }
 
-Tiles.MossTile.MapEntry: Moss Tile
+Tiles: {
+	MossTile.MapEntry: Moss Tile
+	MossBlock.MapEntry: Moss Block
+}
