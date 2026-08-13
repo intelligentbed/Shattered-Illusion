@@ -77,6 +77,15 @@ Items: {
 			'''
 		DisplayName: Moss Stew
 	}
+
+	EvergreenJadeCharm: {
+		Tooltip:
+			'''
+			Melee Speed is increased by 5% 
+			Striking an enemy with melee has a 50% chance spawn a projectile towards the cursor
+			'''
+		DisplayName: EverJade Charm
+	}
 }
 
 Buffs: {
@@ -92,3 +101,4 @@ Buffs: {
 }
 
 Tiles.MossBlock.MapEntry: Moss Block
+Projectiles.JadeSprout.DisplayName: Jade Sprout
