@@ -100,5 +100,9 @@ Buffs: {
 	}
 }
 
-Tiles.MossBlock.MapEntry: Moss Block
+Tiles: {
+	MossBlock.MapEntry: Moss Block
+	MossTile.MapEntry: Moss Tile
+}
+
 Projectiles.JadeSprout.DisplayName: Jade Sprout
