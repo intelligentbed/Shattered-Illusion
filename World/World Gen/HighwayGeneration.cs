@@ -13,7 +13,6 @@ namespace ShatteredIllusion.World.World_Gen
 {
     public class HighwayGeneration : ModSystem
     {
-        // Stores the tile bounds of the highway in world coordinates
         public static Rectangle HighwayArea;
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
@@ -41,10 +40,10 @@ namespace ShatteredIllusion.World.World_Gen
 
             int desertCenterX = desertBounds.X + (desertBounds.Width / 2);
             int structureWidth = 328;
-            int structureHeight = 60; 
+            int structureHeight = 60;
 
             int targetX = desertCenterX - (structureWidth / 2) - 1; // This is the X offset of the structure
-           
+
             int startY = desertBounds.Y;
             int endY = desertBounds.Y + desertBounds.Height;
             int targetY = endY;
@@ -90,4 +89,66 @@ namespace ShatteredIllusion.World.World_Gen
             HighwayArea = Rectangle.Empty;
         }
     }
+
+    #region Highway Protection System
+
+    public class HighwayProtectionTile : GlobalTile
+    {
+        public override void KillTile(int i, int j, int type, ref bool fail, ref bool effectOnly, ref bool noItem)
+        {
+            if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
+            {
+                Player player = Main.LocalPlayer;
+                Item item = player.HeldItem;
+
+                int pickPower = (item != null && item.pick > 0) ? item.pick : 0;
+
+                if (pickPower < 100)
+                {
+                    fail = true;
+                }
+            }
+        }
+
+        public override bool CanExplode(int i, int j, int type)
+        {
+            if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
+            {
+                return false;
+            }
+
+            return base.CanExplode(i, j, type);
+        }
+    }
+
+    public class HighwayProtectionWall : GlobalWall
+    {
+        public override void KillWall(int i, int j, int type, ref bool fail)
+        {
+            if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
+            {
+                Player player = Main.LocalPlayer;
+                Item item = player.HeldItem;
+
+                int pickPower = (item != null && item.pick > 0) ? item.pick : 0;
+
+                if (pickPower < 100)
+                {
+                    fail = true;
+                }
+            }
+        }
+
+        public override bool CanExplode(int i, int j, int type)
+        {
+            if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
+            {
+                return false;
+            }
+
+            return base.CanExplode(i, j, type);
+        }
+    }
+
+    #endregion
 }
