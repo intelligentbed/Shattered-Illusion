@@ -7,6 +7,11 @@
 	<PropertyGroup>
 		
 	</PropertyGroup>
+	<ItemGroup>
+	  <Reference Include="StructureHelper">
+	    <HintPath>..\..\..\..\..\..\..\Downloads\StructureHelper.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
 
 	<!-- References -->
 
