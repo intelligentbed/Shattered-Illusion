@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework; // Fixed: Provides Vector2
+﻿using Microsoft.Xna.Framework; 
 using ShatteredIllusion.Content.Items.Materials;
 using ShatteredIllusion.Content.Projectiles;
 using System;
