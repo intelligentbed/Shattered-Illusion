@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework; // Fixed: Provides Vector2
+using Microsoft.Xna.Framework; 
 using ShatteredIllusion.Content.Items.Materials;
 using ShatteredIllusion.Content.Projectiles;
 using System;
@@ -54,7 +54,7 @@ namespace ShatteredIllusion.Content.Items.Accessories
             }
         }
 
-        // Triggers when hitting an enemy with tmelee 
+        // activate when hitting an enemy with tmelee 
         public override void OnHitNPCWithItem(Item item, NPC target, NPC.HitInfo hit, int damageDone)
         {
             if (hasEvergreenJadeCharm && item.CountsAsClass(DamageClass.Melee))
@@ -63,10 +63,9 @@ namespace ShatteredIllusion.Content.Items.Accessories
             }
         }
 
-        // Triggers when hitting an enemy with a projectile
+        // the same as the last comment above but just melee projectiles 
         public override void OnHitNPCWithProj(Projectile proj, NPC target, NPC.HitInfo hit, int damageDone)
         {
-            // Avoidd loops and while only making it spawn with melee projectiles
             if (hasEvergreenJadeCharm && proj.type != ModContent.ProjectileType<JadeSprout>() && proj.CountsAsClass(DamageClass.Melee))
             {
                 TrySpawnJadeSprout(proj.GetSource_FromThis());
@@ -78,10 +77,9 @@ namespace ShatteredIllusion.Content.Items.Accessories
             // the chance to spawn a Jade Sprout is 1 in 2 so 50% chance
             if (Main.rand.NextBool(2) && Player.whoAmI == Main.myPlayer)
             {
-                // Spawns at player center then goes in the direction of the cursor position
                 Vector2 direction = Vector2.Normalize(Main.MouseWorld - Player.Center);
 
-                // Set initial toss speed
+                // projectiles speed
                 Vector2 velocity = direction * 26f;
 
                 Projectile.NewProjectile(
