@@ -21,16 +21,16 @@ Items: {
 	LivingWoodHelmet: {
 		DisplayName: Living Wood Helmet
 		Tooltip: Increases summon damage by 6%
-		SetBonus:
-			'''
-			Increases maximum minions by 1
-			Increases life regeneration
-			'''
 	}
 
 	LivingWoodChestplate: {
 		DisplayName: Living Wood Chestplate
 		Tooltip: Increases maximum minions by 1
+		SetBonus:
+			'''
+			Increases maximum minions by 1
+			Increases life regeneration
+			'''
 	}
 
 	LivingWoodLeggings: {
@@ -49,19 +49,19 @@ Items: {
 	}
 
 	FrostLeggings: {
-		DisplayName: Frost Leggings
-		Tooltip: Increases ranged damage by 1%
+		DisplayName: Tundra Leggings
+		Tooltip: Increases Melee damage by 1%
 	}
 
 	FrostHelmet: {
-		DisplayName: Frost Helmet
-		Tooltip: Increases ranged damage by 1%
+		DisplayName: Tundra Helmet
+		Tooltip: Increases Melee damage by 1%
 	}
 
 	FrostChestplate: {
-		DisplayName: Frost Chestplate
-		Tooltip: Increases ranged damage by 3%
-		SetBonus: Ranged hits inflict Frostburn
+		DisplayName: Tundra Chestplate
+		Tooltip: Increases Melee damage by 3%
+		SetBonus: Melee hits inflict Frostburn
 	}
 
 	EvergreenCrystal: {
@@ -86,6 +86,21 @@ Items: {
 			'''
 		DisplayName: EverJade Charm
 	}
+
+	LivingWandProto: {
+		DisplayName: Living Wand Proto
+		Tooltip: ""
+	}
+
+	AntlionAltar: {
+		DisplayName: Antlion Altar
+		Tooltip: ""
+	}
+
+	AntlionAttractor: {
+		DisplayName: Antlion Attractor
+		Tooltip: ""
+	}
 }
 
 Buffs: {
@@ -103,6 +118,14 @@ Buffs: {
 Tiles: {
 	MossBlock.MapEntry: Moss Block
 	MossTile.MapEntry: Moss Tile
+	AntlionBossAltar.MapEntry: Antlion Boss Altar
 }
 
-Projectiles.JadeSprout.DisplayName: Jade Sprout
+Projectiles: {
+	JadeSprout.DisplayName: Jade Sprout
+	LivingWandProjectile.DisplayName: Living Wand Projectile
+	ParryVisual.DisplayName: Parry Visual
+}
+
+Keybinds.Parry.DisplayName: Parry
+NPCs.GreatAntlionCharger.DisplayName: Great Antlion Charger

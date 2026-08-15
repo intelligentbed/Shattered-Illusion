@@ -1,8 +1,9 @@
-using Terraria.ModLoader;
+using ShatteredIllusion.Content.Armor.FrostArmorProto;
+using ShatteredIllusion.Content.Items.Materials;
+using ShatteredIllusion.Content.Placeables.Blocks;
 using Terraria;
 using Terraria.ID;
-using ShatteredIllusion.Content.Placeables.Blocks;
-using ShatteredIllusion.Content.Items.Materials;
+using Terraria.ModLoader;
 
 namespace ShatteredIllusion.Content.Armor.LivingWood
 {
@@ -14,7 +15,7 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue;
             Item.defense = 1;
         }
 
@@ -40,7 +41,7 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue;
             Item.defense = 3;
         }
         public override void AddRecipes()
@@ -68,6 +69,8 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
         {
             player.maxMinions += 1;
             player.lifeRegen += 3;
+            player.setBonus = "Increase Max Summons by 1\n" +
+                              "Increase Life Regeneration by 1 HP/s";
         }
     }
 
@@ -79,7 +82,7 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue   ;
             Item.defense = 2;
         }
         public override void AddRecipes()

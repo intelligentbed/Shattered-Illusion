@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using ShatteredIllusion.Content.Placeables.Blocks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,24 +9,22 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.Placeables.Blocks
+namespace ShatteredIllusion.Content.Items.Other
 {
-    public class MossItem : ModItem
+    public class AntlionAttractor : ModItem
     {
-
         public override void SetDefaults()
         {
             Item.width = 16;
             Item.height = 16;
-            Item.maxStack = 999;
+            Item.maxStack = 9999;
             Item.useTurn = true;
             Item.autoReuse = true;
             Item.useAnimation = 15;
             Item.useTime = 10;
             Item.useStyle = ItemUseStyleID.Swing;
-            Item.consumable = true;
-            Item.createTile = ModContent.TileType<MossBlock>();
-            Item.rare = ItemRarityID.Green;
+            Item.consumable = false;
+            //lwk just copy and pasted the moss item since im lazy 
         }
     }
 }

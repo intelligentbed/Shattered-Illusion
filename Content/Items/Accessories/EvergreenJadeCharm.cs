@@ -54,7 +54,7 @@ namespace ShatteredIllusion.Content.Items.Accessories
             }
         }
 
-        // avtivates when hitting an enemy with tmelee 
+        // activates when hitting an enemy with tmelee 
         public override void OnHitNPCWithItem(Item item, NPC target, NPC.HitInfo hit, int damageDone)
         {
             if (hasEvergreenJadeCharm && item.CountsAsClass(DamageClass.Melee))
@@ -63,7 +63,7 @@ namespace ShatteredIllusion.Content.Items.Accessories
             }
         }
 
-        // same as the comment above but with projectile
+        // the same as the comment above but with projectile
         public override void OnHitNPCWithProj(Projectile proj, NPC target, NPC.HitInfo hit, int damageDone)
         {
             if (hasEvergreenJadeCharm && proj.type != ModContent.ProjectileType<JadeSprout>() && proj.CountsAsClass(DamageClass.Melee))
@@ -77,10 +77,9 @@ namespace ShatteredIllusion.Content.Items.Accessories
             // the chance to spawn a Jade Sprout is 1 in 2 so 50% chance
             if (Main.rand.NextBool(2) && Player.whoAmI == Main.myPlayer)
             {
-   
                 Vector2 direction = Vector2.Normalize(Main.MouseWorld - Player.Center);
 
-                // Set speed
+                // speed
                 Vector2 velocity = direction * 26f;
 
                 Projectile.NewProjectile(
