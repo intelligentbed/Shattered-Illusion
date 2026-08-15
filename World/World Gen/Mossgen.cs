@@ -5,7 +5,7 @@ using Terraria.ID;
 using Terraria.IO;
 using Terraria.ModLoader;
 using Terraria.WorldBuilding;
-using ShatteredIllusion.Placeables.Blocks;
+using ShatteredIllusion.Content.Placeables.Blocks;
 
 namespace ShatteredIllusion.World
 {
@@ -60,7 +60,7 @@ namespace ShatteredIllusion.World
                     Main.maxTilesY - 100
                 );
 
-                // START VEIN IN STONE
+                // START VEIN IN dirt
                 if (!Main.tile[centerX, centerY].HasTile ||
                     Main.tile[centerX, centerY].TileType != TileID.Dirt)
                 {

@@ -1,4 +1,4 @@
-﻿using ShatteredIllusion.Placeables.Blocks;
+﻿using ShatteredIllusion.Content.Placeables.Blocks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
