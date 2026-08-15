@@ -42,7 +42,7 @@ namespace ShatteredIllusion.World.World_Gen
             int structureWidth = 328;
             int structureHeight = 60;
 
-            int targetX = desertCenterX - (structureWidth / 2) - 1; // This is the X offset of the structure
+            int targetX = desertCenterX - (structureWidth / 2) - 1; // so i dont forget this is x offset
 
             int startY = desertBounds.Y;
             int endY = desertBounds.Y + desertBounds.Height;
@@ -53,7 +53,7 @@ namespace ShatteredIllusion.World.World_Gen
                 Tile tile = Main.tile[desertCenterX, y];
                 if (tile.HasTile && (tile.TileType == TileID.Sandstone || tile.TileType == TileID.HardenedSand))
                 {
-                    targetY = y - 40; //This is the Y offet of the structure 
+                    targetY = y - 40; //this is Y 
                     break;
                 }
             }

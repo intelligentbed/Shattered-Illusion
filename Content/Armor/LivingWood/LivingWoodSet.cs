@@ -1,7 +1,7 @@
 using Terraria.ModLoader;
 using Terraria;
 using Terraria.ID;
-using ShatteredIllusion.Placeables.Blocks;
+using ShatteredIllusion.Content.Placeables.Blocks;
 using ShatteredIllusion.Content.Items.Materials;
 
 namespace ShatteredIllusion.Content.Armor.LivingWood
