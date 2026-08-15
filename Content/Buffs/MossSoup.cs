@@ -18,17 +18,16 @@ namespace ShatteredIllusion.Content.Buffs
             Item.height = 16;
             Item.maxStack = 9999; 
             Item.value = Item.buyPrice(copper: 1);
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Green;
 
             Item.useStyle = ItemUseStyleID.EatFood;
             Item.useAnimation = 17;
             Item.useTime = 17;
-            Item.UseSound = SoundID.Item2; // basic eating sound
+            Item.UseSound = SoundID.Item2; 
             Item.consumable = true;
 
-            // Buff Setup
-            Item.buffType = ModContent.BuffType<MossBuff>(); // Buff applied on consumption
-            Item.buffTime = 3600 * 5;      // the first number is the ticks and its multiplied by the second number which is the seconds So this is 5 minutes. 
+            Item.buffType = ModContent.BuffType<MossBuff>();
+            Item.buffTime = 3600 * 3;      // 3600 = 1 min, 1 min x 3 = 3 min
         }
 
         public override void AddRecipes()

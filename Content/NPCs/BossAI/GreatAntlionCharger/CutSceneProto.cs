@@ -12,9 +12,8 @@ using ReLogic.Graphics;
 using ReLogic.Utilities;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using ShatteredIllusion.Content.BossAI;
 
-namespace ShatteredIllusion.Content.BossAI.CutSceneProto //IM ACTUALLY COMMENTING HERE TO EXPLAIN STUFF IT SHIT BREAKS WHILE IM GONE//
+namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //IM ACTUALLY COMMENTING HERE TO EXPLAIN STUFF IT SHIT BREAKS WHILE IM GONE//
 {
     public class BossCutsceneSystem : ModSystem
     {
@@ -24,7 +23,7 @@ namespace ShatteredIllusion.Content.BossAI.CutSceneProto //IM ACTUALLY COMMENTIN
         public static Vector2 SmoothedCameraPos { get; set; } = Vector2.Zero;
 
         private static int cutsceneTimer = 0;
-        private const int CUTSCENE_DURATION = 180; //duration of cutscene in ticks (60 = 1 sec)//
+        private const int CUTSCENE_DURATION = 200; //duration of cutscene in ticks (60 = 1 sec) yes bro i know how ticks work im not DUMB//
         private const int TITLE_FADE_IN_START = 40;
         private const int TITLE_FADE_IN_TICKS = 20;
         private const int TITLE_FADE_OUT_START = 140;
@@ -184,7 +183,7 @@ namespace ShatteredIllusion.Content.BossAI.CutSceneProto //IM ACTUALLY COMMENTIN
 
         public override void AI(NPC npc)
         {
-            if (npc.type != NPCID.KingSlime) return; //THIS LINE IS SUPER IMPORTANT: NPCID is which entity the cutscene will track. Just change NPC ID from EOC to whatver antlion boss ID will be//
+            if (npc.type != ModContent.NPCType<GreatAntlionCharger>()) return; //THIS LINE IS SUPER IMPORTANT: NPCID is which entity the cutscene will track. Just change NPC ID from EOC to whatver antlion boss ID will be//
 
             if (!hasTriggeredCutscene)
             {
@@ -200,7 +199,7 @@ namespace ShatteredIllusion.Content.BossAI.CutSceneProto //IM ACTUALLY COMMENTIN
                 hasTriggeredCutscene = true;
             }
 
-            if (BossCutsceneSystem.IsCutsceneActive)
+            if (BossCutsceneSystem.IsCutsceneActive)    
             {
                 npc.dontTakeDamage = true;
             }
