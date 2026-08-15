@@ -194,7 +194,7 @@ namespace ShatteredIllusion.Content.BossAI.CutSceneProto //IM ACTUALLY COMMENTIN
                     screenshakeStartTick: 120,   //screenshake start timestamp//
                     screenshakeDuration: 60,     //shakes for 60 ticks once triggered
                     screenshakeMagnitude: 4,     //severity of screenshake
-                    audioSound: new SoundStyle("ShatteredIllusion/BarkFart"), //Audio file that plays (prolly gonna wanna make a custom roar sfx)//
+                    audioSound: new SoundStyle("ShatteredIllusion/Sounds/BarkFart"), //Audio file that plays (prolly gonna wanna make a custom roar sfx)//
                     audioStartTick: 60,         // another time stamp for start - audio//
                     audioDuration: 120);         //plays/loops for 120 ticks (only matters if the sound loops)
                 hasTriggeredCutscene = true;
