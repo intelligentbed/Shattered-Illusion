@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -75,7 +75,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                         float distance = Vector2.Distance(NPC.Center, target.Center);
 
-                        //12f base speed, plus alittle bit extra speed for distance (clamped so it doesn't zoom forever) 
+                        // Scale launch speed with distance, 
+                         // keeping it safely bounded between 32 and 64. Whoever is reading this hi  
                         float launchSpeed = MathHelper.Clamp(distance * 0.10f, 32f, 64f);
 
                         float directionX = target.Center.X > NPC.Center.X ? 1f : -1f;
@@ -101,7 +102,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     NPC.spriteDirection = NPC.direction;
                     NPC.Opacity = 1f;
 
-                    // disables the tile collision for the first 15 ticks 
+                    // disables the tile collision for the first 15 IGT (in game ticks) 
                     if (LaunchTimer <= 15f)
                     {
                         NPC.noTileCollide = true;
@@ -111,7 +112,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         NPC.noTileCollide = false; // reenable
                     }
 
-                    // Apply momentum friction so he doesnt fly away to the farthests depths of terraria caves
+                    // Apply momentum friction so he doesnt fly away to the farthests depths of the terraria caves
                     {
                         NPC.velocity.X *= 0.97f;
                     }
