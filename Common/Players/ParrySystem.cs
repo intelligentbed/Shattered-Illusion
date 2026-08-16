@@ -1,21 +1,30 @@
 ﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using ReLogic.Content;
 using Terraria;
+using Terraria.Audio;
 using Terraria.DataStructures;
-using Terraria.GameContent;
 using Terraria.GameInput;
 using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace ShatteredIllusionKeybinds
 {
+    // ok since i know people will be confused on what iparryable means 
+    // IT MEANS THAT THE ATTACK IS PARRY ABLE 
+    public interface IParryable
+    {
+        bool IsParryable { get; }
+        void OnParried(Player player);
+    }
+
     public class ParryPlayer : ModPlayer
     {
         public int CooldownTimer = 0;
         public int parrySlowTimer = 0;
 
         public const int MaxCooldown = 120;
+
+        //check if the player is currently in active parry frames
+        public bool IsParrying => parrySlowTimer > 0;
 
         public override void PreUpdate()
         {
@@ -34,14 +43,47 @@ namespace ShatteredIllusionKeybinds
         {
             if (KeybindSystem.ParryKeybind.JustPressed && CooldownTimer <= 0)
             {
-                //makes the player slow for 15 ticks thats like IDKth of a second might reduce depending how how the gameplay feels tbh also cooldown
-                parrySlowTimer = 15;
+                // Active parry window is 10 tick so TIGHT TIGHT
+                parrySlowTimer = 10;
                 CooldownTimer = MaxCooldown;
 
                 Player.velocity.X *= 0.2f;
 
-                Terraria.Audio.SoundEngine.PlaySound(SoundID.Item37, Player.position);
+                SoundEngine.PlaySound(SoundID.Item37, Player.position);
+
+                //Attempt/Miss Visual
+                SpawnDustExplosion(DustID.Silver, 25, 6f);
             }
+        }
+
+        public override bool FreeDodge(Player.HurtInfo info)
+        {
+            if (IsParrying)
+            {
+                if (info.DamageSource.SourceNPCIndex >= 0 && info.DamageSource.SourceNPCIndex < Main.maxNPCs)
+                {
+                    NPC attacker = Main.npc[info.DamageSource.SourceNPCIndex];
+
+                    //if the boss has iparryable and the attack has ISparryable then boom parry 
+                    if (attacker.ModNPC is IParryable boss && boss.IsParryable)
+                    {
+                        // Notify the boss it was parried
+                        boss.OnParried(Player);
+
+                        // Invulnerability frames
+                        Player.SetImmuneTimeForAllTypes(60);
+
+                        SoundEngine.PlaySound(SoundID.Item37 with { Pitch = 0.5f }, Player.position);
+                        SoundEngine.PlaySound(SoundID.Item4, Player.position);
+                        SpawnDustExplosion(DustID.Gold, 40, 9f);
+
+                        parrySlowTimer = 0;
+                        return true; // Completely blocks hit
+                    }
+                }
+            }
+
+            return base.FreeDodge(info);
         }
 
         public override void PostUpdateRunSpeeds()
@@ -53,32 +95,24 @@ namespace ShatteredIllusionKeybinds
                 Player.runAcceleration *= 0.15f;
             }
         }
-    }
 
-    public class ParryVisual : ModProjectile
-    {
-        public override string Texture => "ShatteredIllusion/Common/Textures/ParryVisual";
-        public override void SetDefaults()
+        private void SpawnDustExplosion(int dustType, int amount, float speed)
         {
-            Projectile.width = 30;
-            Projectile.height = 30;
-            Projectile.friendly = false;
-            Projectile.hostile = false;
-            Projectile.tileCollide = false;
-            Projectile.ignoreWater = true;
-            Projectile.timeLeft = 15; 
-        }
-        
-        // i got help on this part :(
-        public override void AI()
-        {
-            Player player = Main.player[Projectile.owner];
+            for (int i = 0; i < amount; i++)
+            {
+                Vector2 dustVelocity = Main.rand.NextVector2Circular(speed, speed);
 
-            Projectile.Center = player.Center;
-            Projectile.gfxOffY = player.gfxOffY;
+                Dust dust = Dust.NewDustPerfect(
+                    Player.Center,
+                    dustType,
+                    dustVelocity,
+                    Alpha: 100,
+                    newColor: default,
+                    Scale: Main.rand.NextFloat(1.3f, 2.2f)
+                );
 
-            if (!player.active || player.dead)
-                Projectile.Kill();
+                dust.noGravity = true;
+            }
         }
     }
 }
