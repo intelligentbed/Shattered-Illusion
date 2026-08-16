@@ -82,7 +82,7 @@ Items: {
 		Tooltip:
 			'''
 			Melee Speed is increased by 5% 
-			Striking an enemy with melee has a 50% chance spawn a projectile towards the cursor
+			Striking an enemy with Melee Damage has a 50% chance spawn a projectile towards the cursor
 			'''
 		DisplayName: EverJade Charm
 	}

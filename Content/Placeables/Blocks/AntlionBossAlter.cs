@@ -38,6 +38,7 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
             int bossType = ModContent.NPCType<GreatAntlionCharger>();
             int itemType = ModContent.ItemType<AntlionAttractor>();
 
+
             if (NPC.AnyNPCs(bossType))
             {
                 return true;
@@ -48,20 +49,42 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
                 if (player.HeldItem.stack > 0)
                 {
                     player.HeldItem.stack--;
+                    SoundEngine.PlaySound(new SoundStyle("ShatteredIllusion/Sounds/AntlionRumble"));
                     if (player.HeldItem.stack <= 0)
                     {
                         player.HeldItem.TurnToAir();
                     }
                 }
 
-                SoundEngine.PlaySound(SoundID.Roar, new Vector2(i * 16, j * 16));
+                Tile tile = Main.tile[i, j];
+
+                int frameX = tile.TileFrameX % 48; 
+                int tileOffsetX = frameX / 16;     
+
+                int frameY = tile.TileFrameY % AnimationFrameHeight;
+                int tileOffsetY = 0;
+
+                if (frameY >= 33) // matches the tile height the top one is bottom row and the bottom is the middle
+                {
+                    tileOffsetY = 2; 
+                }
+                else if (frameY >= 16)
+                {
+                    tileOffsetY = 1; 
+                }
+
+                // Sets an origin
+                int originI = i - tileOffsetX;
+                int originJ = j - tileOffsetY;
+
+
 
                 if (Main.netMode != NetmodeID.MultiplayerClient)
                 {
-                    int spawnX = (i + 10) * 16;
-                    int spawnY = (j - 7) * 16;
+                    int spawnX = (originI + 13) * 16;
+                    int spawnY = (originJ - 5) * 16;
 
-                    NPC.NewNPC(new EntitySource_TileInteraction(player, i, j), spawnX, spawnY, bossType);
+                    NPC.NewNPC(new EntitySource_TileInteraction(player, originI, originJ), spawnX, spawnY, bossType);
                 }
                 else
                 {
@@ -73,6 +96,7 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
 
             return base.RightClick(i, j);
         }
+
 
         public override void AnimateTile(ref int frame, ref int frameCounter)
         {
