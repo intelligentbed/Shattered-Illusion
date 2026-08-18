@@ -31,13 +31,18 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
             var mapName = CreateMapEntryName();
             AddMapEntry(new Color(200, 200, 200), mapName);
         }
+        public override void MouseOver(int i, int j)
+        {
+            Player player = Main.LocalPlayer;
+            player.cursorItemIconEnabled = true;
+            player.cursorItemIconID = ModContent.ItemType<AntlionAttractor>();
+        }
 
         public override bool RightClick(int i, int j)
         {
             Player player = Main.LocalPlayer;
             int bossType = ModContent.NPCType<GreatAntlionCharger>();
             int itemType = ModContent.ItemType<AntlionAttractor>();
-
 
             if (NPC.AnyNPCs(bossType))
             {
@@ -58,30 +63,27 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
 
                 Tile tile = Main.tile[i, j];
 
-                int frameX = tile.TileFrameX % 48; 
-                int tileOffsetX = frameX / 16;     
+                int frameX = tile.TileFrameX % 48;
+                int tileOffsetX = frameX / 16;
 
                 int frameY = tile.TileFrameY % AnimationFrameHeight;
                 int tileOffsetY = 0;
 
-                if (frameY >= 33) // matches the tile height the top one is bottom row and the bottom is the middle
+                if (frameY >= 33)
                 {
-                    tileOffsetY = 2; 
+                    tileOffsetY = 2;
                 }
                 else if (frameY >= 16)
                 {
-                    tileOffsetY = 1; 
+                    tileOffsetY = 1;
                 }
 
-                // Sets an origin
                 int originI = i - tileOffsetX;
                 int originJ = j - tileOffsetY;
 
-
-
                 if (Main.netMode != NetmodeID.MultiplayerClient)
                 {
-                    int spawnX = (originI + 13) * 16;
+                    int spawnX = (originI + 12) * 16;
                     int spawnY = (originJ - 5) * 16;
 
                     NPC.NewNPC(new EntitySource_TileInteraction(player, originI, originJ), spawnX, spawnY, bossType);
@@ -96,7 +98,6 @@ namespace ShatteredIllusion.Content.Placeables.Blocks
 
             return base.RightClick(i, j);
         }
-
 
         public override void AnimateTile(ref int frame, ref int frameCounter)
         {

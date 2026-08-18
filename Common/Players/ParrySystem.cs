@@ -9,7 +9,7 @@ using Terraria.ModLoader;
 namespace ShatteredIllusionKeybinds
 {
     // ok since i know people will be confused on what iparryable means 
-    // IT MEANS THAT THE ATTACK IS PARRY ABLE 
+    // IT MEANS THAT THE BOSS IS PARRYABLE BUT NOT THE ATTACK YOU GOTTA DO THAT YOURSELF  
     public interface IParryable
     {
         bool IsParryable { get; }
@@ -22,8 +22,6 @@ namespace ShatteredIllusionKeybinds
         public int parrySlowTimer = 0;
 
         public const int MaxCooldown = 120;
-
-        //check if the player is currently in active parry frames
         public bool IsParrying => parrySlowTimer > 0;
 
         public override void PreUpdate()
@@ -43,15 +41,13 @@ namespace ShatteredIllusionKeybinds
         {
             if (KeybindSystem.ParryKeybind.JustPressed && CooldownTimer <= 0)
             {
-                // Active parry window is 10 tick so TIGHT TIGHT
-                parrySlowTimer = 10;
+                // Active parry window is 12 tick so TIGHT TIGHT
+                parrySlowTimer = 12;
                 CooldownTimer = MaxCooldown;
 
                 Player.velocity.X *= 0.2f;
 
                 SoundEngine.PlaySound(SoundID.Item37, Player.position);
-
-                //Attempt/Miss Visual
                 SpawnDustExplosion(DustID.Silver, 25, 6f);
             }
         }
@@ -67,10 +63,7 @@ namespace ShatteredIllusionKeybinds
                     //if the boss has iparryable and the attack has ISparryable then boom parry 
                     if (attacker.ModNPC is IParryable boss && boss.IsParryable)
                     {
-                        // Notify the boss it was parried
                         boss.OnParried(Player);
-
-                        // Invulnerability frames
                         Player.SetImmuneTimeForAllTypes(60);
 
                         SoundEngine.PlaySound(SoundID.Item37 with { Pitch = 0.5f }, Player.position);

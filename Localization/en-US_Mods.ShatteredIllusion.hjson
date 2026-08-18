@@ -101,6 +101,11 @@ Items: {
 		DisplayName: Antlion Attractor
 		Tooltip: ""
 	}
+
+	AntlionTreasureBag: {
+		DisplayName: Antlion Treasure Bag
+		Tooltip: ""
+	}
 }
 
 Buffs: {
@@ -125,6 +130,8 @@ Projectiles: {
 	JadeSprout.DisplayName: Jade Sprout
 	LivingWandProjectile.DisplayName: Living Wand Projectile
 	ParryVisual.DisplayName: Parry Visual
+	FallingRubble.DisplayName: Falling Rubble
+	SandBall.DisplayName: Sand Ball
 }
 
 Keybinds.Parry.DisplayName: Parry

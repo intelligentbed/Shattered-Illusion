@@ -7,17 +7,17 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Common.Players
+namespace ShatteredIllusion.Content.Items.Other
 {
-    public class StarterBag : ModItem
+    public class AntlionTreasureBag : ModItem
     {
         public override void SetDefaults()
         {
             Item.width = 20;
             Item.height = 20;
-            Item.maxStack = 1;
+            Item.maxStack = 9999;
             Item.rare = ItemRarityID.Blue;
-            Item.value = 0;
+            Item.value = 50;
         }
 
         public override bool CanRightClick()
@@ -27,7 +27,6 @@ namespace ShatteredIllusion.Common.Players
 
         public override void RightClick(Player player)
         {
-            // Give the player some starter items when open bag, also VSC added this idk how it did but it works.
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Wood, 100);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.RecallPotion, 10);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SwiftnessPotion, 5);
@@ -39,7 +38,6 @@ namespace ShatteredIllusion.Common.Players
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenArrow, 100);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenHammer, 1);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Rope, 10);
-            // PLEASE ADD MAGICX STORAGE SUPPORT IDk HOW TO DO THAT PLEASE DO THAT PLEASE
         }
     }
 }
