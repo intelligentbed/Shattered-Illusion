@@ -71,7 +71,7 @@ namespace ShatteredIllusionKeybinds
                         SpawnDustExplosion(DustID.Gold, 40, 9f);
 
                         parrySlowTimer = 0;
-                        return true; // Completely blocks hit
+                        return true; 
                     }
                 }
             }

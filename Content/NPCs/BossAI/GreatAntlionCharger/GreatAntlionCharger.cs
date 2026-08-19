@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using System.IO;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using ShatteredIllusion.Common.Cutscenes;
@@ -22,21 +23,40 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private const int BurrowPursuitEnd = 180;
         private const int BurrowTelegraphEnd = 210;
         private const int BurrowEnd = 245;
+        private const int SpitWindupFrame = 1;
+        private const int SpitFireFrame = 2;
+        private const int SpitRecoverFrame = 0;
+        const float MouthForwardOffset = 8f;
+        const float MouthSidewaysOffset = 6f;
+        const float MouthVerticalOffset = 8f;
+        float upwardAimOffset = -160f;
+
+        private float Phase2DiveLandingX;
+        private float Phase2DiveGroundY;
+        private float Phase2DiveLaunchX;
+        private float Phase2DiveLaunchY;
+
+        private bool Phase2;
+        private bool Phase2Transitioning;
+
+
+
         private int DashStuckTimer;
 
         private const string BurrowTexturePath =
             "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerBurrow";
+
 
         public enum AIState
         {
             WaitingForCutscene,
             Launch,
             Dash,
+            Phase2BurrowDive,
             Burrow,
             Spit,
             Cooldown
         }
-
         public AIState CurrentState
         {
             get => (AIState)NPC.ai[0];
@@ -61,19 +81,25 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             (CurrentState == AIState.Burrow && Timer > 30f && Timer < 150f);
 
         private Asset<Texture2D> burrowTexture;
-
-        private static readonly AIState[] AttackOrder =
+        private float direction;
+        private static readonly AIState[] Phase1AttackOrder =
         {
-            AIState.Launch,
-            AIState.Dash,
-            AIState.Spit,
-            AIState.Dash,
-            AIState.Burrow,
-            AIState.Dash,
-            AIState.Burrow, 
-            AIState.Spit,
-            AIState.Burrow
+        AIState.Launch,
+        AIState.Dash,
+        AIState.Spit,
+        AIState.Burrow,
+        AIState.Dash,
+        AIState.Burrow,
+        AIState.Spit,
+    };
+
+        private static readonly AIState[] Phase2AttackOrder =
+        {
+        AIState.Phase2BurrowDive,
+        AIState.Phase2BurrowDive,
+        AIState.Burrow,
         };
+
 
         public override void SetStaticDefaults()
         {
@@ -98,6 +124,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.aiStyle = -1;
             NPC.noGravity = false;
             NPC.noTileCollide = false;
+            Main.npcFrameCount[NPC.type] = MainFrameCount;
         }
 
         public override void Load()
@@ -107,6 +134,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
+
             if (CurrentState == AIState.WaitingForCutscene || NPC.alpha >= 255)
             {
                 return false;
@@ -123,8 +151,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             {
                 Texture2D texture = burrowTexture.Value;
                 SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
+                ? SpriteEffects.None
+                : SpriteEffects.FlipHorizontally;
 
                 int burrowFrameHeight = texture.Height / BurrowFrameCount;
 
@@ -157,7 +185,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 return false;
             }
 
-            return true;
+            Texture2D mainTexture = TextureAssets.Npc[NPC.type].Value;
+            SpriteEffects mainEffects = NPC.spriteDirection == -1
+                ? SpriteEffects.None
+                : SpriteEffects.FlipHorizontally;
+
+            Vector2 mainOrigin = new Vector2(
+                mainTexture.Width / 2f,
+                (mainTexture.Height / MainFrameCount) / 2f
+            );
+
+            Vector2 mainDrawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+
+            spriteBatch.Draw(
+                mainTexture,
+                mainDrawPos,
+                NPC.frame,
+                NPC.GetAlpha(drawColor),
+                NPC.rotation,
+                mainOrigin,
+                NPC.scale,
+                mainEffects,
+                0f
+            );
+
+            return false;
         }
 
         public override bool CanHitPlayer(Player target, ref int cooldownSlot)
@@ -192,7 +244,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void FindFrame(int frameHeight)
         {
-            if (CurrentState == AIState.Burrow && Timer <= BurrowDigTime)
+            bool phase2DiveAnimation =
+                CurrentState == AIState.Phase2BurrowDive && Timer <= 45f;
+
+            bool normalBurrowAnimation =
+                CurrentState == AIState.Burrow && Timer <= BurrowDigTime;
+
+            if (phase2DiveAnimation || normalBurrowAnimation)
             {
                 if (burrowTexture == null)
                 {
@@ -201,19 +259,24 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (burrowTexture != null && burrowTexture.IsLoaded)
                 {
-                    int burrowFrameHeight = burrowTexture.Height() / BurrowFrameCount;
+                    int burrowFrameHeight =
+                        burrowTexture.Height() / BurrowFrameCount;
 
-                    NPC.frameCounter += 0.25f;
+                    float animationTime =
+                        phase2DiveAnimation ? 45f : BurrowDigTime;
 
-                    if (NPC.frameCounter >= BurrowFrameCount)
-                    {
-                        NPC.frameCounter = 0f;
-                    }
+                    float animationProgress =
+                        MathHelper.Clamp(Timer / animationTime, 0f, 1f);
+
+                    int frame =
+                        (int)(animationProgress * BurrowFrameCount);
+
+                    frame = Math.Min(frame, BurrowFrameCount - 1);
 
                     NPC.frame.Width = burrowTexture.Width();
                     NPC.frame.Height = burrowFrameHeight;
                     NPC.frame.X = 0;
-                    NPC.frame.Y = (int)NPC.frameCounter * burrowFrameHeight;
+                    NPC.frame.Y = frame * burrowFrameHeight;
 
                     return;
                 }
@@ -223,14 +286,35 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.frame.Width = mainTexture.Width;
             NPC.frame.Height = frameHeight;
 
-            // Freeze on frame 1 while idle
-            if (NPC.velocity.X == 0f || CurrentState == AIState.WaitingForCutscene)
+            if (CurrentState == AIState.Spit)
+            {
+                int spitFrame;
+
+                if (Timer < 30f)
+                {
+                    spitFrame = SpitWindupFrame;
+                }
+                else if (Timer < 40f)
+                {
+                    spitFrame = SpitFireFrame;
+                }
+                else
+                {
+                    spitFrame = SpitRecoverFrame;
+                }
+
+                NPC.frame.Y = spitFrame * frameHeight;
+                return;
+            }
+
+            if (NPC.velocity.X == 0f ||
+                CurrentState == AIState.WaitingForCutscene)
             {
                 NPC.frame.Y = 0;
                 return;
             }
 
-            NPC.frameCounter += System.Math.Abs(NPC.velocity.X) * 0.15f;
+            NPC.frameCounter += Math.Abs(NPC.velocity.X) * 0.15f;
 
             if (NPC.frameCounter >= MainFrameCount)
             {
@@ -241,10 +325,34 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 {
                     NPC.frame.Y = 0;
                 }
+
+
+        NPC.frame.Width = TextureAssets.Npc[NPC.type].Value.Width;
+                NPC.frame.Height = frameHeight;
+
+                // Freeze on frame 1 while idle
+                if (NPC.velocity.X == 0f || CurrentState == AIState.WaitingForCutscene)
+                {
+                    NPC.frame.Y = 0;
+                    return;
+                }
+
+                NPC.frameCounter += System.Math.Abs(NPC.velocity.X) * 0.15f;
+
+                if (NPC.frameCounter >= MainFrameCount)
+                {
+                    NPC.frameCounter = 0f;
+                    NPC.frame.Y += frameHeight;
+
+                    if (NPC.frame.Y >= frameHeight * MainFrameCount)
+                    {
+                        NPC.frame.Y = 0;
+                    }
+                }
             }
         }
 
-        // Scans downward from checkPosition and returns the Y of the nearest solid tile.
+        // Scans downward returns the Y of the nearest solid tile.
         private float GetGroundY(Vector2 checkPosition)
         {
             int startTileX = (int)(checkPosition.X / 16f);
@@ -260,16 +368,23 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            return checkPosition.Y; // No ground found, don't move it
+            return checkPosition.Y;
         }
 
         public override void AI()
         {
+
             NPC.TargetClosest(true);
             Player target = Main.player[NPC.target];
 
             NPC.color = Color.White;
             IsParryable = false;
+
+            // Phase 2 begins at 55% HP.
+            if (!Phase2 && !Phase2Transitioning && NPC.life <= NPC.lifeMax * 0.55f)
+            {
+                StartPhase2(target);
+            }
 
             if (!target.active || target.dead)
             {
@@ -286,6 +401,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 ref NPC.stepSpeed,
                 ref NPC.gfxOffY
             );
+
+
 
             switch (CurrentState)
             {
@@ -304,7 +421,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     else if (HasSeenCutsceneStart)
                     {
                         AttackSequenceIndex = 0;
-                        CurrentState = AttackOrder[(int)AttackSequenceIndex];
+                        CurrentState = Phase1AttackOrder[(int)AttackSequenceIndex];
                         Timer = 0;
 
                         NPC.alpha = 0;
@@ -427,6 +544,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     IsParryable = true;
                     NPC.color = new Color(255, 190, 190);
 
+
                     // Reset the escape timer when the dash starts.
                     if (Timer == 1)
                     {
@@ -447,18 +565,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         SoundEngine.PlaySound(SoundID.Roar);
                     }
 
-                    // If the dash suddenly loses horizontal speed  
                     if (Math.Abs(NPC.velocity.X) < 1f && Math.Abs(NPC.oldVelocity.X) > 3f)
                     {
                         DashStuckTimer++;
 
-                        //  hop over the obstruction.
                         if (DashStuckTimer == 1)
                         {
                             NPC.velocity.Y = -8f;
                         }
 
-                        // If we're STILL stuck, temporarily ignore tiles.
                         if (DashStuckTimer >= 4)
                         {
                             NPC.noTileCollide = true;
@@ -471,7 +586,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     }
                     else
                     {
-                        // We're moving normally again.
                         DashStuckTimer = 0;
                     }
 
@@ -517,10 +631,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         float progress = Timer / BurrowDigTime;
                         float smoothProgress = progress * progress * (3f - 2f * progress);
 
-                        NPC.alpha = (int)MathHelper.Lerp(0f, 255f, smoothProgress);
+                        NPC.alpha = (int)MathHelper.Lerp(0f, 190f, smoothProgress);
+
                         NPC.noTileCollide = true;
                         NPC.velocity.X *= 0.92f;
-                        NPC.velocity.Y = MathHelper.Lerp(0f, 4f, smoothProgress);
+                        NPC.velocity.Y = MathHelper.Lerp(0f, 2f, smoothProgress);
 
                         int dustCount = progress < 0.5f ? 3 : 5;
 
@@ -573,7 +688,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         NPC.alpha = 255;
                         NPC.noTileCollide = true;
 
-                        // Ground level under the player, not under the boss
                         float actualGroundY = GetGroundY(target.Center) + 64f;
 
                         float deltaX = target.Center.X - NPC.Center.X;
@@ -723,8 +837,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                         // Gravity's back on for the actual jump out
                         NPC.velocity.Y += 0.35f;
-
-                        // Collision stays disabled until the launch animation is completely finished.
                         if (Timer >= BurrowEnd)
                         {
                             NPC.noTileCollide = false;
@@ -733,8 +845,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             NPC.netUpdate = true;
                         }
                     }
-
                     break;
+
 
                 case AIState.Spit:
                     NPC.alpha = 0;
@@ -746,19 +858,30 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     if (Timer == 1f)
                     {
                         NPC.velocity = Vector2.Zero;
-
-                        NPC.direction = target.Center.X > NPC.Center.X ? 1 : -1;
-                        NPC.spriteDirection = NPC.direction;
-
-                        NPC.netUpdate = true;
                     }
 
-                    // Sand gathers around his mouth before spitting.
+                    {
+                        float spitDeltaX = target.Center.X - NPC.Center.X;
+
+                        if (Math.Abs(spitDeltaX) > 10f)
+                        {
+                            int newDirection = spitDeltaX > 0f ? 1 : -1;
+
+                            if (newDirection != NPC.spriteDirection)
+                            {
+                                NPC.direction = newDirection;
+                                NPC.spriteDirection = newDirection;
+                                NPC.netUpdate = true;
+                            }
+                        }
+                    }
+
+                    //Sand gathers around his mouth before spitting.
                     if (Timer <= 30f)
                     {
                         Vector2 mouthPosition = NPC.Center + new Vector2(
-                            NPC.direction * (NPC.width / 2f),
-                            -5f
+                            NPC.spriteDirection * (NPC.width / 2f + MouthForwardOffset + MouthSidewaysOffset),
+                            MouthVerticalOffset
                         );
 
                         if (Main.rand.NextBool(2))
@@ -778,8 +901,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     if (Timer == 30f)
                     {
                         Vector2 mouthPosition = NPC.Center + new Vector2(
-                            NPC.direction * (NPC.width / 2f + 8f),
-                            -5f
+                            NPC.direction * (NPC.width / 2f + MouthForwardOffset + MouthSidewaysOffset),
+                            MouthVerticalOffset
                         );
 
                         Vector2 predictedPosition =
@@ -787,6 +910,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                         Vector2 direction = predictedPosition - mouthPosition;
                         direction.Normalize();
+                        direction = direction.RotatedBy(-MathHelper.ToRadians(15f));
 
                         int shotCount = Main.masterMode
                             ? 4
@@ -827,7 +951,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             );
                         }
 
-                        SoundEngine.PlaySound(SoundID.Item15, mouthPosition);
+                        SoundEngine.PlaySound(SoundID.DD2_OgreSpit, mouthPosition);
 
                         for (int i = 0; i < 15; i++)
                         {
@@ -853,6 +977,296 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                     break;
 
+
+                case AIState.Phase2BurrowDive:
+                    Timer++;
+
+                    // BURROW DOWN FOR PHASE 2
+                    if (Timer <= 45f)
+                    {
+                        float progress = Timer / 45f;
+                        float smoothProgress = progress * progress * (3f - 2f * progress);
+
+                        NPC.alpha = (int)MathHelper.Lerp(0f, 255f, smoothProgress);
+                        NPC.noTileCollide = true;
+
+                        NPC.velocity.X *= 0.90f;
+                        NPC.velocity.Y = MathHelper.Lerp(0f, 3f, smoothProgress);
+
+                        for (int i = 0; i < 4; i++)
+                        {
+                            Dust dust = Dust.NewDustPerfect(
+                                NPC.Bottom + new Vector2(
+                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                                    0f
+                                ),
+                                DustID.Sand
+                            );
+
+                            dust.velocity = new Vector2(
+                                Main.rand.NextFloat(-3f, 3f),
+                                -Main.rand.NextFloat(2f, 5f)
+                            );
+
+                            dust.scale = Main.rand.NextFloat(1.3f, 2.3f);
+                        }
+
+                        if (Timer == 1f)
+                        {
+                            SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+                        }
+                    }
+
+                    // REPOSITIONING FARTHER WAY FOR THE LAUNCH (lunch im writing this kinda hungry btw)
+                    else if (Timer <= 75f)
+                    {
+                        NPC.alpha = 255;
+                        NPC.noTileCollide = true;
+                        NPC.velocity = Vector2.Zero;
+
+                        if (Timer == 46f)
+                        {
+                            float direction = target.Center.X >= NPC.Center.X
+                                ? 1f
+                                : -1f;
+
+                            float launchX = target.Center.X - direction * 800f;
+
+                            launchX = MathHelper.Clamp(
+                                launchX,
+                                200f,
+                                Main.maxTilesX * 16f - 200f
+                            );
+
+                            // Land BEHIND the player.
+                            Phase2DiveLandingX =
+                                target.Center.X - direction * 180f;
+
+                            Phase2DiveLandingX = MathHelper.Clamp(
+                                Phase2DiveLandingX,
+                                200f,
+                                Main.maxTilesX * 16f - 200f
+                            );
+
+                            float launchGroundY = GetGroundY(
+                                new Vector2(launchX, target.Center.Y)
+                            );
+
+                            Phase2DiveGroundY = GetGroundY(
+                                new Vector2(
+                                    Phase2DiveLandingX,
+                                    target.Center.Y
+                                )
+                            );
+
+                            NPC.Center = new Vector2(
+                                launchX,
+                                launchGroundY - NPC.height / 2f
+                            );
+
+                            NPC.direction = (int)direction;
+                            NPC.spriteDirection = NPC.direction;
+
+                            NPC.netUpdate = true;
+                        }
+
+                        if (Main.rand.NextBool(2))
+                        {
+                            Dust dust = Dust.NewDustPerfect(
+                                NPC.Center + Main.rand.NextVector2Circular(30f, 15f),
+                                DustID.SandstormInABottle,
+                                Main.rand.NextVector2Circular(1f, 1f)
+                            );
+
+                            dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                            dust.noGravity = true;
+                        }
+                    }
+
+                    // TELEGRAPH FROM THE LAUNCH
+                    else if (Timer <= 90f)
+                    {
+                        NPC.alpha = 0;
+                        NPC.noTileCollide = true;
+                        NPC.velocity = Vector2.Zero;
+
+                        for (int i = 0; i < 5; i++)
+                        {
+                            Dust dust = Dust.NewDustPerfect(
+                                NPC.Bottom + new Vector2(
+                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                                    0f
+                                ),
+                                DustID.Sand
+                            );
+
+                            dust.velocity = new Vector2(
+                                Main.rand.NextFloat(-4f, 4f),
+                                -Main.rand.NextFloat(4f, 8f)
+                            );
+
+                            dust.scale = Main.rand.NextFloat(1.5f, 3f);
+                            dust.noGravity = true;
+                        }
+
+                        if (Timer == 76f)
+                        {
+                            SoundEngine.PlaySound(
+                                SoundID.Roar,
+                                NPC.Center
+                            );
+                        }
+                    }
+            
+                   
+                    // ACTUAL PHASE 2 LAUNCH
+                    else
+                    {
+                        NPC.alpha = 0;
+                        NPC.noTileCollide = true;
+
+                        const float airTime = 50f; // total frames the leap takes
+                        const float arcHeight = 500f;
+
+                        if (Timer == 91f)
+                        {
+                            // Snapshot start position once, at launch.
+                            Phase2DiveLaunchX = NPC.Center.X;
+                            Phase2DiveLaunchY = NPC.Center.Y;
+
+                            NPC.direction =
+                                Phase2DiveLandingX > Phase2DiveLaunchX ? 1 : -1;
+
+                            NPC.spriteDirection = NPC.direction;
+
+                            NPC.netUpdate = true;
+
+                            // Launch burst.
+                            for (int i = 0; i < 30; i++)
+                            {
+                                Dust dust = Dust.NewDustPerfect(
+                                    NPC.Center,
+                                    DustID.Sand,
+                                    Main.rand.NextVector2Circular(8f, 8f)
+                                );
+
+                                dust.scale = Main.rand.NextFloat(2f, 3.5f);
+                                dust.noGravity = true;
+                            }
+
+                            // RUBBLE
+                            int rubbleCount = Main.masterMode
+                                ? 12
+                                : Main.expertMode
+                                    ? 8
+                                    : 6;
+
+                            for (int i = 0; i < rubbleCount; i++)
+                            {
+                                float rubbleX =
+                                    target.Center.X +
+                                    Main.rand.NextFloat(-500f, 500f);
+
+                                Vector2 rubbleSpawn = new Vector2(
+                                    rubbleX,
+                                    target.Center.Y - 450f
+                                );
+
+                                Vector2 rubbleVelocity = new Vector2(
+                                    Main.rand.NextFloat(-2f, 2f),
+                                    Main.rand.NextFloat(2f, 5f)
+                                );
+
+                                Projectile.NewProjectile(
+                                    NPC.GetSource_FromAI(),
+                                    rubbleSpawn,
+                                    rubbleVelocity,
+                                    ModContent.ProjectileType<FallingRubble>(),
+                                    50,
+                                    2f,
+                                    Main.myPlayer
+                                );
+                            }
+                        }
+
+                        if (Timer >= 91f)
+                        {
+    
+                            float progress =
+                                MathHelper.Clamp((Timer - 91f) / airTime, 0f, 1f);
+
+                            float landingY =
+                                Phase2DiveGroundY - NPC.height / 2f;
+
+                            float newX =
+                                MathHelper.Lerp(Phase2DiveLaunchX, Phase2DiveLandingX, progress);
+
+                            float newY =
+                                MathHelper.Lerp(Phase2DiveLaunchY, landingY, progress)
+                                - arcHeight * 4f * progress * (1f - progress);
+
+                            NPC.Center = new Vector2(newX, newY);
+
+                            // Sand trail while flying.
+                            if (Main.rand.NextBool(2))
+                            {
+                                Dust dust = Dust.NewDustPerfect(
+                                    NPC.Center,
+                                    DustID.Sand,
+                                    Main.rand.NextVector2Circular(1.5f, 1.5f)
+                                );
+
+                                dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                                dust.noGravity = true;
+                            }
+
+                            // CRASH 
+                            if (progress >= 1f)
+                            {
+                                NPC.Center = new Vector2(
+                                    Phase2DiveLandingX,
+                                    landingY
+                                );
+
+                                NPC.velocity = Vector2.Zero;
+                                NPC.noTileCollide = false;
+
+                                SoundEngine.PlaySound(
+                                    SoundID.Item14,
+                                    NPC.Center
+                                );
+
+                                for (int i = 0; i < 50; i++)
+                                {
+                                    Vector2 dustVelocity =
+                                        Main.rand.NextVector2Circular(10f, 7f);
+
+                                    dustVelocity.Y -= 4f;
+
+                                    Dust dust = Dust.NewDustPerfect(
+                                        NPC.Bottom,
+                                        DustID.Sand,
+                                        dustVelocity
+                                    );
+
+                                    dust.scale = Main.rand.NextFloat(2f, 4f);
+                                    dust.noGravity = true;
+                                }
+
+                                // Start the actual burrow animation.
+                                Timer = 0;
+                                CurrentState = AIState.Burrow;
+
+                                NPC.alpha = 0;
+                                NPC.noTileCollide = true;
+
+                                NPC.netUpdate = true;
+                            }
+                        }
+                    }
+
+                    break;
+
                 case AIState.Cooldown:
                     NPC.alpha = 0;
                     Timer++;
@@ -867,10 +1281,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     {
                         Timer = 0;
 
-                        AttackSequenceIndex =
-                            (AttackSequenceIndex + 1) % AttackOrder.Length;
+                        AIState[] attackOrder = Phase2
+                            ? Phase2AttackOrder
+                            : Phase1AttackOrder;
 
-                        CurrentState = AttackOrder[(int)AttackSequenceIndex];
+                        AttackSequenceIndex =
+                            (AttackSequenceIndex + 1) % attackOrder.Length;
+
+                        CurrentState = attackOrder[(int)AttackSequenceIndex];
                         NPC.netUpdate = true;
                     }
 
@@ -878,6 +1296,106 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
         }
 
+        private void StartPhase2(Player target)
+        {
+            Phase2 = true;
+            Phase2Transitioning = true;
+
+            Timer = 0;
+            AttackSequenceIndex = 0;
+
+            NPC.velocity = Vector2.Zero;
+            NPC.noTileCollide = false;
+            NPC.alpha = 0;
+            NPC.color = Color.White;
+
+            IsParryable = false;
+
+            NPC.netUpdate = true;
+
+            SoundEngine.PlaySound(SoundID.Roar, NPC.Center);
+
+            for (int i = 0; i < 40; i++)
+            {
+                Vector2 velocity = Main.rand.NextVector2Circular(8f, 6f);
+                velocity.Y -= 3f;
+
+                Dust dust = Dust.NewDustPerfect(
+                    NPC.Center,
+                    DustID.Sand,
+                    velocity
+                );
+
+                dust.scale = Main.rand.NextFloat(2f, 4f);
+                dust.noGravity = true;
+            }
+        }
+
+        private void HandlePhase2Transition()
+        {
+            Timer++;
+
+            NPC.velocity.X *= 0.85f;
+            NPC.velocity.Y = 0f;
+
+            NPC.noTileCollide = false;
+            NPC.alpha = 0;
+            NPC.color = Color.White;
+
+            IsParryable = false;
+
+
+            NPC.position.X += Main.rand.NextFloat(-1.5f, 1.5f);
+
+            int dustCount = Timer < 30f ? 4 : 7;
+
+            for (int i = 0; i < dustCount; i++)
+            {
+                Vector2 dustPosition = NPC.Bottom + new Vector2(
+                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                    0f
+                );
+
+                Dust dust = Dust.NewDustPerfect(
+                    dustPosition,
+                    DustID.Sand
+                );
+
+                dust.velocity = new Vector2(
+                    Main.rand.NextFloat(-4f, 4f),
+                    -Main.rand.NextFloat(2f, 6f)
+                );
+
+                dust.scale = Main.rand.NextFloat(1.5f, 3f);
+                dust.noGravity = true;
+            }
+
+            if (Timer == 30f)
+            {
+                SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+
+                for (int i = 0; i < 30; i++)
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        NPC.Center,
+                        DustID.Sand,
+                        Main.rand.NextVector2Circular(7f, 7f)
+                    );
+
+                    dust.scale = Main.rand.NextFloat(2f, 3.5f);
+                    dust.noGravity = true;
+                }
+            }
+
+            if (Timer >= 60f)
+            {
+                Timer = 0;
+                AttackSequenceIndex = 0;
+                CurrentState = AIState.Phase2BurrowDive;
+                Phase2Transitioning = false;
+                NPC.netUpdate = true;
+            }
+        }
 
         public void OnParried(Player player)
         {
