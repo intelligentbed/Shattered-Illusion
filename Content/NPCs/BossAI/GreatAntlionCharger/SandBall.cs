@@ -6,7 +6,7 @@ using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
+namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey this shouldve been called spit ball but whatever
 {
     public class SandBall : ModProjectile
     {

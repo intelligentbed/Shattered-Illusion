@@ -21,8 +21,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void SetDefaults()
         {
-            Projectile.width = 24;
-            Projectile.height = 24;
+            Projectile.width = 36;
+            Projectile.height = 36;
             Projectile.hostile = true;
             Projectile.penetrate = 1;
             Projectile.timeLeft = 600;
@@ -35,7 +35,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             if (State == 0f)
             {
                 Projectile.rotation = Main.rand.NextFloat(MathHelper.TwoPi);
-                Projectile.scale = Main.rand.NextFloat(0.8f, 1.2f);
+                Projectile.scale = Main.rand.NextFloat(1.5f, 2.0f);
                 State = 1f;
             }
 

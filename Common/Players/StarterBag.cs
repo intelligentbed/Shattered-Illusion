@@ -27,7 +27,7 @@ namespace ShatteredIllusion.Common.Players
 
         public override void RightClick(Player player)
         {
-            // Give the player some starter items when open bag, also VSC added this idk how it did but it works.
+            //THIS REAALLLY COULD GET OPTIMIZED BUT ILL MAKE ANOTHER DEV DO THAT
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Wood, 100);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.RecallPotion, 10);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SwiftnessPotion, 5);
@@ -39,7 +39,6 @@ namespace ShatteredIllusion.Common.Players
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenArrow, 100);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenHammer, 1);
             player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Rope, 10);
-            // PLEASE ADD MAGICX STORAGE SUPPORT IDk HOW TO DO THAT PLEASE DO THAT PLEASE
         }
     }
 }
