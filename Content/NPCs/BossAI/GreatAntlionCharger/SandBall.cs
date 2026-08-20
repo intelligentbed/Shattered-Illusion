@@ -37,7 +37,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
                 Projectile.velocity.Y += 0.18f;
             }
 
-            // Spawn sand particle trails
             if (Main.rand.NextBool(2))
             {
                 Dust sandDust = Dust.NewDustPerfect(

@@ -11,7 +11,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
     internal class FallingRubble : ModProjectile
     {
         private ref float State => ref Projectile.ai[0];
-        private ref float FallSpeed => ref Projectile.ai[1];
 
         public override void SetStaticDefaults()
         {
@@ -39,9 +38,23 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 State = 1f;
             }
 
-            Projectile.velocity.Y = Math.Min(Projectile.velocity.Y + 0.4f, 14f);
-            Projectile.velocity.X *= 0.98f;
-            Projectile.rotation += Projectile.velocity.X * 0.05f + Math.Sign(Projectile.velocity.Y) * 0.05f;
+            if (Projectile.timeLeft > 580)
+            {
+                Projectile.hostile = false; 
+
+                Dust d = Dust.NewDustPerfect(
+                    new Vector2(Projectile.Center.X, Main.screenPosition.Y + 10f),
+                    DustID.Gold,
+                    new Vector2(0, 6f)
+                );
+                d.noGravity = true;
+            }
+            else
+            {
+                Projectile.hostile = true;
+            }
+
+            Projectile.velocity.Y = Math.Min(Projectile.velocity.Y + 0.2f, 14f);
 
             if (Main.rand.NextBool(2))
             {
