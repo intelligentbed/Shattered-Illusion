@@ -50,18 +50,18 @@ Items: {
 
 	FrostLeggings: {
 		DisplayName: Tundra Leggings
-		Tooltip: Increases Melee damage by 1%
+		Tooltip: Increases Ranged damage by 1%
 	}
 
 	FrostHelmet: {
 		DisplayName: Tundra Helmet
-		Tooltip: Increases Melee damage by 1%
+		Tooltip: Increases Ranged damage by 1%
 	}
 
 	FrostChestplate: {
 		DisplayName: Tundra Chestplate
-		Tooltip: Increases Melee damage by 3%
-		SetBonus: Melee hits inflict Frostburn
+		Tooltip: Increases Ranger damage by 3%
+		SetBonus: Ranged hits inflict Frostburn
 	}
 
 	EvergreenCrystal: {
@@ -106,6 +106,21 @@ Items: {
 		DisplayName: Antlion Treasure Bag
 		Tooltip: ""
 	}
+
+	AntlionTrophyItem: {
+		Tooltip: ""
+		DisplayName: Antlion Trophy Item
+	}
+
+	AntlionRelicItem: {
+		Tooltip: ""
+		DisplayName: Antlion Relic Item
+	}
+
+	AntlionRelic: {
+		Tooltip: ""
+		DisplayName: Antlion Relic
+	}
 }
 
 Buffs: {
@@ -135,4 +150,9 @@ Projectiles: {
 }
 
 Keybinds.Parry.DisplayName: Parry
-NPCs.GreatAntlionCharger.DisplayName: Great Antlion Charger
+
+NPCs: {
+	GreatAntlionCharger.DisplayName: Great Antlion Charger
+	KingSlimeNinja.DisplayName: King Slime Ninja
+	Ninja.DisplayName: Ninja
+}

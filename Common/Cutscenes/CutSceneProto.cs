@@ -1,18 +1,19 @@
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using ReLogic.Graphics;
+using ReLogic.Utilities;
+using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Terraria;
+using Terraria.Audio;
+using Terraria.DataStructures;
+using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
-using Terraria.GameContent;
-using Terraria.Audio;
-using ReLogic.Graphics;
-using ReLogic.Utilities;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 
 namespace ShatteredIllusion.Common.Cutscenes //IM ACTUALLY COMMENTING HERE TO EXPLAIN STUFF IT SHIT BREAKS WHILE IM GONE//
 {
@@ -182,9 +183,9 @@ namespace ShatteredIllusion.Common.Cutscenes //IM ACTUALLY COMMENTING HERE TO EX
 
         private bool hasTriggeredCutscene = false;
 
-        public override void AI(NPC npc)
+        // Use OnSpawn so it triggers BEFORE any PreAI returns false
+        public override void OnSpawn(NPC npc, IEntitySource source)
         {
-            // Return immediately if the NPC spawning is NOT a registered boss
             if (!IsRegisteredBoss(npc.type)) return;
 
             if (!hasTriggeredCutscene)
@@ -192,49 +193,49 @@ namespace ShatteredIllusion.Common.Cutscenes //IM ACTUALLY COMMENTING HERE TO EX
                 TriggerBossCutscene(npc);
                 hasTriggeredCutscene = true;
             }
+        }
 
+        public override bool PreAI(NPC npc)
+        {
+            if (!IsRegisteredBoss(npc.type)) return true;
 
-            if (BossCutsceneSystem.IsCutsceneActive)
-            {
-                npc.dontTakeDamage = true;
-            }
-            else
-            {
-                npc.dontTakeDamage = false;
-            }
+            // Apply invulnerability while cutscene is playing
+            npc.dontTakeDamage = BossCutsceneSystem.IsCutsceneActive;
+
+            return true;
         }
 
         private bool IsRegisteredBoss(int type)
         {
             return type == ModContent.NPCType<GreatAntlionCharger>() || type == NPCID.KingSlime;
-        } //add this not sure if this is a sustanable way to register bosses what whatever
+        }
 
         private void TriggerBossCutscene(NPC npc)
         {
             switch (npc.type)
             {
-                case int type when type == ModContent.NPCType<GreatAntlionCharger>(): //THIS LINE IS SUPER IMPORTANT: NPCID is which entity the cutscene will track. Just change NPC ID from EOC to whatver antlion boss ID will be//
+                case int type when type == ModContent.NPCType<GreatAntlionCharger>():
                     BossCutsceneSystem.StartBossCutscene(
                         npc,
                         "      The Isolated Beast      \n--Great Antlion Charger--",
-                        screenshakeStartTick: 0,   //screenshake start timestamp//
-                        screenshakeDuration: 200,     //shakes screen for ___ time
-                        screenshakeMagnitude: 4,     //severity of screenshake
+                        screenshakeStartTick: 0,
+                        screenshakeDuration: 200,
+                        screenshakeMagnitude: 4,
                         audioSound: new SoundStyle("ShatteredIllusion/Sounds/Silence"),
-                        audioStartTick: 0,          // another time stamp for start - audio//
-                        audioDuration: 120);         //plays/loops for 120 ticks (only matters if the sound loops)
+                        audioStartTick: 0,
+                        audioDuration: 120);
                     break;
 
-                case NPCID.KingSlime: 
+                case NPCID.KingSlime:
                     BossCutsceneSystem.StartBossCutscene(
                         npc,
                         "      The Crowned Aberration      \n           --King Slime--",
-                        screenshakeStartTick: 120,   
-                        screenshakeDuration: 60,     
-                        screenshakeMagnitude: 4,    
-                        audioSound: new SoundStyle("ShatteredIllusion/Sounds/BarkFart"),  //Audio file that plays (prolly gonna wanna make a custom roar sfx)//
-                        audioStartTick: 60,          
-                        audioDuration: 120);         
+                        screenshakeStartTick: 120,
+                        screenshakeDuration: 60,
+                        screenshakeMagnitude: 4,
+                        audioSound: new SoundStyle("ShatteredIllusion/Sounds/BarkFart"),
+                        audioStartTick: 60,
+                        audioDuration: 120);
                     break;
             }
         }

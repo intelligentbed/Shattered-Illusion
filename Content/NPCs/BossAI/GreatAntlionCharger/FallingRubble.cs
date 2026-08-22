@@ -22,10 +22,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             Projectile.width = 36;
             Projectile.height = 36;
-            Projectile.hostile = true;
+            Projectile.hostile = false;
             Projectile.penetrate = 1;
             Projectile.timeLeft = 600;
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.ignoreWater = true;
         }
 
@@ -38,27 +38,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 State = 1f;
             }
 
-            if (Projectile.timeLeft > 580)
+            if (Projectile.timeLeft > 550)
             {
-                Projectile.hostile = false; 
-
-                Dust d = Dust.NewDustPerfect(
-                    new Vector2(Projectile.Center.X, Main.screenPosition.Y + 10f),
-                    DustID.Gold,
-                    new Vector2(0, 6f)
-                );
-                d.noGravity = true;
-            }
-            else
-            {
-                Projectile.hostile = true;
+                Projectile.hostile = false;
+                Projectile.tileCollide = false;
+                Projectile.velocity = Vector2.Zero;
+                return;
             }
 
-            Projectile.velocity.Y = Math.Min(Projectile.velocity.Y + 0.2f, 14f);
+            Projectile.hostile = true;
+            Projectile.tileCollide = true;
+
+            Projectile.velocity.Y = Math.Min(Projectile.velocity.Y + 0.35f, 16f);
 
             if (Main.rand.NextBool(2))
             {
-                Dust dust = Dust.NewDustDirect(
+                Dust fallDust = Dust.NewDustDirect(
                     Projectile.position,
                     Projectile.width,
                     Projectile.height,
@@ -67,20 +62,95 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     Projectile.velocity.Y * 0.2f,
                     100,
                     default,
-                    0.8f
+                    1.0f
+                );
+                fallDust.noGravity = true;
+            }
+        }
+
+        public override bool PreDraw(ref Color lightColor)
+        {
+            if (Projectile.timeLeft > 550)
+            {
+                Texture2D telegraphTex = ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/RubbleTelegraph").Value;
+
+                float startY = Projectile.Center.Y - 25f;
+                float endY = Projectile.Center.Y + 400f;
+
+                int tileX = (int)(Projectile.Center.X / 16f);
+                int startTileY = (int)(Projectile.Center.Y / 16f);
+
+                if (tileX >= 10 && tileX < Main.maxTilesX - 10)
+                {
+                    int maxSearchY = Math.Min(Main.maxTilesY - 10, startTileY + 35);
+                    for (int y = startTileY; y < maxSearchY; y++)
+                    {
+                        Tile tile = Main.tile[tileX, y];
+
+                        if (tile.HasTile && !tile.IsActuated && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
+                        {
+                            endY = y * 16f;
+                            break;
+                        }
+                    }
+                }
+
+                float totalLength = MathHelper.Clamp(endY - startY, 50f, 600f);
+                Vector2 drawPos = new Vector2(Projectile.Center.X, startY) - Main.screenPosition;
+
+                float progress = (600 - Projectile.timeLeft) / 50f;
+                float alpha = MathHelper.Clamp(1f - progress, 0.4f, 1.0f);
+                Color drawColor = Color.Red * alpha;
+
+                float rotation = MathHelper.PiOver2;
+                Vector2 origin = new Vector2(0f, telegraphTex.Height / 2f);
+                Vector2 scale = new Vector2(totalLength / telegraphTex.Width, 6f);
+
+                Main.spriteBatch.End();
+                Main.spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.Additive,
+                    Main.DefaultSamplerState,
+                    DepthStencilState.None,
+                    RasterizerState.CullCounterClockwise,
+                    null,
+                    Main.GameViewMatrix.TransformationMatrix
                 );
 
-                dust.noGravity = true;
+                Main.EntitySpriteDraw(
+                    telegraphTex,
+                    drawPos,
+                    null,
+                    drawColor,
+                    rotation,
+                    origin,
+                    scale,
+                    SpriteEffects.None,
+                    0
+                );
+
+                Main.spriteBatch.End();
+                Main.spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend,
+                    Main.DefaultSamplerState,
+                    DepthStencilState.None,
+                    RasterizerState.CullCounterClockwise,
+                    null,
+                    Main.GameViewMatrix.TransformationMatrix
+                );
             }
+
+            return true;
         }
 
         public override void OnKill(int timeLeft)
         {
             SoundEngine.PlaySound(SoundID.Dig, Projectile.position);
 
-            for (int i = 0; i < 15; i++)
+            for (int i = 0; i < 20; i++)
             {
-                Vector2 dustVelocity = Main.rand.NextVector2Circular(4f, 4f);
+                Vector2 dustVelocity = Main.rand.NextVector2Circular(6f, 6f);
 
                 Dust.NewDust(
                     Projectile.position,
@@ -91,7 +161,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     dustVelocity.Y,
                     100,
                     default,
-                    1.2f
+                    1.4f
                 );
             }
 

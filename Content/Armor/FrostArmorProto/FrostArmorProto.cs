@@ -18,7 +18,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
 
         public override void UpdateEquip(Player player)
         {
-            player.GetDamage(DamageClass.Melee) += 0.01f;
+            player.GetDamage(DamageClass.Ranged) += 0.01f;
         }
         public override void AddRecipes()
         {
@@ -52,7 +52,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
 
         public override void UpdateEquip(Player player)
         {
-            player.GetDamage(DamageClass.Melee) += 0.03f;
+            player.GetDamage(DamageClass.Ranged) += 0.03f;
         }
 
         public override bool IsArmorSet(Item head, Item body, Item legs)
@@ -65,7 +65,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
         public override void UpdateArmorSet(Player player) //SET BONUS//
         {
             player.GetModPlayer<FrostArmorPlayer>().frostSet = true;
-            player.setBonus = "Melee hits inflict Frostburn";
+            player.setBonus = "Ranger hits inflict Frostburn";
         }
     }
 
@@ -91,7 +91,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
 
         public override void UpdateEquip(Player player)
         {
-            player.GetDamage(DamageClass.Melee) += 0.01f;
+            player.GetDamage(DamageClass.Ranged) += 0.01f;
         }
     }
 
@@ -113,7 +113,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             {
                 Player owner = Main.player[projectile.owner];
                 if (owner.active && owner.GetModPlayer<FrostArmorPlayer>().frostSet
-                    && projectile.DamageType == DamageClass.Melee)
+                    && projectile.DamageType == DamageClass.Ranged)
                 {
                     target.AddBuff(BuffID.Frostburn, 180);
                 }

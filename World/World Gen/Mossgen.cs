@@ -5,7 +5,7 @@ using Terraria.ID;
 using Terraria.IO;
 using Terraria.ModLoader;
 using Terraria.WorldBuilding;
-using ShatteredIllusion.Content.Placeables.Blocks;
+using ShatteredIllusion.Content.Items.Placeables.Blocks;
 
 namespace ShatteredIllusion.World
 {
