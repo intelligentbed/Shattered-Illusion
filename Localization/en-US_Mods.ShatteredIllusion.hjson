@@ -147,6 +147,7 @@ Projectiles: {
 	ParryVisual.DisplayName: Parry Visual
 	FallingRubble.DisplayName: Falling Rubble
 	SandBall.DisplayName: Sand Ball
+	SlimyShockwave.DisplayName: Slimy Shockwave
 }
 
 Keybinds.Parry.DisplayName: Parry
@@ -155,4 +156,5 @@ NPCs: {
 	GreatAntlionCharger.DisplayName: Great Antlion Charger
 	KingSlimeNinja.DisplayName: King Slime Ninja
 	Ninja.DisplayName: Ninja
+	KingSlimeClone.DisplayName: King Slime Clone
 }
