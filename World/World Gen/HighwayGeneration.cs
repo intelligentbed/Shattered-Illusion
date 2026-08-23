@@ -11,19 +11,26 @@ using Terraria.WorldBuilding;
 
 namespace ShatteredIllusion.World.World_Gen
 {
-    public class HighwayGeneration : ModSystem
+    public class HighwayGeneration : ModSystem //OM GHTIS CODE IS SO ASS WHOEVER MADE IT I HATE YOU AND IT FUCKING CRASHES AND IVE BEEN HERE FOR HOURS FIXING 
     {
         public static Rectangle HighwayArea;
+
+        private const int StructureWidth = 329;
+        private const int StructureHeight = 46;
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
         {
             int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Micro Biomes"));
+
             if (passIndex != -1)
             {
-                tasks.Insert(passIndex + 1, new PassLegacy("ShatteredIllusion Highway Structure", (progress, config) =>
-                {
-                    GenerateHighwayStructure(progress, config);
-                }));
+                tasks.Insert(
+                    passIndex + 1,
+                    new PassLegacy("ShatteredIllusion Highway Structure", (progress, config) =>
+                    {
+                        GenerateHighwayStructure(progress, config);
+                    })
+                );
             }
         }
 
@@ -31,39 +38,66 @@ namespace ShatteredIllusion.World.World_Gen
         {
             progress.Message = "Generating Highway Structure...";
 
+            int targetX = Main.maxTilesX / 2 - StructureWidth / 2;
+            int targetY = Main.maxTilesY / 3;
+
             Rectangle desertBounds = GenVars.UndergroundDesertLocation;
 
-            if (desertBounds.Width == 0 || desertBounds.Height == 0)
+            if (desertBounds.Width > 0 && desertBounds.Height > 0)
             {
-                return;
-            }
+                int desertCenterX = Utils.Clamp(desertBounds.X + desertBounds.Width / 2, 50, Main.maxTilesX - StructureWidth - 50);
+                int startY = Utils.Clamp(desertBounds.Y, 50, Main.maxTilesY - 50);
+                int endY = Utils.Clamp(desertBounds.Y + desertBounds.Height - 1, 50, Main.maxTilesY - 50);
 
-            int desertCenterX = desertBounds.X + (desertBounds.Width / 2);
-            int structureWidth = 328;
-            int structureHeight = 60;
+                int foundY = -1;
 
-            int targetX = desertCenterX - (structureWidth / 2) - 1; // so i dont forget this is x offset
-
-            int startY = desertBounds.Y;
-            int endY = desertBounds.Y + desertBounds.Height;
-            int targetY = endY;
-
-            for (int y = endY; y > startY; y--)
-            {
-                Tile tile = Main.tile[desertCenterX, y];
-                if (tile.HasTile && (tile.TileType == TileID.Sandstone || tile.TileType == TileID.HardenedSand))
+                for (int y = endY; y >= startY; y--)
                 {
-                    targetY = y - 40; //this is Y 
-                    break;
+                    Tile tile = Framing.GetTileSafely(desertCenterX, y);
+
+                    if (tile.HasTile && (tile.TileType == TileID.Sandstone || tile.TileType == TileID.HardenedSand))
+                    {
+                        int possibleY = y - 40;
+                        if (possibleY >= 50 && possibleY + StructureHeight < Main.maxTilesY - 50)
+                        {
+                            foundY = possibleY;
+                            break;
+                        }
+                    }
+                }
+
+                if (foundY != -1)
+                {
+                    targetX = desertCenterX - StructureWidth / 2;
+                    targetY = foundY;
+                }
+                else
+                {
+                    targetY = Utils.Clamp(desertBounds.Y + desertBounds.Height / 2 - StructureHeight / 2, 50, Main.maxTilesY - StructureHeight - 50);
                 }
             }
 
-            string structurePath = "World/Structures/Highway.shstruct";
+            targetX = Utils.Clamp(targetX, 50, Main.maxTilesX - StructureWidth - 50);
+            targetY = Utils.Clamp(targetY, 50, Main.maxTilesY - StructureHeight - 50);
+
             Point16 position = new Point16(targetX, targetY);
 
-            StructureHelper.API.Generator.GenerateStructure(structurePath, position, ModContent.GetInstance<ShatteredIllusion>());
+            try
+            {
+                StructureHelper.API.Generator.GenerateStructure(
+                    "World/Structures/AntlionBossArena.shstruct",
+                    position,
+                    ModContent.GetInstance<ShatteredIllusion>()
+                );
+            }
+            catch (System.Exception ex)
+            {
+                ModContent.GetInstance<ShatteredIllusion>().Logger.Error(
+                    $"Highway structure placement FAILED at ({targetX},{targetY}) size {StructureWidth}x{StructureHeight}: {ex}"
+                );
+            }
 
-            HighwayArea = new Rectangle(targetX, targetY, structureWidth, structureHeight);
+            HighwayArea = new Rectangle(targetX, targetY, StructureWidth, StructureHeight);
         }
 
         public override void SaveWorldData(TagCompound tag)
@@ -94,20 +128,20 @@ namespace ShatteredIllusion.World.World_Gen
 
     public class HighwayProtectionTile : GlobalTile
     {
-        public override void KillTile(int i, int j, int type, ref bool fail, ref bool effectOnly, ref bool noItem)
+        public override bool CanKillTile(int i, int j, int type, ref bool blockDamaged)
         {
             if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
             {
                 Player player = Main.LocalPlayer;
-                Item item = player.HeldItem;
-
-                int pickPower = (item != null && item.pick > 0) ? item.pick : 0;
+                int pickPower = player?.HeldItem?.pick ?? 0;
 
                 if (pickPower < 100)
                 {
-                    fail = true;
+                    return false;
                 }
             }
+
+            return base.CanKillTile(i, j, type, ref blockDamaged);
         }
 
         public override bool CanExplode(int i, int j, int type)
@@ -128,11 +162,9 @@ namespace ShatteredIllusion.World.World_Gen
             if (!HighwayGeneration.HighwayArea.IsEmpty && HighwayGeneration.HighwayArea.Contains(i, j))
             {
                 Player player = Main.LocalPlayer;
-                Item item = player.HeldItem;
+                int hammerPower = player?.HeldItem?.hammer ?? 0;
 
-                int pickPower = (item != null && item.pick > 0) ? item.pick : 0;
-
-                if (pickPower < 100)
+                if (hammerPower < 100)
                 {
                     fail = true;
                 }
