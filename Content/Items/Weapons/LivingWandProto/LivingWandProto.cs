@@ -12,8 +12,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.LivingWandProto
             Item.width = 20;
             Item.height = 20;
             Item.useStyle = ItemUseStyleID.Shoot;
-            Item.useTime = 5;
-            Item.useAnimation = 5;
+            Item.useTime = 16;
+            Item.useAnimation = 16;
             Item.autoReuse = true;
             Item.DamageType = DamageClass.Magic;
             Item.knockBack = 2;
@@ -29,8 +29,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.LivingWandProto
         public override void AddRecipes()
         {
             Recipe recipe = CreateRecipe();
-            recipe.AddIngredient(ModContent.ItemType<EvergreenCrystal>(), 5);
-            recipe.AddIngredient(ItemID.Wood, 10);
+            recipe.AddIngredient(ModContent.ItemType<EvergreenCrystal>(), 7);
+            recipe.AddIngredient(ItemID.Wood, 40);
             recipe.AddTile(TileID.Anvils);
             recipe.Register();
         }

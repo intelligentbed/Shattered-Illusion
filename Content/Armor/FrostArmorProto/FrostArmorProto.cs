@@ -12,7 +12,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue;
             Item.defense = 3;
         }
 
@@ -38,7 +38,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue;
             Item.defense = 4;
         }
         public override void AddRecipes() //RECIPIES//
@@ -65,7 +65,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
         public override void UpdateArmorSet(Player player) //SET BONUS//
         {
             player.GetModPlayer<FrostArmorPlayer>().frostSet = true;
-            player.setBonus = "Ranged hits inflict Frostburn";
+            player.setBonus = "Ranger hits inflict Frostburn";
         }
     }
 
@@ -77,7 +77,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.width = 20;
             Item.height = 20;
             Item.maxStack = 1;
-            Item.rare = ItemRarityID.White;
+            Item.rare = ItemRarityID.Blue;
             Item.defense = 3;
         }
         public override void AddRecipes()

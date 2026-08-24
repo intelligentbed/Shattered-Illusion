@@ -1,3 +1,4 @@
 displayName = Shattered Illusion Mod
 author = Shattered Illusion Team
 version = 0.1
+modReferences = StructureHelper

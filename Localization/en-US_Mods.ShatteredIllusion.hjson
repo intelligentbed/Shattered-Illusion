@@ -21,16 +21,16 @@ Items: {
 	LivingWoodHelmet: {
 		DisplayName: Living Wood Helmet
 		Tooltip: Increases summon damage by 6%
-		SetBonus:
-			'''
-			Increases maximum minions by 1
-			Increases life regeneration
-			'''
 	}
 
 	LivingWoodChestplate: {
 		DisplayName: Living Wood Chestplate
 		Tooltip: Increases maximum minions by 1
+		SetBonus:
+			'''
+			Increases maximum minions by 1
+			Increases life regeneration
+			'''
 	}
 
 	LivingWoodLeggings: {
@@ -40,18 +40,121 @@ Items: {
 
 	MossItem: {
 		Tooltip: You can still feel it moving
-		DisplayName: "[c/5AB80D:Moss]"
+		DisplayName: Moss
+	}
+
+	MossTileItem: {
+		Tooltip: ""
+		DisplayName: Moss Tile Item
+	}
+
+	FrostLeggings: {
+		DisplayName: Tundra Leggings
+		Tooltip: Increases Ranged damage by 1%
+	}
+
+	FrostHelmet: {
+		DisplayName: Tundra Helmet
+		Tooltip: Increases Ranged damage by 1%
+	}
+
+	FrostChestplate: {
+		DisplayName: Tundra Chestplate
+		Tooltip: Increases Ranger damage by 3%
+		SetBonus: Ranged hits inflict Frostburn
+	}
+
+	EvergreenCrystal: {
+		Tooltip: ""
+		DisplayName: Evergreen Crystal
+	}
+
+	MossSoup: {
+		Tooltip:
+			'''
+			A disgusting stew only a true moss lover would enjoy
+			Increases life regeneration
+			'''
+		DisplayName: Moss Stew
+	}
+
+	EvergreenJadeCharm: {
+		Tooltip:
+			'''
+			Melee Speed is increased by 5% 
+			Striking an enemy with Melee Damage has a 50% chance spawn a projectile towards the cursor
+			'''
+		DisplayName: EverJade Charm
+	}
+
+	LivingWandProto: {
+		DisplayName: Living Wand Proto
+		Tooltip: ""
+	}
+
+	AntlionAltar: {
+		DisplayName: Antlion Altar
+		Tooltip: ""
+	}
+
+	AntlionAttractor: {
+		DisplayName: Antlion Attractor
+		Tooltip: ""
+	}
+
+	AntlionTreasureBag: {
+		DisplayName: Antlion Treasure Bag
+		Tooltip: ""
+	}
+
+	AntlionTrophyItem: {
+		Tooltip: ""
+		DisplayName: Antlion Trophy Item
+	}
+
+	AntlionRelicItem: {
+		Tooltip: ""
+		DisplayName: Antlion Relic Item
+	}
+
+	AntlionRelic: {
+		Tooltip: ""
+		DisplayName: Antlion Relic
 	}
 }
 
 Buffs: {
 	ShieldBuff: {
+		Description: Mods.ShatteredIllusion.Buffs.ShieldBuff.Description
 		DisplayName: Shield Buff
-		Description: Mods.overshieldprototype.Buffs.ShieldBuff.Description
+	}
+
+	MossBuff: {
+		Description: Increases life regeneration by 1 hp/s
+		DisplayName: Mossed out
 	}
 }
 
 Tiles: {
-	MossTile.MapEntry: Moss Tile
 	MossBlock.MapEntry: Moss Block
+	MossTile.MapEntry: Moss Tile
+	AntlionBossAltar.MapEntry: Antlion Boss Altar
+}
+
+Projectiles: {
+	JadeSprout.DisplayName: Jade Sprout
+	LivingWandProjectile.DisplayName: Living Wand Projectile
+	ParryVisual.DisplayName: Parry Visual
+	FallingRubble.DisplayName: Falling Rubble
+	SandBall.DisplayName: Sand Ball
+	SlimyShockwave.DisplayName: Slimy Shockwave
+}
+
+Keybinds.Parry.DisplayName: Parry
+
+NPCs: {
+	GreatAntlionCharger.DisplayName: Great Antlion Charger
+	KingSlimeNinja.DisplayName: King Slime Ninja
+	Ninja.DisplayName: Ninja
+	KingSlimeClone.DisplayName: King Slime Clone
 }
