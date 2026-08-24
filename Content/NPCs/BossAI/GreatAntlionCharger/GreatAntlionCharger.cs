@@ -162,11 +162,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void SetDefaults()
         {
-            NPC.width = 160;
-            NPC.height = 70;
-            NPC.damage = 45;
+            NPC.width = 144;
+            NPC.height = 63;
+            NPC.damage = 40;
             NPC.defense = 10;
-            NPC.lifeMax = 1832;
+            NPC.lifeMax = 3500;
             NPC.HitSound = SoundID.NPCHit1;
             NPC.DeathSound = SoundID.NPCDeath1;
             NPC.value = 100f;
@@ -179,6 +179,21 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.noTileCollide = false;
             Main.npcFrameCount[NPC.type] = MainFrameCount;
         }
+
+        public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment)
+        {
+            if (Main.masterMode)
+            {
+                NPC.lifeMax = 5915;
+                NPC.damage = 100;
+            }
+            else if (Main.expertMode)
+            {
+                NPC.lifeMax = 4550;
+                NPC.damage = 80;
+            }
+        }
+
         public override void ModifyNPCLoot(NPCLoot npcLoot)
         {
 
@@ -961,7 +976,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         NPC.noTileCollide = false;
 
                         float directionX = target.Center.X > NPC.Center.X ? 1f : -1f;
-                        float dashSpeed = Main.masterMode ? 21.5f : (Main.expertMode ? 19.5f : 17.5f);
+                        float dashSpeed = Main.masterMode ? 21.5f : (Main.expertMode ? 19.5f : 10f);
 
                         NPC.velocity.X = directionX * dashSpeed;
                         NPC.velocity.Y = 0f;
@@ -1264,12 +1279,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                                     Main.rand.NextFloat(2f, 5f)
                                 );
 
+                                int fallDamage = Main.masterMode ? 15 : (Main.expertMode ? 30 : 15);
+
                                 Projectile.NewProjectile(
                                     NPC.GetSource_FromAI(),
                                     spawnPos,
                                     velocity,
                                     ModContent.ProjectileType<FallingRubble>(),
-                                    50,
+                                    fallDamage,
                                     2f,
                                     Main.myPlayer
                                 );
@@ -1320,12 +1337,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     );
 
                     // telegraph for the spit
-                    if (Timer <= 30f)
+                    if (Timer <= 90f)
                     {
                         Vector2 baseDir = target.Center - mouthPosition;
                         baseDir.Normalize();
 
-                        int shotCount = Main.masterMode ? 4 : (Main.expertMode ? 3 : 1);
+                        int shotCount = Main.masterMode ? 5 : (Main.expertMode ? 3 : 1);
                         float spread = Main.masterMode ? 0.22f : (Main.expertMode ? 0.18f : 0f);
 
                         if (Timer % 2 == 0)
@@ -1370,7 +1387,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     }
 
                     //Spit
-                    if (Timer == 30f)
+                    if (Timer == 90f)
                     {
                         Vector2 predictedPosition = target.Center + target.velocity * 4f;
                         Vector2 direction = predictedPosition - mouthPosition;
@@ -1379,7 +1396,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         float aimInaccuracy = Main.rand.NextFloat(-0.05f, 0.05f);
                         direction = direction.RotatedBy(aimInaccuracy);
 
-                        int shotCount = Main.masterMode ? 4 : (Main.expertMode ? 3 : 1);
+                        int shotCount = Main.masterMode ? 5 : (Main.expertMode ? 3 : 1);
                         float spitSpeed = Main.masterMode ? 14f : (Main.expertMode ? 13f : 12f);
                         float spread = Main.masterMode ? 0.22f : (Main.expertMode ? 0.18f : 0f);
 
@@ -1393,12 +1410,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                                 shotDirection = direction.RotatedBy(offset);
                             }
 
+                            int spitDamage = Main.masterMode ? 15 : (Main.expertMode ? 25 : 10);
+
                             Projectile.NewProjectile(
                                 NPC.GetSource_FromAI(),
                                 mouthPosition,
                                 shotDirection * spitSpeed,
                                 ModContent.ProjectileType<SandBall>(),
-                                35,
+                                spitDamage,
                                 0f,
                                 Main.myPlayer
                             );
@@ -1416,11 +1435,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             );
 
                             dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
-                            dust.noGravity = true;
                         }
                     }
 
-                    if (Timer >= 55f)
+                    if (Timer >= 105f)
                     {
                         Timer = 0;
                         CurrentState = AIState.Cooldown;
@@ -1434,7 +1452,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     Timer++;
 
                     // BURROW DOWN FOR PHASE 2 
-                    if (Timer <= 45f)
+                    if (Timer <= 55f)
                     {
                         float progress = Timer / 45f;
                         float smoothProgress = progress * progress * (3f - 2f * progress);
@@ -1476,16 +1494,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         NPC.noTileCollide = true;
                         NPC.velocity = Vector2.Zero;
 
-                        if (Timer == 46f)
+                        if (Timer == 56f)
                         {
-#pragma warning disable S1117
                             float direction = target.Center.X >= NPC.Center.X
                                 ? 1f
                                 : -1f;
-#pragma warning restore S1117
 
                             float launchX = target.Center.X - direction * 800f;
-
                             launchX = MathHelper.Clamp(
                                 launchX,
                                 200f,
@@ -1522,6 +1537,35 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             NPC.spriteDirection = NPC.direction;
 
                             NPC.netUpdate = true;
+                        }
+
+                        // telegraph for the jump
+                        if (Timer % 2 == 0)
+                        {
+                            Vector2 diveOrigin = NPC.Center;
+                            Vector2 landingPoint = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
+
+                            const float previewArcHeight = 350f; // tune this to match/preview the real arc's height
+
+                            for (int d = 1; d <= 10; d++)
+                            {
+                                float t = d / 10f;
+
+                                float x = MathHelper.Lerp(diveOrigin.X, landingPoint.X, t);
+                                float y = MathHelper.Lerp(diveOrigin.Y, landingPoint.Y, t)
+                                          - previewArcHeight * 4f * t * (1f - t);
+
+                                Vector2 dustPos = new Vector2(x, y);
+
+                                Dust lineDust = Dust.NewDustPerfect(
+                                    dustPos,
+                                    DustID.SandstormInABottle,
+                                    Vector2.Zero
+                                );
+
+                                lineDust.scale = 2f;
+                                lineDust.noGravity = true;
+                            }
                         }
 
                         if (Main.rand.NextBool(2))
@@ -1647,13 +1691,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                                     Main.rand.NextFloat(-2f, 2f),
                                     Main.rand.NextFloat(2f, 5f)
                                 );
-
+                                int rubbleDamage = Main.masterMode ? 15 : (Main.expertMode ? 30 : 15);
                                 Projectile.NewProjectile(
                                     NPC.GetSource_FromAI(),
                                     rubbleSpawn,
                                     rubbleVelocity,
                                     ModContent.ProjectileType<FallingRubble>(),
-                                    50,
+                                    rubbleDamage,
                                     2f,
                                     Main.myPlayer
                                 );
