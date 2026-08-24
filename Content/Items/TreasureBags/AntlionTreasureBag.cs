@@ -7,10 +7,15 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.Items.Other
+namespace ShatteredIllusion.Content.Items.TreasureBags
 {
     public class AntlionTreasureBag : ModItem
     {
+        public override void SetStaticDefaults()
+        {
+            ItemID.Sets.BossBag[Item.type] = true;
+        }
+
         public override void SetDefaults()
         {
             Item.width = 20;
@@ -18,6 +23,7 @@ namespace ShatteredIllusion.Content.Items.Other
             Item.maxStack = 9999;
             Item.rare = ItemRarityID.Blue;
             Item.value = 50;
+            Item.expert = true; 
         }
 
         public override bool CanRightClick()

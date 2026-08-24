@@ -1,5 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
-using ShatteredIllusion.Content.Items.Other;
+using ShatteredIllusion.Content.Items.SummonItems;
 using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 using Terraria;
 using Terraria.Audio;
@@ -8,7 +8,7 @@ using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.ObjectData;
 
-namespace ShatteredIllusion.Content.Placeables.Blocks
+namespace ShatteredIllusion.Content.Tiles
 {
     public class AntlionBossAltar : ModTile
     {

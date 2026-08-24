@@ -54,7 +54,7 @@ namespace ShatteredIllusion.Content.Items.Accessories
             }
         }
 
-        // activates when hitting an enemy with tmelee 
+        // activates when hitting an enemy with tmelee
         public override void OnHitNPCWithItem(Item item, NPC target, NPC.HitInfo hit, int damageDone)
         {
             if (hasEvergreenJadeCharm && item.CountsAsClass(DamageClass.Melee))

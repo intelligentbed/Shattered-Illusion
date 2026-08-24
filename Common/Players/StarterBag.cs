@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Terraria;
+using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -20,25 +21,34 @@ namespace ShatteredIllusion.Common.Players
             Item.value = 0;
         }
 
-        public override bool CanRightClick()
-        {
-            return true;
-        }
+        public override bool CanRightClick() => true;
 
-        public override void RightClick(Player player)
+        public override void ModifyItemLoot(ItemLoot itemLoot)
         {
-            //THIS REAALLLY COULD GET OPTIMIZED BUT ILL MAKE ANOTHER DEV DO THAT
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Wood, 100);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.RecallPotion, 10);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SwiftnessPotion, 5);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Torch, 40);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.CopperBow, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.BabyBirdStaff, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.AmethystStaff, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SilverBroadsword, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenArrow, 100);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenHammer, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Rope, 10);
+            itemLoot.Add(ItemDropRule.Common(ItemID.Wood, 1, 100, 100));
+            itemLoot.Add(ItemDropRule.Common(ItemID.RecallPotion, 1, 10, 10));
+            itemLoot.Add(ItemDropRule.Common(ItemID.SwiftnessPotion, 1, 5, 5));
+            itemLoot.Add(ItemDropRule.Common(ItemID.Torch, 1, 40, 40));
+            itemLoot.Add(ItemDropRule.Common(ItemID.CopperBow, 1));
+            itemLoot.Add(ItemDropRule.Common(ItemID.BabyBirdStaff, 1));
+            itemLoot.Add(ItemDropRule.Common(ItemID.AmethystStaff, 1));
+            itemLoot.Add(ItemDropRule.Common(ItemID.SilverBroadsword, 1));
+            itemLoot.Add(ItemDropRule.Common(ItemID.WoodenArrow, 1, 100, 100));
+            itemLoot.Add(ItemDropRule.Common(ItemID.WoodenHammer, 1));
+            itemLoot.Add(ItemDropRule.Common(ItemID.Rope, 1, 10, 10));
+
+            // Magic Storage integration we might add more cross mod stuff but 
+            if (ModLoader.TryGetMod("MagicStorage", out Mod magicStorage))
+            {
+                if (magicStorage.TryFind("StorageHeart", out ModItem heart))
+                    itemLoot.Add(ItemDropRule.Common(heart.Type, 1));
+
+                if (magicStorage.TryFind("StorageUnit", out ModItem unit))
+                    itemLoot.Add(ItemDropRule.Common(unit.Type, 1, 4, 4));
+
+                if (magicStorage.TryFind("CraftingAccess", out ModItem crafting))
+                    itemLoot.Add(ItemDropRule.Common(crafting.Type, 1));
+            }
         }
     }
 }

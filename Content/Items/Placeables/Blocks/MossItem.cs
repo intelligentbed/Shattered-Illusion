@@ -7,7 +7,7 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Placeables.Blocks
+namespace ShatteredIllusion.Content.Items.Placeables.Blocks
 {
     public class MossItem : ModItem
     {
@@ -24,6 +24,7 @@ namespace ShatteredIllusion.Placeables.Blocks
             Item.useStyle = ItemUseStyleID.Swing;
             Item.consumable = true;
             Item.createTile = ModContent.TileType<MossBlock>();
+            Item.rare = ItemRarityID.Green;
         }
     }
 }

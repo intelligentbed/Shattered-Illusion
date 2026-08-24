@@ -5,7 +5,7 @@ using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.ObjectData;
 
-namespace ShatteredIllusion.Content.Placeables.Blocks
+namespace ShatteredIllusion.Content.Items.Placeables.Blocks
 {
     public class MossBlock : ModTile
     {

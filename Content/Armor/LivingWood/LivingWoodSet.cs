@@ -1,6 +1,4 @@
-using ShatteredIllusion.Content.Armor.FrostArmorProto;
 using ShatteredIllusion.Content.Items.Materials;
-using ShatteredIllusion.Content.Placeables.Blocks;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
