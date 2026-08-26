@@ -62,8 +62,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private bool Phase2Transitioning;
 
 
-
         private int DashStuckTimer;
+
+        private int 
+            StuckTimer;
 
 
         private int DespawnTimer;

@@ -13,7 +13,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.height = 20;
             Item.maxStack = 1;
             Item.rare = ItemRarityID.Blue;
-            Item.defense = 3;
+            Item.defense = 2;
         }
 
         public override void UpdateEquip(Player player)
@@ -39,7 +39,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.height = 20;
             Item.maxStack = 1;
             Item.rare = ItemRarityID.Blue;
-            Item.defense = 4;
+            Item.defense = 2;
         }
         public override void AddRecipes() //RECIPIES//
         {
@@ -78,7 +78,7 @@ namespace ShatteredIllusion.Content.Armor.FrostArmorProto
             Item.height = 20;
             Item.maxStack = 1;
             Item.rare = ItemRarityID.Blue;
-            Item.defense = 3;
+            Item.defense = 1;
         }
         public override void AddRecipes()
         {

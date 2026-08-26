@@ -15,25 +15,34 @@ namespace ShatteredIllusion.GUI.ResolveBar
         public const float DefaultPosX = 35f;
         public const float DefaultPosY = 15f;
 
-        private const float MouseDragEpsilon = 0.05f; 
+        private const float MouseDragEpsilon = 0.05f;
 
-        private const float FullPulseSpeed = 6f; 
+        private const float FullPulseSpeed = 6f;
         private static readonly Color FullPulseColor = new Color(255, 220, 80); // gold
+
+        // Background and fill (x/y)
+        private static readonly Vector2 BackgroundSizeMultiplier = new Vector2(1.5f, 1.5f);
+        private static readonly Vector2 BarSizeMultiplier = new Vector2(1.3f, 1.4f);
+
+        private const float BorderSizeMultiplier = 1.3f;
+        private const float BorderExtraScale = 1f;
 
         private static Vector2? dragOffset = null;
 
+        private static Texture2D backgroundTex;
         private static Texture2D barTex;
         private static Texture2D borderTex;
 
         public static void LoadTextures()
         {
-
+            backgroundTex = ModContent.Request<Texture2D>("ShatteredIllusion/GUI/SturdinessBar/SturdinessBarBackground", AssetRequestMode.ImmediateLoad).Value;
             barTex = ModContent.Request<Texture2D>("ShatteredIllusion/GUI/SturdinessBar/SturdinessBarFill", AssetRequestMode.ImmediateLoad).Value;
             borderTex = ModContent.Request<Texture2D>("ShatteredIllusion/GUI/SturdinessBar/SturdinessBarBorder", AssetRequestMode.ImmediateLoad).Value;
         }
 
         public static void UnloadTextures()
         {
+            backgroundTex = null;
             barTex = null;
             borderTex = null;
             dragOffset = null;
@@ -46,7 +55,7 @@ namespace ShatteredIllusion.GUI.ResolveBar
 
         public static void Draw(SpriteBatch spriteBatch, Player player)
         {
-            if (barTex == null || borderTex == null)
+            if (backgroundTex == null || barTex == null || borderTex == null)
                 return;
 
             var config = ModContent.GetInstance<ShatteredIllusionConfig>();
@@ -63,28 +72,31 @@ namespace ShatteredIllusion.GUI.ResolveBar
             screenPos.Y = (int)(screenPos.Y * 0.01f * Main.screenHeight);
 
             var modPlayer = player.GetModPlayer<ParryPlayer>();
-            float uiScale = Main.UIScale;
 
-            DrawBar(spriteBatch, modPlayer, screenPos, uiScale);
+            float uiScale = Main.UIScale * BorderSizeMultiplier;
+            Vector2 backgroundScale = Main.UIScale * BackgroundSizeMultiplier;
+            Vector2 barScale = Main.UIScale * BarSizeMultiplier;
+
+            DrawBar(spriteBatch, modPlayer, screenPos, backgroundScale, barScale, uiScale);
             HandleMouseInteraction(modPlayer, config, screenPos, screenRatioPos, uiScale);
         }
 
-        private static void DrawBar(SpriteBatch spriteBatch, ParryPlayer modPlayer, Vector2 screenPos, float uiScale)
+        private static void DrawBar(SpriteBatch spriteBatch, ParryPlayer modPlayer, Vector2 screenPos, Vector2 backgroundScale, Vector2 barScale, float uiScale)
         {
-            Vector2 origin = borderTex.Size() * 0.5f;
 
-            // Border drawn first bar fill drawn on top of it.just the way how the news goes 
-            spriteBatch.Draw(borderTex, screenPos, null, Color.White, 0f, origin, uiScale, SpriteEffects.None, 0);
+            Vector2 backgroundOrigin = backgroundTex.Size() * 0.5f;
+            Vector2 barOrigin = barTex.Size() * 0.5f;
+            Vector2 borderOrigin = borderTex.Size() * 0.5f;
+
+            spriteBatch.Draw(backgroundTex, screenPos, null, Color.White, 0f, backgroundOrigin, backgroundScale, SpriteEffects.None, 0);
 
             float percent = ParryPlayer.MaxSturdinessMeter <= 0
                 ? 0f
                 : MathHelper.Clamp(modPlayer.SturdinessMeter / (float)ParryPlayer.MaxSturdinessMeter, 0f, 1f);
 
-            float offsetX = (borderTex.Width - barTex.Width) * 0.5f;
-            float offsetY = (borderTex.Height - barTex.Height) * 0.5f;
             Rectangle cropRect = new Rectangle(0, 0, (int)(barTex.Width * percent), barTex.Height);
 
-            // While full pulse the fill's color between its normal tint and a bright gold highlight instead of just sitting there 
+            // While full pulse the fill's color between its normal tint and a bright gold highlight instead of just sitting there like a chud takes 1 to know 1 
             Color barColor = Color.White;
             if (percent >= 1f)
             {
@@ -94,14 +106,16 @@ namespace ShatteredIllusion.GUI.ResolveBar
 
             spriteBatch.Draw(
                 barTex,
-                screenPos + new Vector2(offsetX * uiScale, offsetY * uiScale),
+                screenPos,
                 cropRect,
                 barColor,
                 0f,
-                origin,
-                uiScale,
+                barOrigin,
+                barScale,
                 SpriteEffects.None,
                 0);
+
+            spriteBatch.Draw(borderTex, screenPos, null, Color.White, 0f, borderOrigin, uiScale * BorderExtraScale, SpriteEffects.None, 0);
         }
 
         private static void HandleMouseInteraction(
