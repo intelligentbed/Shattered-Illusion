@@ -10,7 +10,7 @@ namespace ShatteredIllusionKeybinds
         public override void Load()  
         {
             ParryKeybind = KeybindLoader.RegisterKeybind(Mod, "Parry", "V");
-            SturdinessMeterUseKeybind = KeybindLoader.RegisterKeybind(Mod, "Resolve Meter", "C");
+            SturdinessMeterUseKeybind = KeybindLoader.RegisterKeybind(Mod, "Sturdiness Meter", "C");
         }
 
         public override void Unload()
