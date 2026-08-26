@@ -65,9 +65,8 @@ namespace ShatteredIllusion.Content.Armor.LivingWood
 
         public override void UpdateArmorSet(Player player)
         {
-            player.maxMinions += 1;
             player.lifeRegen += 3;
-            player.setBonus = "Increase Max Summons by 1\n" +
+            player.setBonus =
                               "Increase Life Regeneration by 1 HP/s";
         }
     }
