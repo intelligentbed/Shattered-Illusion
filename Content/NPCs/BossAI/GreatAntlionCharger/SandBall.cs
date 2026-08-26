@@ -24,19 +24,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
             Projectile.friendly = false;
             Projectile.penetrate = 1;
             Projectile.timeLeft = 300; 
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.ignoreWater = false;
         }
 
         public override void AI()
         {
-            Projectile.rotation += Projectile.velocity.X * 0.08f;
-            Projectile.ai[0]++;
-            if (Projectile.ai[0] > 15f)
-            {
-                Projectile.velocity.Y += 0.18f;
-            }
-
             if (Main.rand.NextBool(2))
             {
                 Dust sandDust = Dust.NewDustPerfect(
@@ -53,7 +46,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
         {
             if (Main.rand.NextBool(1))
             {
-                target.AddBuff(BuffID.Poisoned, 5);
+                target.AddBuff(BuffID.Poisoned, 300);
             }
         }
 
