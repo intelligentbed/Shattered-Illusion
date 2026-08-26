@@ -13,6 +13,7 @@ using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.Graphics.CameraModifiers;
+using ShatteredIllusion.Common.Players.ParrySystem;
 using ShatteredIllusion.Content.Tiles.Trophys;
 using ShatteredIllusion.Content.Items.Placeables.Relics;
 

@@ -108,7 +108,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             npc.ai[1] = 0f;
             npc.ai[2] = 1f;
             npc.localAI[1] = 0f;
-            npc.scale = BaseScale;
 
             if (!hasTriggeredCutscene)
             {
@@ -188,6 +187,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             npc.noGravity = false;
             npc.noTileCollide = false;
             npc.alpha = SlimeAlpha;
+            npc.scale = BaseScale;
             npc.velocity.X *= 0.9f;
 
             const float cooldownTime = 20f;
@@ -213,10 +213,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             npc.noGravity = false;
             npc.noTileCollide = false;
             npc.alpha = SlimeAlpha;
+            npc.scale = BaseScale;
 
             if (SubState == 0)
             {
                 npc.velocity.X *= 0.8f;
+
+                // Extra goopy squish particles right before launching into a jump
+                if (Main.rand.NextBool(3))
+                {
+                    Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime, 0f, 2f, 100, Color.Cyan, 1.2f);
+                }
 
                 // Give King Slime a short pause before committing to the jump.
                 if (Timer >= 30f)
@@ -236,7 +243,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                         npc.velocity = new Vector2(xVel, yVel);
                         npc.netUpdate = true;
 
-                        for (int i = 0; i < (isBigJump ? 10 : 5); i++)
+                        for (int i = 0; i < (isBigJump ? 14 : 7); i++)
                         {
                             Dust.NewDust(
                                 npc.position,
@@ -247,7 +254,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                                 yVel * 0.2f,
                                 100,
                                 new Color(0, 100, 255, 120),
-                                1f
+                                1.2f
                             );
                         }
                     }
@@ -263,6 +270,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             }
             else if (SubState == 1)
             {
+                // Leave a trail of slime blobs while airborne during big jumps
+                if (isBigJump && Main.rand.NextBool(2))
+                {
+                    Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime, npc.velocity.X * 0.3f, npc.velocity.Y * 0.3f, 150, Color.DeepSkyBlue, 1.1f);
+                }
+
                 // Wait until the jump has landed before moving to the next attack.
                 if (Timer > 10f && HasLanded(npc))
                 {
@@ -275,6 +288,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                         },
                         npc.Center
                     );
+
+                    // Impact goo splash
+                    for (int i = 0; i < 10; i++)
+                    {
+                        Dust.NewDust(npc.position, npc.width, npc.height, DustID.BlueCrystalShard, Main.rand.NextFloat(-4f, 4f), Main.rand.NextFloat(-3f, 0f), 100, Color.Cyan, 1.4f);
+                    }
 
                     EnterCooldown();
                 }
@@ -290,16 +309,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 npc.noTileCollide = true;
                 npc.alpha += 15;
 
-                // Fancy particle fade-out dust effects during teleport vanish
-                if (Main.rand.NextBool(2))
+                // Shrink in on the teleport vanish
+                npc.scale = MathHelper.Max(BaseScale * 0.2f, npc.scale - 0.05f);
+
+                // Extra goopy particle burst fade-out during teleport vanish
+                for (int i = 0; i < 2; i++)
                 {
                     Dust d = Dust.NewDustPerfect(
                         npc.Center + Main.rand.NextVector2Circular(npc.width * 0.5f, npc.height * 0.5f),
                         DustID.t_Slime,
-                        Vector2.Zero,
+                        Main.rand.NextVector2Circular(4f, 4f),
                         150,
                         Color.Cyan,
-                        1.4f
+                        Main.rand.NextFloat(1.2f, 1.8f)
                     );
                     d.noGravity = true;
                 }
@@ -331,23 +353,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             {
                 npc.alpha -= 20;
 
-                // Fancy particle burst upon reappearing
-                if (Timer <= 10f && Main.rand.NextBool(2))
+                // Extend back out to normal size (and slightly overshoot for a squishy pop effect) as he reappears
+                float targetMaterializeScale = BaseScale;
+                npc.scale = MathHelper.Lerp(npc.scale, targetMaterializeScale, 0.15f);
+
+                // Heavy goopy particle burst upon reappearing
+                if (Timer <= 12f)
                 {
-                    Dust d = Dust.NewDustPerfect(
-                        npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.4f, 20f),
-                        DustID.BlueCrystalShard,
-                        new Vector2(0f, -3f),
-                        100,
-                        Color.DeepSkyBlue,
-                        1.5f
-                    );
-                    d.noGravity = true;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        Dust d = Dust.NewDustPerfect(
+                            npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.5f, 25f),
+                            DustID.BlueCrystalShard,
+                            new Vector2(Main.rand.NextFloat(-3f, 3f), Main.rand.NextFloat(-5f, -1f)),
+                            100,
+                            Color.DeepSkyBlue,
+                            Main.rand.NextFloat(1.4f, 2.0f)
+                        );
+                        d.noGravity = true;
+                    }
                 }
 
                 if (npc.alpha <= SlimeAlpha)
                 {
                     npc.alpha = SlimeAlpha;
+                    npc.scale = BaseScale;
                     npc.noTileCollide = false;
 
                     if (IsAuthority)
@@ -366,6 +396,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
         private void ExecuteHugeJump(NPC npc, Player player)
         {
             npc.alpha = SlimeAlpha;
+            npc.scale = BaseScale;
 
             if (SubState == 0)
             {
@@ -396,16 +427,16 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             }
             else if (SubState == 1)
             {
-                if (Timer % 6f == 0f)
+                if (Timer % 4f == 0f)
                 {
-                    for (int i = 0; i < 3; i++)
+                    for (int i = 0; i < 4; i++)
                     {
                         Dust d = Dust.NewDustPerfect(
                             npc.Center +
-                            Main.rand.NextVector2Circular(40f, 40f),
+                            Main.rand.NextVector2Circular(50f, 50f),
                             DustID.BlueCrystalShard,
-                            Velocity: -npc.velocity * 0.1f,
-                            Scale: 1.3f
+                            Velocity: -npc.velocity * 0.15f + Main.rand.NextVector2Circular(2f, 2f),
+                            Scale: 1.5f
                         );
 
                         d.noGravity = true;
@@ -463,6 +494,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                     );
 
                     ScreenShake(npc, 10f, 20, 16f);
+
+                    // Extra massive goopy splatter on huge slam landing
+                    for (int i = 0; i < 30; i++)
+                    {
+                        Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime, Main.rand.NextFloat(-8f, 8f), Main.rand.NextFloat(-6f, 2f), 100, Color.Cyan, 1.8f);
+                    }
 
                     // The slam releases a small spread of Spiked Slime projectiles on impact.
                     // Classic: 2, Expert: 4, Master: 6.
@@ -522,17 +559,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 // Windup dust: ramps up from a light trickle to a heavy release as the
                 // split approaches, so it reads as building energy rather than a flat rate.
                 float windupT = MathHelper.Clamp(Timer / 60f, 0f, 1f);
-                int dustCount = (int)MathHelper.Lerp(1f, 8f, windupT);
+                int dustCount = (int)MathHelper.Lerp(2f, 14f, windupT);
 
                 for (int i = 0; i < dustCount; i++)
                 {
                     Dust d = Dust.NewDustPerfect(
-                        npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.5f, 14f),
+                        npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.6f, 20f),
                         DustID.BlueCrystalShard,
-                        new Vector2(Main.rand.NextFloat(-1f, 1f), Main.rand.NextFloat(-3f, -1f)),
+                        new Vector2(Main.rand.NextFloat(-2f, 2f), Main.rand.NextFloat(-4f, -1f)),
                         100,
                         Color.Cyan,
-                        Main.rand.NextFloat(1.1f, 1.8f)
+                        Main.rand.NextFloat(1.3f, 2.1f)
                     );
                     d.noGravity = true;
                 }
@@ -582,6 +619,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             {
                 npc.scale = SplitMinScale;
 
+                // Extra goopy idle particles while split apart
+                if (Main.rand.NextBool(2))
+                {
+                    Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime, Main.rand.NextFloat(-2f, 2f), Main.rand.NextFloat(-2f, 2f), 150, Color.Cyan, 1.3f);
+                }
+
                 // Telegraph the incoming shockwave: sprinkle dust outward along the four
                 // firing directions for the last stretch before it actually fires.
                 float framesUntilFire = 70f - Timer;
@@ -626,9 +669,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                         SoundEngine.PlaySound(SoundID.NPCDeath19 with { Pitch = -0.4f, Volume = 1.6f }, npc.Center);
                         ScreenShake(npc, 18f, 28, 22f);
 
-                        for (int i = 0; i < 25; i++)
+                        // Ample goopy explosion on re-merge
+                        for (int i = 0; i < 40; i++)
                         {
-                            Dust.NewDust(npc.position, npc.width, npc.height, DustID.TintableDust, Main.rand.NextFloat(-6f, 6f), Main.rand.NextFloat(-6f, 6f), 100, Color.Cyan, 1.8f);
+                            Dust.NewDust(npc.position, npc.width, npc.height, DustID.TintableDust, Main.rand.NextFloat(-8f, 8f), Main.rand.NextFloat(-8f, 8f), 100, Color.Cyan, 2.0f);
                         }
 
                         // shockwave projectiles
