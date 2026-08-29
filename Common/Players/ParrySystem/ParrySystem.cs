@@ -43,6 +43,25 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
         private const float SteeledMinScale = 0.05f;
         private int steeledHealPerParry = 0;
 
+        // Purely visual: lets the bar drain smoothly over the buff's duration instead
+        // of snapping to empty the instant Steeled is activated. SturdinessMeter itself
+        // still hits 0 immediately below - this never touches the real resource value.
+        private int steeledDrainStartValue = 0;
+        private int steeledDrainDuration = 0;
+        private int steeledDrainTimer = 0;
+
+        public float DisplaySturdinessMeter
+        {
+            get
+            {
+                if (steeledDrainTimer <= 0 || steeledDrainDuration <= 0)
+                    return SturdinessMeter;
+
+                float progress = 1f - (steeledDrainTimer / (float)steeledDrainDuration);
+                return MathHelper.Lerp(steeledDrainStartValue, 0f, progress);
+            }
+        }
+
 
         public bool MycelialSetActive;
 
@@ -65,6 +84,11 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             if (parrySlowTimer > 0)
             {
                 parrySlowTimer--;
+            }
+
+            if (steeledDrainTimer > 0)
+            {
+                steeledDrainTimer--;
             }
         }
 
@@ -106,6 +130,12 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
             Player.AddBuff(ModContent.BuffType<SteeledBuff>(), duration);
 
+            // Bar drains from its current fill down to empty over exactly `duration` ticks,
+            // so a max-duration activation drains slow and a min-duration one drains fast.
+            steeledDrainStartValue = SturdinessMeter;
+            steeledDrainDuration = duration;
+            steeledDrainTimer = duration;
+
             SturdinessMeter = 0;
             SoundEngine.PlaySound(SteeledUseSound, Player.position);
             SpawnDustExplosion(DustID.BlueTorch, 40, 9f);
@@ -137,6 +167,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                         bool wasFull = SturdinessMeter >= MaxSturdinessMeter;
 
+                        steeledDrainTimer = 0;
                         SturdinessMeter += SturdinessMeterGainPerParry;
 
                         if (SturdinessMeter > MaxSturdinessMeter)
@@ -201,7 +232,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                     float angle = MathHelper.TwoPi * i / dustPerLayer;
                     Vector2 direction = angle.ToRotationVector2();
                     Vector2 spawnPos = center + direction * layerRadius;
-                    Vector2 velocity = direction * 3f; 
+                    Vector2 velocity = direction * 3f;
 
                     Dust ring = Dust.NewDustPerfect(spawnPos, DustID.GlowingMushroom, velocity, Alpha: 40, Scale: 1.8f);
                     ring.noGravity = true;
