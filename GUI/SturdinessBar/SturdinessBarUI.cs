@@ -92,7 +92,7 @@ namespace ShatteredIllusion.GUI.ResolveBar
 
             float percent = ParryPlayer.MaxSturdinessMeter <= 0
                 ? 0f
-                : MathHelper.Clamp(modPlayer.SturdinessMeter / (float)ParryPlayer.MaxSturdinessMeter, 0f, 1f);
+                : MathHelper.Clamp(modPlayer.DisplaySturdinessMeter / ParryPlayer.MaxSturdinessMeter, 0f, 1f);
 
             Rectangle cropRect = new Rectangle(0, 0, (int)(barTex.Width * percent), barTex.Height);
 
@@ -135,7 +135,7 @@ namespace ShatteredIllusion.GUI.ResolveBar
             if (!config.SturdinessBarLocked)
                 Main.LocalPlayer.mouseInterface = true;
 
-            Main.instance.MouseText($"Sturdiness: {modPlayer.SturdinessMeter}/{ParryPlayer.MaxSturdinessMeter}");
+            Main.instance.MouseText($"Sturdiness: {(int)Math.Round(modPlayer.DisplaySturdinessMeter)}/{ParryPlayer.MaxSturdinessMeter}");
 
             MouseState ms = Mouse.GetState();
             Vector2 mousePos = Main.MouseScreen;

@@ -20,18 +20,27 @@ namespace ShatteredIllusion.World.World_Gen
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
         {
-            int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Shattered Illusion: Rebuild Underground Desert"));
+            // Run AFTER all decoration passes (chests, pots, houses, statues, life crystals, etc.)
+            // but BEFORE liquids settle, so nothing gets placed inside the structure afterward.
+            int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Settle Liquids"));
 
-            if (passIndex != -1)
+            if (passIndex == -1)
             {
-                tasks.Insert(
-                    passIndex + 1,
-                    new PassLegacy("ShatteredIllusion Highway Structure", (progress, config) =>
-                    {
-                        GenerateHighwayStructure(progress, config);
-                    })
-                );
+                for (int i = 0; i < tasks.Count; i++)
+                {
+                    ModContent.GetInstance<ShatteredIllusion>().Logger.Info($"[GenPass {i}] {tasks[i].Name}");
+                }
+
+                passIndex = tasks.Count - 1; 
             }
+
+            tasks.Insert(
+                passIndex,
+                new PassLegacy("ShatteredIllusion Highway Structure", (progress, config) =>
+                {
+                    GenerateHighwayStructure(progress, config);
+                })
+            );
         }
 
         private void GenerateHighwayStructure(GenerationProgress progress, GameConfiguration config)
