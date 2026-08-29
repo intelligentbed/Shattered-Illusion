@@ -22,34 +22,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
     [AutoloadBossHead] // ID LIKE TO THANK MERLIN FOR HELPING ME OUT ALSO FOR CLEANING MY DIRTY NASTY CODE A LITTLE
     public class GreatAntlionCharger : ModNPC, IParryable
     {
-        private const int MainFrameCount = 5;
-        private const int BurrowFrameCount = 7;
-        private const int PopFrameCount = 5;
-        private const int RoarFrameCount = 5;
-        private const int DiveFrameCount = 5;
-        private const int ParryFrameCount = 5;
+        private const int MainFrameCount = 4;
+        private const int BurrowFrameCount = 8;
+        private const int PopFrameCount = 6;
+        private const int ParryFrameCount = 4;
         private const int SpitFrameCount = 5;
 
-        readonly int burrowFrameHeight = 66;
-        readonly int popFrameHeight = 74;
-        readonly int roarFrameHeight = 378 / 5;
-        readonly int diveFrameHeight = 328 / 5;
-        readonly int parryFrameHeight = 328 / 5;
-        readonly int spitFrameHeight = 348 / 5;
+        int burrowFrameHeight;
+        int popFrameHeight;
+        int parryFrameHeight;
+        int spitFrameHeight;
 
         private const int BurrowDigTime = 90;
         private const int BurrowPursuitEnd = 185;
         private const int BurrowTelegraphEnd = 215;
         private const int BurrowEnd = 250;
 
-        private const int SpitWindupFrame = 1;
-        private const int SpitFireFrame = 2;
-        private const int SpitRecoverFrame = 0;
+        private const int SpitWindupFrameCount = 3; 
+        private const int SpitFireFrame = 3; 
+        private const int SpitRecoverFrame = 4;
+        private const float SpitFireTiming = 90f; // must match the Timer == 90f 
 
         const float MouthForwardOffset = 8f;
         const float MouthSidewaysOffset = 6f;
         const float MouthVerticalOffset = 8f;
-        private const float SpriteVisualScale = 1.4f;
+        private const float SpriteVisualScale = 0.8f;
 
         private SlotId rumbleSoundSlot;
         private float Phase2DiveLandingX;
@@ -64,28 +61,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         private int DashStuckTimer;
 
-        private int 
+        private int
             StuckTimer;
 
 
         private int DespawnTimer;
-        private const int DespawnTime = 300;    
-        private const float DespawnRange = 2100f; 
+        private const int DespawnTime = 300;
+        private const float DespawnRange = 2100f;
 
         private const string BurrowTexturePath =
             "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerBurrow";
 
-        private const string DigTexturePath =
-            "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerDig";
-
         private const string PopTexturePath =
             "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerPop";
-
-        private const string RoarTexturePath =
-            "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerRoar";
-
-        private const string DiveTexturePath =
-            "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerDive";
 
         private const string ParryTexturePath =
             "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerParry";
@@ -127,10 +115,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             (CurrentState == AIState.Burrow && Timer > 30f && Timer < BurrowPursuitEnd);
 
         private Asset<Texture2D> burrowTexture;
-        private Asset<Texture2D> digTexture;
         private Asset<Texture2D> popTexture;
-        private Asset<Texture2D> roarTexture;
-        private Asset<Texture2D> diveTexture;
         private Asset<Texture2D> parryTexture;
         private Asset<Texture2D> spitTexture;
 
@@ -165,8 +150,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void SetDefaults()
         {
-            NPC.width = 144;
-            NPC.height = 63;
+            NPC.width = 160; 
+            NPC.height = 70; 
             NPC.damage = 40;
             NPC.defense = 10;
             NPC.lifeMax = 3500;
@@ -208,12 +193,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         public override void Load()
         {
             burrowTexture = ModContent.Request<Texture2D>(BurrowTexturePath);
-            digTexture = ModContent.Request<Texture2D>(DigTexturePath);
             popTexture = ModContent.Request<Texture2D>(PopTexturePath);
-            roarTexture = ModContent.Request<Texture2D>(RoarTexturePath);
-            diveTexture = ModContent.Request<Texture2D>(DiveTexturePath);
             parryTexture = ModContent.Request<Texture2D>(ParryTexturePath);
             spitTexture = ModContent.Request<Texture2D>(SpitTexturePath);
+        }
+
+        private void EnsureFrameHeightsCached()
+        {
+            if (burrowFrameHeight == 0 && burrowTexture != null && burrowTexture.IsLoaded)
+                burrowFrameHeight = burrowTexture.Value.Height / BurrowFrameCount;
+
+            if (popFrameHeight == 0 && popTexture != null && popTexture.IsLoaded)
+                popFrameHeight = popTexture.Value.Height / PopFrameCount;
+
+            if (parryFrameHeight == 0 && parryTexture != null && parryTexture.IsLoaded)
+                parryFrameHeight = parryTexture.Value.Height / ParryFrameCount;
+
+            if (spitFrameHeight == 0 && spitTexture != null && spitTexture.IsLoaded)
+                spitFrameHeight = spitTexture.Value.Height / SpitFrameCount;
+        }
+
+        private float GetGroundAlignedOffset(float frameHeightPx)
+        {
+            float visualHalfHeight = frameHeightPx / 2f * SpriteVisualScale * NPC.scale;
+            float hitboxHalfHeight = NPC.height / 2f;
+            return hitboxHalfHeight - visualHalfHeight;
         }
 
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
@@ -224,12 +228,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
 
             if (burrowTexture == null) burrowTexture = ModContent.Request<Texture2D>(BurrowTexturePath);
-            if (digTexture == null) digTexture = ModContent.Request<Texture2D>(DigTexturePath);
             if (popTexture == null) popTexture = ModContent.Request<Texture2D>(PopTexturePath);
-            if (roarTexture == null) roarTexture = ModContent.Request<Texture2D>(RoarTexturePath);
-            if (diveTexture == null) diveTexture = ModContent.Request<Texture2D>(DiveTexturePath);
             if (parryTexture == null) parryTexture = ModContent.Request<Texture2D>(ParryTexturePath);
             if (spitTexture == null) spitTexture = ModContent.Request<Texture2D>(SpitTexturePath);
+
+            EnsureFrameHeightsCached();
 
             //red = parryable
             Color tintColor = IsParryable ? new Color(255, 120, 120) : Color.White;
@@ -244,87 +247,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, parryFrameHeight);
                 Vector2 origin = new Vector2(texture.Width / 2f, parryFrameHeight / 2f);
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(parryFrameHeight));
 
                 spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, effects, 0f);
                 return false;
             }
 
-            // Dive Texture
-            bool isPhase2DiveDrawing = CurrentState == AIState.Phase2BurrowDive && Timer >= 111f;
-            if (isPhase2DiveDrawing && diveTexture != null && diveTexture.IsLoaded)
-            {
-                Texture2D texture = diveTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(
-                    0,
-                    NPC.frame.Y,
-                    texture.Width,
-                    diveFrameHeight
-                );
-
-                Vector2 origin = new Vector2(
-                    texture.Width / 2f,
-                    diveFrameHeight / 2f
-                );
-
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
-
-                spriteBatch.Draw(
-                    texture,
-                    drawPos,
-                    sourceRect,
-                    finalDrawColor,
-                    NPC.rotation,
-                    origin,
-                    NPC.scale * SpriteVisualScale,
-                    effects,
-                    0f
-                );
-
-                return false;
-            }
-
-            // Roar Texture
-            bool isRoarAnimation = Phase2Transitioning;
-            if (isRoarAnimation && roarTexture != null && roarTexture.IsLoaded)
-            {
-                Texture2D texture = roarTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(
-                    0,
-                    NPC.frame.Y,
-                    texture.Width,
-                    roarFrameHeight
-                );
-
-                Vector2 origin = new Vector2(
-                    texture.Width / 2f,
-                    roarFrameHeight / 2f
-                );
-
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
-
-                spriteBatch.Draw(
-                    texture,
-                    drawPos,
-                    sourceRect,
-                    finalDrawColor,
-                    NPC.rotation,
-                    origin,
-                    NPC.scale * SpriteVisualScale,
-                    effects,
-                    0f
-                );
-
-                return false;
-            }
+            // We lost the dedicated dive-flight sprite in this resprite pass, so the arc through the air
+            // and the phase 2 roar just fall through to the default idle texture below - no clue how to
+            // compensate for the dive, but we made the phase 2 transition itself flashier to make up for the roar.
 
             // Pop Texture
             bool isPhase2PopDrawing = CurrentState == AIState.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
@@ -347,7 +278,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     popFrameHeight / 2f
                 );
 
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(popFrameHeight));
 
                 spriteBatch.Draw(
                     texture,
@@ -373,54 +304,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, spitFrameHeight);
                 Vector2 origin = new Vector2(texture.Width / 2f, spitFrameHeight / 2f);
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(spitFrameHeight));
 
                 spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, effects, 0f);
                 return false;
             }
 
-            //Dig Texture
-            bool isDiggingAnimation = CurrentState == AIState.Burrow && Timer <= 20f;
-            if (isDiggingAnimation && digTexture != null && digTexture.IsLoaded)
-            {
-                Texture2D texture = digTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
-
-                int digFrameHeight = texture.Height / 5;
-
-                Rectangle sourceRect = new Rectangle(
-                    0,
-                    NPC.frame.Y,
-                    texture.Width,
-                    digFrameHeight
-                );
-
-                Vector2 origin = new Vector2(
-                    texture.Width / 2f,
-                    digFrameHeight / 2f
-                );
-
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
-
-                spriteBatch.Draw(
-                    texture,
-                    drawPos,
-                    sourceRect,
-                    finalDrawColor,
-                    NPC.rotation,
-                    origin,
-                    NPC.scale * SpriteVisualScale,
-                    effects,
-                    0f
-                );
-
-                return false;
-            }
-
+            // The Dig animation is gone now, so the Burrow texture just covers the whole digging-in window itself.
             //Burrow Texture
-            bool isPhase1Burrowing = CurrentState == AIState.Burrow && Timer > 20f && Timer <= BurrowDigTime;
+            bool isPhase1Burrowing = CurrentState == AIState.Burrow && Timer <= BurrowDigTime;
             bool isPhase2Burrowing = CurrentState == AIState.Phase2BurrowDive && Timer <= 45f;
 
             if ((isPhase1Burrowing || isPhase2Burrowing) && burrowTexture != null && burrowTexture.IsLoaded)
@@ -429,8 +321,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 SpriteEffects effects = NPC.spriteDirection == -1
                     ? SpriteEffects.None
                     : SpriteEffects.FlipHorizontally;
-
-                int burrowFrameHeight = texture.Height / BurrowFrameCount;
 
                 Rectangle sourceRect = new Rectangle(
                     0,
@@ -444,7 +334,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     burrowFrameHeight / 2f
                 );
 
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(burrowFrameHeight));
 
                 spriteBatch.Draw(
                     texture,
@@ -472,7 +362,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 (mainTexture.Height / MainFrameCount) / 2f
             );
 
-            Vector2 mainDrawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY - -5f);
+            Vector2 mainDrawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(mainTexture.Height / (float)MainFrameCount));
 
 
             spriteBatch.Draw(
@@ -522,6 +412,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void FindFrame(int frameHeight)
         {
+            EnsureFrameHeightsCached();
+
             // PARRY ANIMATION FRAME HANDLING
             if (CurrentState == AIState.Cooldown && Timer < 0f)
             {
@@ -542,55 +434,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            // PHASE 2 DIVE FLIGHT ANIMATION
-            bool phase2DiveFlightAnimation = CurrentState == AIState.Phase2BurrowDive && Timer >= 111f;
-
-            if (phase2DiveFlightAnimation)
-            {
-                if (diveTexture == null)
-                {
-                    diveTexture = ModContent.Request<Texture2D>(DiveTexturePath);
-                }
-
-                if (diveTexture != null && diveTexture.IsLoaded)
-                {
-                    const float airTime = 40f;
-                    float progress = MathHelper.Clamp((Timer - 111f) / airTime, 0f, 1f);
-
-                    int frame = (int)(progress * DiveFrameCount);
-                    frame = Math.Min(frame, DiveFrameCount - 1);
-
-                    NPC.frame.Width = diveTexture.Width();
-                    NPC.frame.Height = diveFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * diveFrameHeight;
-
-                    return;
-                }
-            }
-
-            // PHASE 2 TRANSITION ROAR ANIMATION
-            if (Phase2Transitioning)
-            {
-                if (roarTexture == null)
-                {
-                    roarTexture = ModContent.Request<Texture2D>(RoarTexturePath);
-                }
-
-                if (roarTexture != null && roarTexture.IsLoaded)
-                {
-                    float progress = MathHelper.Clamp(Timer / 60f, 0f, 1f);
-                    int frame = (int)(progress * RoarFrameCount);
-                    frame = Math.Min(frame, RoarFrameCount - 1);
-
-                    NPC.frame.Width = roarTexture.Width();
-                    NPC.frame.Height = roarFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * roarFrameHeight;
-
-                    return;
-                }
-            }
+            // We lost the dive-flight and roar sprites in this resprite pass, so both of those just drop
+            // through to the default idle frame handling further down instead of getting their own animation.
 
             // PHASE 2 POP ANIMATION
             bool phase2PopAnimation = CurrentState == AIState.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
@@ -620,32 +465,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
 
             //checks if the boss is in either of the burrows
-            bool isDiggingAnimation = CurrentState == AIState.Burrow && Timer <= 20f;
+            // The Dig animation is gone now, so the normal burrow window just covers the entire digging-in time.
             bool phase2DiveAnimation = CurrentState == AIState.Phase2BurrowDive && Timer <= 45f;
-            bool normalBurrowAnimation = CurrentState == AIState.Burrow && Timer > 20f && Timer <= BurrowDigTime;
-
-            if (isDiggingAnimation)
-            {
-                if (digTexture == null)
-                {
-                    digTexture = ModContent.Request<Texture2D>(DigTexturePath);
-                }
-
-                if (digTexture != null && digTexture.IsLoaded)
-                {
-                    int digFrameHeight = digTexture.Height() / 5;
-                    float progress = Timer / 20f;
-                    int frame = (int)(progress * 5);
-                    frame = Math.Min(frame, 5 - 1);
-
-                    NPC.frame.Width = digTexture.Width();
-                    NPC.frame.Height = digFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * digFrameHeight;
-
-                    return;
-                }
-            }
+            bool normalBurrowAnimation = CurrentState == AIState.Burrow && Timer <= BurrowDigTime;
 
             if (phase2DiveAnimation || normalBurrowAnimation)
             {
@@ -656,8 +478,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (burrowTexture != null && burrowTexture.IsLoaded)
                 {
-                    float animationTime = phase2DiveAnimation ? 45f : (BurrowDigTime - 20f);
-                    float adjustedTimer = phase2DiveAnimation ? Timer : (Timer - 20f);
+                    float animationTime = phase2DiveAnimation ? 45f : BurrowDigTime;
+                    float adjustedTimer = Timer;
 
                     float animationProgress = MathHelper.Clamp(adjustedTimer / animationTime, 0f, 1f);
 
@@ -684,7 +506,26 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (spitTexture != null && spitTexture.IsLoaded)
                 {
-                    int spitFrame = Timer < 30f ? SpitWindupFrame : (Timer < 40f ? SpitFireFrame : SpitRecoverFrame);
+                    // Fixed a bug where the spit frame played way before the projectile actually fired
+                    // (used to jump to the fire frame at Timer 30-40 while the real spit happens at Timer == 90).
+                    // Now the windup frames ease across the telegraph and the fire frame lands right on Timer == 90.
+                    int spitFrame;
+
+                    if (Timer < SpitFireTiming)
+                    {
+                        float windupProgress = MathHelper.Clamp(Timer / SpitFireTiming, 0f, 1f);
+                        spitFrame = (int)(windupProgress * SpitWindupFrameCount);
+                        spitFrame = Math.Min(spitFrame, SpitWindupFrameCount - 1);
+                    }
+                    else if (Timer < SpitFireTiming + 5f)
+                    {
+                        spitFrame = SpitFireFrame;
+                    }
+                    else
+                    {
+                        spitFrame = SpitRecoverFrame;
+                    }
+
                     NPC.frame.Width = spitTexture.Width();
                     NPC.frame.Height = spitFrameHeight;
                     NPC.frame.X = 0;
@@ -1832,9 +1673,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.netUpdate = true;
 
             SoundEngine.PlaySound(SoundID.Roar, NPC.Center);
-            ScreenShake(5f, 15);
+            ScreenShake(7f, 18); // bumped up from 5f/15 - no dedicated roar sprite anymore so the shake has to sell it
 
-            for (int i = 0; i < 40; i++)
+            for (int i = 0; i < 60; i++) // bumped up from 40 to help compensate for losing the roar animation
             {
                 Vector2 velocity = Main.rand.NextVector2Circular(8f, 6f);
                 velocity.Y -= 3f;
@@ -1859,14 +1700,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.noTileCollide = false;
             NPC.alpha = 0;
-            NPC.color = Color.White;
+
+            // No dedicated roar sprite anymore, so flash the tint between white and red to help sell the transition.
+            float flashPulse = (float)Math.Sin(Timer * 0.6f) * 0.5f + 0.5f;
+            NPC.color = Color.Lerp(Color.White, new Color(255, 90, 90), flashPulse);
 
             IsParryable = false;
 
 
             NPC.position.X += Main.rand.NextFloat(-1.5f, 1.5f);
 
-            int dustCount = Timer < 30f ? 4 : 7;
+            int dustCount = Timer < 30f ? 6 : 10; // bumped up from 4/7 to compensate for losing the roar animation
 
             for (int i = 0; i < dustCount; i++)
             {
@@ -1889,12 +1733,18 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 dust.noGravity = true;
             }
 
+            // Extra shake punctuation throughout, since we no longer have a roar animation to lean on visually.
+            if (Timer % 15 == 0)
+            {
+                ScreenShake(3f, 8);
+            }
+
             if (Timer == 30f)
             {
                 SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
-                ScreenShake(4f, 10);
+                ScreenShake(6f, 14); // bumped up from 4f/10
 
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 45; i++) // bumped up from 30
                 {
                     Dust dust = Dust.NewDustPerfect(
                         NPC.Center,
