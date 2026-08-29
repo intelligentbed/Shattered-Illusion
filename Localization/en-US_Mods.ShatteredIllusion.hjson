@@ -20,22 +20,17 @@ Items: {
 
 	LivingWoodHelmet: {
 		DisplayName: Living Wood Helmet
-		Tooltip: Increases summon damage by 6%
+		Tooltip: Increases summon damage by 2%
 	}
 
 	LivingWoodChestplate: {
 		DisplayName: Living Wood Chestplate
 		Tooltip: Increases maximum minions by 1
-		SetBonus:
-			'''
-			Increases maximum minions by 1
-			Increases life regeneration
-			'''
 	}
 
 	LivingWoodLeggings: {
 		DisplayName: Living Wood Leggings
-		Tooltip: Increases summon damage by 6%
+		Tooltip: Increases summon damage by 2%
 	}
 
 	MossItem: {
@@ -45,7 +40,7 @@ Items: {
 
 	MossTileItem: {
 		Tooltip: ""
-		DisplayName: Moss Tile Item
+		DisplayName: Moss
 	}
 
 	FrostLeggings: {
@@ -121,6 +116,36 @@ Items: {
 		Tooltip: ""
 		DisplayName: Antlion Relic
 	}
+
+	Journal: {
+		DisplayName: Journal
+		Tooltip: ""
+	}
+
+	MycelialLeggings: {
+		Tooltip: 4% increased melee attack speed
+		DisplayName: Mycelial Leggings
+	}
+
+	MycelialHelmet: {
+		Tooltip: 4% increased melee critial hit chance
+		DisplayName: Mycelial Helmet
+	}
+
+	MycelialChestplate: {
+		Tooltip: 3% increased melee damage
+		DisplayName: Mycelial Chestplate
+	}
+
+	DuneCarapace: {
+		DisplayName: Dune Carapace
+		Tooltip: Increases defense the lower your health
+	}
+
+	LivingWoodGreatClub: {
+		DisplayName: Living Wood Great Club
+		Tooltip: ""
+	}
 }
 
 Buffs: {
@@ -132,6 +157,16 @@ Buffs: {
 	MossBuff: {
 		Description: Increases life regeneration by 1 hp/s
 		DisplayName: Mossed out
+	}
+
+	SteeledBuff: {
+		Description: All parries heal and total damage multiplied damage by 1.1x
+		DisplayName: Steeled
+	}
+
+	SproutedBuff: {
+		Description: Summon Damage is increase by 15%
+		DisplayName: Sprouted
 	}
 }
 
@@ -148,13 +183,78 @@ Projectiles: {
 	FallingRubble.DisplayName: Falling Rubble
 	SandBall.DisplayName: Sand Ball
 	SlimyShockwave.DisplayName: Slimy Shockwave
+	LivingWoodGreatClubProjectile.DisplayName: Living Wood Great Club Projectile
+	LivingWoodRubble.DisplayName: Living Wood Rubble
+	LivingWoodGreatClubHoldout.DisplayName: Living Wood Great Club Holdout
 }
 
-Keybinds.Parry.DisplayName: Parry
+Keybinds: {
+	Parry.DisplayName: Parry
+	"Use Resolve Meter.DisplayName": Use  Resolve  Meter
+	"Resolve Meter.DisplayName": Resolve  Meter
+	"Sturdiness Meter.DisplayName": Sturdiness  Meter
+}
 
 NPCs: {
 	GreatAntlionCharger.DisplayName: Great Antlion Charger
 	KingSlimeNinja.DisplayName: King Slime Ninja
 	Ninja.DisplayName: Ninja
 	KingSlimeClone.DisplayName: King Slime Clone
+}
+
+Configs: {
+	ShatteredIllusionConfig: {
+		DisplayName: Shattered Illusion Config
+
+		Headers: {
+			ParryBar: Parry Bar Header
+			ResolveBar: Resolve Bar Header
+			SturdinessBar: Sturdiness Bar Header
+		}
+
+		ParryBarLocked: {
+			Label: Lock Parry Bar Position
+			Tooltip: When enabled, the parry bar stays fixed in place. Disable to drag it anywhere on screen.
+		}
+
+		ParryBarPosX: {
+			Label: Parry Bar Pos X
+			Tooltip: ""
+		}
+
+		ParryBarPosY: {
+			Label: Parry Bar Pos Y
+			Tooltip: ""
+		}
+
+		ResolveBarLocked: {
+			Label: Lock Resolve Bar Position
+			Tooltip: When enabled, the Resolve bar stays fixed in place. Disable to drag it anywhere on screen.
+		}
+
+		ResolveBarPosX: {
+			Label: Resolve Bar Pos X
+			Tooltip: ""
+		}
+
+		ResolveBarPosY: {
+			Label: Resolve Bar Pos Y
+			Tooltip: ""
+		}
+
+		SturdinessBarLocked: {
+			Label: Lock Sturdiness Bar Position
+			Tooltip: When enabled, the Sturdiness bar stays fixed in place. Disable to drag it anywhere on screen.
+		}
+
+		SturdinessBarPosX: {
+			Label: Sturdiness Bar Pos X
+			Tooltip: ""
+		}
+
+		SturdinessBarPosY: {
+			Label: Sturdiness Bar Pos Y
+			Tooltip: ""
+		}
+	}
 }

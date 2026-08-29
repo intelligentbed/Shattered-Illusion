@@ -12,237 +12,573 @@ namespace ShatteredIllusion.World.World_Gen
 {
     public class DesertRework : ModSystem
     {
-        private const string InsertAfterPassName = "Full Desert";
-        private const string CustomPassName = "Shattered Illusion: Open Up Underground Desert";
+        private const string VanillaPassName = "Full Desert";
+        private const string ReworkPassName = "Shattered Illusion: Rebuild Underground Desert";
 
-        private const int TunnelCount = 35;
-        private const int TunnelMinSteps = 120;
-        private const int TunnelMaxSteps = 260;
-
-        private const double TunnelMinStrength = 2.5;
-        private const double TunnelMaxStrength = 5.5;
-        private const double TurnAmount = 0.35;
-
-        private const int StepsBetweenBranches = 40;
-        private const float BranchChance = 0.5f;
-
-        private const int EdgeMargin = 15;
+        private const int BorderMargin = 12;
+        private const int TopSectionRatio = 5;
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
         {
-            int insertAfterIndex = tasks.FindIndex(
-                genPass => genPass.Name.Equals(InsertAfterPassName)
-            );
+            int index = tasks.FindIndex(pass => pass.Name.Equals(VanillaPassName));
 
-            if (insertAfterIndex == -1)
+            if (index == -1)
             {
                 Mod.Logger.Warn(
-                    $"[DesertRework] Could not find '{InsertAfterPassName}' gen pass; underground desert rework was skipped."
-                );
-
+                    $"[DesertRework] Could not find '{VanillaPassName}' gen pass; underground desert rework was skipped.");
                 return;
             }
 
-            tasks.Insert(
-                insertAfterIndex + 1,
-                new PassLegacy(CustomPassName, CarveSpaghettiNetwork)
-            );
+            tasks.Insert(index + 1, new PassLegacy(ReworkPassName, RebuildUndergroundDesert));
         }
 
-        private static void CarveSpaghettiNetwork(
+        private static void RebuildUndergroundDesert(
             GenerationProgress progress,
             GameConfiguration configuration)
         {
-            progress.Message = "Winding tunnels through the sand...";
+            Rectangle vanillaArea = GenVars.UndergroundDesertLocation;
 
-            Rectangle area = GenVars.UndergroundDesertLocation;
-
-            if (area.Width <= 0 || area.Height <= 0)
+            if (!IsValidArea(vanillaArea))
             {
                 ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
-                    "[DesertRework] Underground Desert bounds not found, skipping cave rework."
-                );
-
+                    "[DesertRework] Underground Desert bounds were invalid; rework was skipped.");
                 return;
             }
 
-            int tunnelsCarved = 0;
-            int branchesCarved = 0;
+            Rectangle area = GetUndergroundArea(vanillaArea);
 
-            for (int i = 0; i < TunnelCount; i++)
-            {
-                Point start = RandomPointInArea(area);
-                double angle = WorldGen.genRand.NextDouble() * MathHelper.TwoPi;
-                int steps = WorldGen.genRand.Next(TunnelMinSteps, TunnelMaxSteps + 1);
+            progress.Message = "Mapping underground desert layout...";
+            bool[,] mask = BuildDesertMask(area);
 
-                CarveWorm(
-                    area,
-                    start.X,
-                    start.Y,
-                    angle,
-                    steps,
-                    ref branchesCarved
-                );
+            progress.Message = "Preserving vanilla desert structure...";
+            PreserveVanillaInterior(area, mask);
 
-                tunnelsCarved++;
-            }
+            progress.Message = "Sculpting sandstone formations...";
+            PlaceSandstoneFormations(area, mask);
+
+            progress.Message = "Adding layered desert strata...";
+            ApplySandstormStriations(area, mask);
+
+            progress.Message = "Carving fractured canyon systems...";
+            CarveCanyonSystem(area);
+
+            progress.Message = "Excavating underground caves...";
+            CarveOrganicPockets(area, mask);
+
+            progress.Message = "Connecting underground passages...";
+            AddGroundingConnections(area);
         }
 
-        private static Point RandomPointInArea(Rectangle area)
+        private static bool[,] BuildDesertMask(Rectangle area)
         {
-            int x = area.X + WorldGen.genRand.Next(area.Width);
-            int y = area.Y + WorldGen.genRand.Next(area.Height);
+            bool[,] mask = new bool[area.Width, area.Height];
 
-            return new Point(x, y);
-        }
-
-        private static void CarveWorm(
-            Rectangle area,
-            int startX,
-            int startY,
-            double startAngle,
-            int steps,
-            ref int branchesCarved)
-        {
-            double x = startX;
-            double y = startY;
-            double angle = startAngle;
-
-            double strength = TunnelMinStrength +
-                WorldGen.genRand.NextDouble() *
-                (TunnelMaxStrength - TunnelMinStrength);
-
-            for (int step = 0; step < steps; step++)
+            for (int x = area.Left; x < area.Right; x++)
             {
-                if (!IsWellInsideArea(area, (int)x, (int)y))
-                    break;
-
-                CarveCircle((int)x, (int)y, strength);
-
-                angle += (WorldGen.genRand.NextDouble() * 2 - 1) * TurnAmount;
-
-                x += Math.Cos(angle);
-                y += Math.Sin(angle);
-
-                if (step > 0 &&
-                    step % StepsBetweenBranches == 0 &&
-                    WorldGen.genRand.NextFloat() < BranchChance)
+                for (int y = area.Top; y < area.Bottom; y++)
                 {
-                    double branchTurn =
-                        -0.3 + WorldGen.genRand.NextDouble() * 0.6;
+                    if (!WorldGen.InWorld(x, y, 20))
+                        continue;
 
-                    double branchAngle =
-                        angle +
-                        (WorldGen.genRand.NextBool() ? 1 : -1) *
-                        (MathHelper.PiOver2 + branchTurn);
+                    Tile tile = Main.tile[x, y];
 
-                    int branchSteps = WorldGen.genRand.Next(
-                        TunnelMinSteps / 2,
-                        TunnelMaxSteps / 2
-                    );
+                    if (tile.HasTile && IsDesertTile(tile.TileType))
+                        mask[x - area.Left, y - area.Top] = true;
+                }
+            }
 
-                    // Branches cannot create their own branches preventing exponential growth (trust me its happends before)
-                    CarveWormNoBranching(
-                        area,
-                        (int)x,
-                        (int)y,
-                        branchAngle,
-                        branchSteps
-                    );
+            return mask;
+        }
 
-                    branchesCarved++;
+        private static void PreserveVanillaInterior(Rectangle area, bool[,] mask)
+        {
+            for (int x = area.Left; x < area.Right; x++)
+            {
+                for (int y = area.Top; y < area.Bottom; y++)
+                {
+                    if (!IsMasked(area, mask, x, y))
+                        continue;
+
+                    Tile tile = Main.tile[x, y];
+
+                    if (!tile.HasTile)
+                        WorldGen.PlaceTile(x, y, TileID.Sand, mute: true, forced: true);
                 }
             }
         }
 
-        private static void CarveWormNoBranching(
-            Rectangle area,
-            int startX,
-            int startY,
-            double startAngle,
-            int steps)
+        private static void PlaceSandstoneFormations(Rectangle area, bool[,] mask)
         {
-            double x = startX;
-            double y = startY;
-            double angle = startAngle;
+            const int majorCount = 20;
+            const int minorCount = 30;
 
-            double minStrength = TunnelMinStrength * 0.7;
-            double maxStrength = TunnelMaxStrength * 0.7;
+            int topBoundary = area.Height / TopSectionRatio;
 
-            double strength = minStrength +
-                WorldGen.genRand.NextDouble() *
-                (maxStrength - minStrength);
-
-            for (int step = 0; step < steps; step++)
+            for (int i = 0; i < majorCount; i++)
             {
-                if (!IsWellInsideArea(area, (int)x, (int)y))
-                    break;
+                Point center = RandomMaskedPoint(area, mask, 35);
 
-                CarveCircle((int)x, (int)y, strength);
+                if (center.Y < area.Top + topBoundary + 20)
+                    continue;
 
-                angle += (WorldGen.genRand.NextDouble() * 2 - 1) * TurnAmount;
+                ApplyBlobFormation(
+                    area,
+                    mask,
+                    center,
+                    WorldGen.genRand.Next(45, 95),
+                    WorldGen.genRand.Next(20, 50),
+                    WorldGen.genRand.NextFloat(0.04f, 0.1f),
+                    TileID.Sandstone);
+            }
 
-                x += Math.Cos(angle);
-                y += Math.Sin(angle);
+            for (int i = 0; i < minorCount; i++)
+            {
+                Point center = RandomMaskedPoint(area, mask, 25);
+
+                if (center.Y < area.Top + topBoundary + 15)
+                    continue;
+
+                ushort tileType = WorldGen.genRand.NextBool()
+                    ? TileID.Sandstone
+                    : TileID.HardenedSand;
+
+                ApplyBlobFormation(
+                    area,
+                    mask,
+                    center,
+                    WorldGen.genRand.Next(18, 42),
+                    WorldGen.genRand.Next(12, 28),
+                    WorldGen.genRand.NextFloat(0.1f, 0.22f),
+                    tileType);
             }
         }
 
-        private static bool IsWellInsideArea(Rectangle area, int x, int y)
+        private static void ApplyBlobFormation(
+            Rectangle area,
+            bool[,] mask,
+            Point center,
+            int radiusX,
+            int radiusY,
+            double waveModifier,
+            ushort tileType)
         {
-            return x > area.X + EdgeMargin
-                && x < area.X + area.Width - EdgeMargin
-                && y > area.Y + EdgeMargin
-                && y < area.Y + area.Height - EdgeMargin
-                && WorldGen.InWorld(x, y, 10);
+            for (int dx = -radiusX; dx <= radiusX; dx++)
+            {
+                for (int dy = -radiusY; dy <= radiusY; dy++)
+                {
+                    double normalizedX = dx / (double)radiusX;
+                    double normalizedY = dy / (double)radiusY;
+
+                    double noise =
+                        1.0 +
+                        Math.Sin(dx * waveModifier * 1.5 + dy * waveModifier) * 0.18 +
+                        Math.Cos(dy * waveModifier * 1.2 - dx * waveModifier) * 0.15;
+
+                    if (normalizedX * normalizedX + normalizedY * normalizedY > noise)
+                        continue;
+
+                    int x = center.X + dx;
+                    int y = center.Y + dy;
+
+                    if (!IsInside(area, x, y, 2) || !IsMasked(area, mask, x, y))
+                        continue;
+
+                    Tile tile = Main.tile[x, y];
+
+                    if (tile.HasTile && IsDesertTile(tile.TileType))
+                        tile.TileType = tileType;
+                }
+            }
         }
 
-        // Only desert-related blocks are removed; existing structures and other tiles are preserved.
-        private static readonly HashSet<int> CarvableTileTypes = new HashSet<int>
+        private static void ApplySandstormStriations(Rectangle area, bool[,] mask)
         {
-            TileID.Sand,
-            TileID.HardenedSand,
-            TileID.Sandstone,
-            TileID.CorruptSandstone,
-            TileID.CrimsonSandstone
-        };
+            const int baseStreakCount = 20;
+            const int maxStreakCount = 75;
+            const int verticalSpacing = 15;
 
-        private static void CarveCircle(
+            int topBoundary = area.Height / TopSectionRatio;
+            int usableHeight = area.Height - topBoundary;
+
+            for (int y = area.Top + topBoundary; y < area.Bottom; y += verticalSpacing)
+            {
+                float depthRatio = MathHelper.Clamp(
+                    (float)(y - (area.Top + topBoundary)) / usableHeight,
+                    0f,
+                    1f);
+
+                int streakCount = (int)MathHelper.Lerp(
+                    baseStreakCount,
+                    maxStreakCount,
+                    depthRatio * depthRatio);
+
+                for (int i = 0; i < streakCount / 4; i++)
+                    CreateStriation(area, mask, y, depthRatio);
+            }
+        }
+
+        private static void CreateStriation(
+            Rectangle area,
+            bool[,] mask,
+            int y,
+            float depthRatio)
+        {
+            Point start = new Point(
+                WorldGen.genRand.Next(area.Left + 15, area.Right - 15),
+                y + WorldGen.genRand.Next(-10, 10));
+
+            if (!IsMasked(area, mask, start.X, start.Y))
+                return;
+
+            int length = WorldGen.genRand.Next(30, 90);
+            float angle = MathHelper.PiOver4 + WorldGen.genRand.NextFloat(-0.35f, 0.35f);
+
+            ushort tileType = depthRatio > 0.5f
+                ? (WorldGen.genRand.NextBool() ? TileID.Sandstone : TileID.HardenedSand)
+                : TileID.HardenedSand;
+
+            Vector2 position = new Vector2(start.X, start.Y);
+            Vector2 direction = new Vector2(
+                (float)Math.Cos(angle),
+                (float)Math.Sin(angle));
+
+            for (int step = 0; step < length; step++)
+            {
+                position += direction;
+
+                float wave = (float)Math.Sin(step * 0.15f) * 1.5f;
+                int x = (int)(position.X + wave);
+                int targetY = (int)position.Y;
+
+                if (!IsInside(area, x, targetY, 2))
+                    continue;
+
+                int thickness = depthRatio > 0.6f
+                    ? WorldGen.genRand.Next(1, 4)
+                    : 1;
+
+                PaintDesertArea(
+                    area,
+                    x,
+                    targetY,
+                    thickness,
+                    tileType);
+            }
+        }
+
+        private static void CarveCanyonSystem(Rectangle area)
+        {
+            CarvePrimaryRift(area);
+
+            CarveJaggedBranch(
+                area,
+                new Vector2(area.Center.X - 15, area.Top + area.Height / 3),
+                -0.7f,
+                65);
+
+            CarveJaggedBranch(
+                area,
+                new Vector2(area.Center.X + 15, area.Top + area.Height / 2),
+                0.65f,
+                55);
+        }
+
+        private static void CarvePrimaryRift(Rectangle area)
+        {
+            Vector2 position = new Vector2(
+                area.Center.X,
+                area.Top + area.Height / TopSectionRatio + 2);
+
+            int steps = area.Height - area.Height / TopSectionRatio - 20;
+            float direction = 0f;
+
+            for (int step = 0; step < steps; step++)
+            {
+                if (step % 12 == 0)
+                    direction = WorldGen.genRand.NextFloat(-1.2f, 1.2f);
+
+                position.X += direction + WorldGen.genRand.NextFloat(-0.8f, 0.8f);
+                position.Y += 1f;
+
+                if (!IsInside(area, (int)position.X, (int)position.Y, 4))
+                    continue;
+
+                CarveFracture(
+                    area,
+                    (int)position.X,
+                    (int)position.Y,
+                    WorldGen.genRand.Next(8, 24),
+                    WorldGen.genRand.Next(12, 30));
+            }
+        }
+
+        private static void CarveJaggedBranch(
+            Rectangle area,
+            Vector2 startPosition,
+            float horizontalDirection,
+            int length)
+        {
+            Vector2 position = startPosition;
+
+            for (int step = 0; step < length; step++)
+            {
+                if (step % 8 == 0)
+                    horizontalDirection *= -1f;
+
+                position.X += horizontalDirection + WorldGen.genRand.NextFloat(-0.5f, 0.5f);
+                position.Y += 1f;
+
+                if (!IsInside(area, (int)position.X, (int)position.Y, 4))
+                    break;
+
+                CarveFracture(
+                    area,
+                    (int)position.X,
+                    (int)position.Y,
+                    WorldGen.genRand.Next(6, 16),
+                    WorldGen.genRand.Next(8, 20));
+            }
+        }
+
+        private static void CarveFracture(
+            Rectangle area,
             int centerX,
             int centerY,
-            double radius)
+            int radiusX,
+            int radiusY)
         {
-            int radiusTiles = (int)Math.Ceiling(radius);
-
-            for (int dx = -radiusTiles; dx <= radiusTiles; dx++)
+            for (int dx = -radiusX; dx <= radiusX; dx++)
             {
-                for (int dy = -radiusTiles; dy <= radiusTiles; dy++)
+                for (int dy = -radiusY; dy <= radiusY; dy++)
                 {
-                    if (dx * dx + dy * dy > radius * radius)
-                        continue;
-
-                    int worldX = centerX + dx;
-                    int worldY = centerY + dy;
-
-                    if (!WorldGen.InWorld(worldX, worldY, 10))
-                        continue;
-
-                    Tile tile = Main.tile[worldX, worldY];
-
-                    if (!tile.HasTile ||
-                        !CarvableTileTypes.Contains(tile.TileType))
+                    if (Math.Abs(dx) +
+                        Math.Abs(dy) +
+                        WorldGen.genRand.Next(-3, 3) >
+                        radiusX + radiusY * 0.5)
                     {
                         continue;
                     }
 
-                    WorldGen.KillTile(
-                        worldX,
-                        worldY,
-                        false,
-                        false,
-                        true
-                    );
+                    int x = centerX + dx;
+                    int y = centerY + dy;
+
+                    if (!IsInside(area, x, y, 1))
+                        continue;
+
+                    Tile tile = Main.tile[x, y];
+
+                    if (tile.HasTile)
+                        WorldGen.KillTile(x, y, false, false, true);
                 }
             }
         }
+
+        private static void CarveOrganicPockets(Rectangle area, bool[,] mask)
+        {
+            const int pocketCount = 14;
+
+            int minimumY = area.Top + area.Height / TopSectionRatio + 10;
+
+            for (int i = 0; i < pocketCount; i++)
+            {
+                Point start = RandomMaskedPoint(area, mask, 20);
+
+                if (start.Y < minimumY)
+                    continue;
+
+                double angle = WorldGen.genRand.NextDouble() * MathHelper.TwoPi;
+                int steps = WorldGen.genRand.Next(35, 70);
+                int radius = WorldGen.genRand.Next(6, 13);
+
+                Vector2 position = new Vector2(start.X, start.Y);
+
+                for (int step = 0; step < steps; step++)
+                {
+                    if (!IsInside(area, (int)position.X, (int)position.Y, 6))
+                        break;
+
+                    CarveFracture(
+                        area,
+                        (int)position.X,
+                        (int)position.Y,
+                        radius,
+                        radius);
+
+                    angle += WorldGen.genRand.NextFloat(-0.35f, 0.35f);
+
+                    position.X += (float)Math.Cos(angle) * 1.8f;
+                    position.Y += (float)Math.Sin(angle) * 1.8f;
+                }
+            }
+        }
+
+        private static void AddGroundingConnections(Rectangle area)
+        {
+            int centerX = area.Center.X;
+
+            CarveTunnel(
+                area,
+                new Vector2(centerX, area.Top + 2),
+                new Vector2(centerX, area.Top + 35),
+                7);
+
+            CarveTunnel(
+                area,
+                new Vector2(centerX, area.Bottom - 30),
+                new Vector2(centerX, area.Bottom - 2),
+                9);
+        }
+
+        private static void CarveTunnel(
+            Rectangle area,
+            Vector2 start,
+            Vector2 target,
+            int radius)
+        {
+            Vector2 position = start;
+            int safety = 0;
+
+            while (Vector2.Distance(position, target) > 2f && safety++ < 1000)
+            {
+                Vector2 direction = target - position;
+
+                if (direction != Vector2.Zero)
+                    direction.Normalize();
+
+                position += direction * 1.5f;
+
+                CarveFracture(
+                    area,
+                    (int)position.X,
+                    (int)position.Y,
+                    radius,
+                    radius);
+            }
+        }
+
+        private static void PaintDesertArea(
+            Rectangle area,
+            int centerX,
+            int centerY,
+            int radius,
+            ushort tileType)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    int x = centerX + dx;
+                    int y = centerY + dy;
+
+                    if (!IsInside(area, x, y, 2))
+                        continue;
+
+                    Tile tile = Main.tile[x, y];
+
+                    if (tile.HasTile && IsDesertTile(tile.TileType))
+                        tile.TileType = tileType;
+                }
+            }
+        }
+
+        private static bool IsDesertTile(int tileType)
+        {
+            return tileType == TileID.Sand ||
+                   tileType == TileID.HardenedSand ||
+                   tileType == TileID.Sandstone ||
+                   tileType == TileID.CorruptSandstone ||
+                   tileType == TileID.CrimsonSandstone;
+        }
+
+        private static Point RandomMaskedPoint(
+            Rectangle area,
+            bool[,] mask,
+            int margin)
+        {
+            for (int attempt = 0; attempt < 50; attempt++)
+            {
+                Point candidate = RandomPoint(area, margin);
+
+                if (IsMasked(area, mask, candidate.X, candidate.Y))
+                    return candidate;
+            }
+
+            return RandomPoint(area, margin);
+        }
+
+        private static Point RandomPoint(Rectangle area, int margin)
+        {
+            int minX = area.Left + margin;
+            int maxX = area.Right - margin;
+            int minY = area.Top + margin;
+            int maxY = area.Bottom - margin;
+
+            if (maxX <= minX)
+                minX = maxX = area.Center.X;
+
+            if (maxY <= minY)
+                minY = maxY = area.Center.Y;
+
+            return new Point(
+                WorldGen.genRand.Next(minX, maxX + 1),
+                WorldGen.genRand.Next(minY, maxY + 1));
+        }
+
+        private static Rectangle GetUndergroundArea(Rectangle vanillaArea)
+        {
+            int top = vanillaArea.Y + vanillaArea.Height / TopSectionRatio;
+            int bottom = vanillaArea.Bottom - BorderMargin;
+
+            if (bottom <= top)
+                return vanillaArea;
+
+            return new Rectangle(
+                vanillaArea.X + BorderMargin,
+                top,
+                Math.Max(1, vanillaArea.Width - BorderMargin * 2),
+                Math.Max(1, bottom - top));
+        }
+
+        private static bool IsValidArea(Rectangle area)
+        {
+            return area.Width > BorderMargin * 2 &&
+                   area.Height > BorderMargin * 2 &&
+                   WorldGen.InWorld(area.Left + BorderMargin, area.Top + BorderMargin, 20) &&
+                   WorldGen.InWorld(area.Right - BorderMargin, area.Bottom - BorderMargin, 20);
+        }
+
+        private static bool IsMasked(
+            Rectangle area,
+            bool[,] mask,
+            int x,
+            int y)
+        {
+            int maskX = x - area.Left;
+            int maskY = y - area.Top;
+
+            if (maskX < 0 ||
+                maskY < 0 ||
+                maskX >= mask.GetLength(0) ||
+                maskY >= mask.GetLength(1))
+            {
+                return false;
+            }
+
+            return mask[maskX, maskY];
+        }
+
+        private static bool IsInside(
+            Rectangle area,
+            int x,
+            int y,
+            int margin)
+        {
+            return x >= area.Left + margin &&
+                   x < area.Right - margin &&
+                   y >= area.Top + margin &&
+                   y < area.Bottom - margin &&
+                   WorldGen.InWorld(x, y, 20);
+        }
     }
 }
+

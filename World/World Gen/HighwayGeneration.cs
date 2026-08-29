@@ -20,7 +20,7 @@ namespace ShatteredIllusion.World.World_Gen
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
         {
-            int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Micro Biomes"));
+            int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Shattered Illusion: Rebuild Underground Desert"));
 
             if (passIndex != -1)
             {
@@ -49,27 +49,22 @@ namespace ShatteredIllusion.World.World_Gen
                 int startY = Utils.Clamp(desertBounds.Y, 50, Main.maxTilesY - 50);
                 int endY = Utils.Clamp(desertBounds.Y + desertBounds.Height - 1, 50, Main.maxTilesY - 50);
 
-                int foundY = -1;
+                int deepestSolidY = -1;
 
-                for (int y = endY; y >= startY; y--)
+                for (int y = startY; y <= endY; y++)
                 {
                     Tile tile = Framing.GetTileSafely(desertCenterX, y);
 
                     if (tile.HasTile && (tile.TileType == TileID.Sandstone || tile.TileType == TileID.HardenedSand))
                     {
-                        int possibleY = y - 40;
-                        if (possibleY >= 50 && possibleY + StructureHeight < Main.maxTilesY - 50)
-                        {
-                            foundY = possibleY;
-                            break;
-                        }
+                        deepestSolidY = y;
                     }
                 }
 
-                if (foundY != -1)
+                if (deepestSolidY != -1)
                 {
                     targetX = desertCenterX - StructureWidth / 2;
-                    targetY = foundY;
+                    targetY = Utils.Clamp(deepestSolidY - StructureHeight - 5, 50, Main.maxTilesY - StructureHeight - 50);
                 }
                 else
                 {

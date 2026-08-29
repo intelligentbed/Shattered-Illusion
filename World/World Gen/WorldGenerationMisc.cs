@@ -65,9 +65,6 @@ namespace ShatteredIllusion.World.World_Gen
                 if (TryAddItemToChestFirstSlot(chest, ModContent.ItemType<DuneCarapace>(), stack: 1))
                     itemsPlaced++;
             }
-
-            ModContent.GetInstance<ShatteredIllusion>().Logger.Info(
-                $"[DuneCarapace] Chests scanned: {chestsScanned}, underground: {undergroundChests}, desert: {desertChests}, items placed: {itemsPlaced}");
         }
 
         private static bool IsUnderground(int tileY)
