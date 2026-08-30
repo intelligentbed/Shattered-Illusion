@@ -20,8 +20,6 @@ namespace ShatteredIllusion.World.World_Gen
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
         {
-            // Run AFTER all decoration passes (chests, pots, houses, statues, life crystals, etc.)
-            // but BEFORE liquids settle, so nothing gets placed inside the structure afterward.
             int passIndex = tasks.FindIndex(genpass => genpass.Name.Equals("Settle Liquids"));
 
             if (passIndex == -1)
