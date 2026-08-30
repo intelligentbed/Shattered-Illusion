@@ -37,15 +37,12 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
         public const int FocusedBuffDuration = 600;
         public const int ParryHealAmount = 20;
 
-        // The curve for the buff duration so above 60 = good below bad
+        // The curve for the buff duration so above 60 = good below cant use 
         private const float SteeledCurveThreshold = 0.6f;
 
         private const float SteeledMinScale = 0.05f;
         private int steeledHealPerParry = 0;
 
-        // Purely visual: lets the bar drain smoothly over the buff's duration instead
-        // of snapping to empty the instant Steeled is activated. SturdinessMeter itself
-        // still hits 0 immediately below - this never touches the real resource value.
         private int steeledDrainStartValue = 0;
         private int steeledDrainDuration = 0;
         private int steeledDrainTimer = 0;
@@ -104,6 +101,8 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                 SoundEngine.PlaySound(SoundID.Item37, Player.position);
                 SpawnDustExplosion(DustID.Silver, 25, 6f);
+
+                SpawnRing(Player.Center, DustID.Silver, 30f, 14, 3.5f, alpha: 80, scale: 1.3f);
             }
 
             if (KeybindSystem.SturdinessMeterUseKeybind.JustPressed)
@@ -130,8 +129,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
             Player.AddBuff(ModContent.BuffType<SteeledBuff>(), duration);
 
-            // Bar drains from its current fill down to empty over exactly `duration` ticks,
-            // so a max-duration activation drains slow and a min-duration one drains fast.
             steeledDrainStartValue = SturdinessMeter;
             steeledDrainDuration = duration;
             steeledDrainTimer = duration;
@@ -140,6 +137,15 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             SoundEngine.PlaySound(SteeledUseSound, Player.position);
             SpawnDustExplosion(DustID.BlueTorch, 40, 9f);
 
+
+            Lighting.AddLight(Player.Center, 0.3f, 0.5f, 1.2f * scale);
+
+            int auraRings = 2 + (int)Math.Round(2 * scale); // 2-4 rings depending on power
+            for (int i = 0; i < auraRings; i++)
+            {
+                float ringRadius = 35f + i * 22f;
+                SpawnRing(Player.Center, DustID.BlueTorch, ringRadius, 16, 2f + i * 0.5f, alpha: 100, scale: 1.4f);
+            }
         }
 
         public override bool FreeDodge(Player.HurtInfo info)
@@ -165,6 +171,25 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                         SoundEngine.PlaySound(SoundID.Item4, Player.position);
                         SpawnDustExplosion(DustID.Gold, 40, 9f);
 
+
+                        Lighting.AddLight(Player.Center, 1.3f, 1.05f, 0.35f);
+                        SpawnRing(Player.Center, DustID.Gold, 20f, 18, 9f, alpha: 40, scale: 1.7f);
+                        SpawnRing(Player.Center, DustID.GoldFlame, 45f, 22, 5f, alpha: 70, scale: 1.4f);
+
+
+                        Vector2 toAttacker = attacker.Center - Player.Center;
+                        if (toAttacker != Vector2.Zero)
+                        {
+                            attacker.velocity += Vector2.Normalize(toAttacker) * 4f;
+                            attacker.netUpdate = true;
+                        }
+                        for (int i = 0; i < 14; i++)
+                        {
+                            Vector2 dustVelocity = Main.rand.NextVector2Circular(5f, 5f);
+                            Dust clash = Dust.NewDustPerfect(attacker.Center, DustID.Gold, dustVelocity, Alpha: 60, Scale: 1.6f);
+                            clash.noGravity = true;
+                        }
+
                         bool wasFull = SturdinessMeter >= MaxSturdinessMeter;
 
                         steeledDrainTimer = 0;
@@ -187,8 +212,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                             Player.HealEffect(steeledHealPerParry);
                         }
 
-                        // Mycelial set bonus - parrying pops a burst of spores that
-                        // damages and poisons anything nearby, not just a visual.
                         if (MycelialSetActive)
                         {
                             SpawnMycelialExplosion();
@@ -208,6 +231,10 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
         {
             SoundEngine.PlaySound(ParryFullSound, Player.position);
             SpawnDustExplosion(DustID.GoldFlame, 60, 12f);
+
+            Lighting.AddLight(Player.Center, 1.4f, 1.1f, 0.4f);
+            SpawnRing(Player.Center, DustID.GoldFlame, 15f, 20, 10f, alpha: 30, scale: 1.9f);
+            SpawnRing(Player.Center, DustID.Gold, 55f, 26, 3f, alpha: 90, scale: 1.5f);
         }
 
         private void SpawnMycelialExplosion()
@@ -220,23 +247,20 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
             Lighting.AddLight(center, 0.2f, 1.4f, 0.3f);
 
-
             const int ringLayers = 4;
             const int dustPerLayer = 20;
             for (int layer = 1; layer <= ringLayers; layer++)
             {
                 float layerRadius = MycelialExplosionRadius * layer / ringLayers;
+                SpawnRing(center, DustID.GlowingMushroom, layerRadius, dustPerLayer, 3f, alpha: 40, scale: 1.8f);
+            }
 
-                for (int i = 0; i < dustPerLayer; i++)
-                {
-                    float angle = MathHelper.TwoPi * i / dustPerLayer;
-                    Vector2 direction = angle.ToRotationVector2();
-                    Vector2 spawnPos = center + direction * layerRadius;
-                    Vector2 velocity = direction * 3f;
 
-                    Dust ring = Dust.NewDustPerfect(spawnPos, DustID.GlowingMushroom, velocity, Alpha: 40, Scale: 1.8f);
-                    ring.noGravity = true;
-                }
+            for (int i = 0; i < 16; i++)
+            {
+                Vector2 velocity = new Vector2(Main.rand.NextFloat(-4f, 4f), Main.rand.NextFloat(-7f, -2f));
+                Dust spore = Dust.NewDustPerfect(center, DustID.GlowingMushroom, velocity, Alpha: 50, Scale: Main.rand.NextFloat(1.2f, 2f));
+                spore.noGravity = false;
             }
 
             SpawnDustExplosion(DustID.GlowingMushroom, 35, 7f);
@@ -259,6 +283,13 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                 npc.StrikeNPC(hit);
                 npc.AddBuff(BuffID.Poisoned, MycelialPoisonedDuration);
+
+                for (int d = 0; d < 6; d++)
+                {
+                    Vector2 popVel = Main.rand.NextVector2Circular(2.5f, 2.5f);
+                    Dust pop = Dust.NewDustPerfect(npc.Center, DustID.GlowingMushroom, popVel, Alpha: 60, Scale: 1.3f);
+                    pop.noGravity = true;
+                }
             }
         }
 
@@ -288,6 +319,20 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                 );
 
                 dust.noGravity = true;
+            }
+        }
+
+        private void SpawnRing(Vector2 center, int dustType, float radius, int count, float outwardSpeed, int alpha = 60, float scale = 1.6f)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float angle = MathHelper.TwoPi * i / count;
+                Vector2 direction = angle.ToRotationVector2();
+                Vector2 spawnPos = center + direction * radius;
+                Vector2 velocity = direction * outwardSpeed;
+
+                Dust ring = Dust.NewDustPerfect(spawnPos, dustType, velocity, Alpha: alpha, Scale: scale);
+                ring.noGravity = true;
             }
         }
     }
