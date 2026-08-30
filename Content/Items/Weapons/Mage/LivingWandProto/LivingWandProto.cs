@@ -3,7 +3,7 @@ using Terraria;
 using Terraria.ID;
 using ShatteredIllusion.Content.Items.Materials;
 
-namespace ShatteredIllusion.Content.Items.Weapons.LivingWandProto
+namespace ShatteredIllusion.Content.Items.Weapons.Mage.LivingWandProto
 {
     public class LivingWandProto : ModItem
     {

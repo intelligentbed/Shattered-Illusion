@@ -2,7 +2,7 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.Items.Weapons
+namespace ShatteredIllusion.Content.Items.Weapons.Ranger
 {
 	public class DeleteThisLater : ModItem
 	{

@@ -23,13 +23,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
             Projectile.hostile = true;
             Projectile.friendly = false;
             Projectile.penetrate = 1;
-            Projectile.timeLeft = 300; 
+            Projectile.timeLeft = 300;
             Projectile.tileCollide = false;
             Projectile.ignoreWater = false;
         }
 
         public override void AI()
         {
+            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+
             if (Main.rand.NextBool(2))
             {
                 Dust sandDust = Dust.NewDustPerfect(
