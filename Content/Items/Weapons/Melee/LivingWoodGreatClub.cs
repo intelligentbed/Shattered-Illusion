@@ -52,10 +52,14 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         private int baseDamage = -1;
         private float baseKnockback = -1f;
 
+        private bool hasSlammed;
+
         private const int MaxChargeTime = 50;
         private const int SwingTime = 30;
 
-        // Damage/knockback scale from a weak tap to a fully-charged hit
+        private const float ClubHeadReach = 78f;
+        private const float ClubHeadCheckSize = 10f;
+
         private const float MinDamageMultiplier = 0.6f;
         private const float MaxDamageMultiplier = 1.8f;
         private const float MinKnockbackMultiplier = 0.5f;
@@ -140,12 +144,20 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             {
                 rotation = DoSwinging(player, direction, out bool justFinishedSwing);
 
-                if (justFinishedSwing)
+                if (!hasSlammed && CanDamage() == true && TryGetTileSlamPosition(player, rotation, out Vector2 slamPosition))
                 {
-                    // Overrides the itemAnimation=2 set earlier this tick so
+                    hasSlammed = true;
+
                     player.itemAnimation = player.itemTime = PostSwingCooldown;
 
-                    CreateImpact(player, direction);
+                    CreateImpact(player, direction, slamPosition);
+                    Projectile.Kill();
+                    return;
+                }
+
+                if (justFinishedSwing)
+                {
+                    player.itemAnimation = player.itemTime = PostSwingCooldown;
                     Projectile.Kill();
                     return;
                 }
@@ -216,6 +228,24 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         }
 
 
+        /// <summary>
+        /// Checks whether the head of the club (out past the grip, along the
+        /// current swing rotation) is currently overlapping a solid tile.
+        /// Returns the head's world position so the impact can be spawned
+        /// exactly where contact happened, rather than guessed from the
+        /// player's own position.
+        /// </summary>
+        private bool TryGetTileSlamPosition(Player player, float swingRotation, out Vector2 slamPosition)
+        {
+            Vector2 gripPosition = player.MountedCenter + swingRotation.ToRotationVector2() * HandReachDistance;
+            Vector2 headPosition = gripPosition + swingRotation.ToRotationVector2() * ClubHeadReach;
+
+            slamPosition = headPosition;
+
+            float half = ClubHeadCheckSize / 2f;
+            return Collision.SolidCollision(headPosition - new Vector2(half, half), (int)ClubHeadCheckSize, (int)ClubHeadCheckSize);
+        }
+
         private const float RestAngleRight = -0.5236f;        // -30°, held up near the shoulder
         private const float FullChargeAngleRight = -2.618f;   // -150°, raised overhead and back
         private const float TapEndAngleRight = 0.5236f;       // +30°, short quick chop
@@ -285,36 +315,9 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             return false;
         }
 
-        private void CreateImpact(Player player, int direction)
+        private void CreateImpact(Player player, int direction, Vector2 impactPosition)
         {
             if (Main.myPlayer != Projectile.owner)
-                return;
-
-            if (!IsPlayerGrounded(player))
-                return;
-
-            Vector2 impactPosition = player.Center + new Vector2(32f * direction, 12f);
-
-            const int maxSearchTiles = 8; 
-            const float groundSearchStep = 4f;
-            bool foundGround = false;
-
-            for (int i = 0; i < maxSearchTiles; i++)
-            {
-                int tileX = (int)(impactPosition.X / 16f);
-                int tileY = (int)(impactPosition.Y / 16f);
-
-                if (WorldGen.InWorld(tileX, tileY) && WorldGen.SolidTile(Main.tile[tileX, tileY]))
-                {
-                    foundGround = true;
-                    impactPosition.Y -= groundSearchStep * 2f;
-                    break;
-                }
-
-                impactPosition.Y += groundSearchStep;
-            }
-
-            if (!foundGround)
                 return;
 
             float chargeRatio = Projectile.localAI[1];
@@ -347,11 +350,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
                 Main.dust[dust].noGravity = false;
                 Main.dust[dust].scale = Main.rand.NextFloat(1f, 1.6f);
             }
-        }
-
-        private bool IsPlayerGrounded(Player player)
-        {
-            return player.velocity.Y == 0f;
         }
 
         private void SpawnRubble(Vector2 impactPosition, int direction, float chargeRatio)
