@@ -1,5 +1,4 @@
 ﻿using Microsoft.Xna.Framework;
-using ShatteredIllusion.Content.Items.Materials;
 using System.Collections.Generic;
 using Terraria;
 using Terraria.ID;
@@ -8,7 +7,7 @@ using Terraria.ObjectData;
 
 namespace ShatteredIllusion.Content.Items.Placeables.Blocks
 {
-    public class MossBlock : ModTile
+    public class SpecialIronBricks : ModTile
     {
         public override void SetStaticDefaults()
         {
@@ -23,17 +22,14 @@ namespace ShatteredIllusion.Content.Items.Placeables.Blocks
             TileObjectData.newTile.CopyFrom(TileObjectData.Style1x1);
             TileObjectData.addTile(Type);
 
-            var mapName = CreateMapEntryName();
-            AddMapEntry(new Color(150, 255, 150), mapName);
-        }
+            MinPick = 100;  
 
-        public override IEnumerable<Item> GetItemDrops(int i, int j)
-        {
-            yield return new Item(ModContent.ItemType<MossItem>());
+            var mapName = CreateMapEntryName();
+            AddMapEntry(new Color(203, 203, 203), mapName);
         }
     }
 
-    public class MossItem : ModItem
+    public class SpecialIronBricksItem : ModItem
     {
         public override void SetDefaults()
         {
@@ -46,16 +42,8 @@ namespace ShatteredIllusion.Content.Items.Placeables.Blocks
             Item.useTime = 10;
             Item.useStyle = ItemUseStyleID.Swing;
             Item.consumable = true;
-            Item.createTile = ModContent.TileType<MossBlock>();
+            Item.createTile = ModContent.TileType<SpecialIronBricks>();
             Item.rare = ItemRarityID.Green;
-        }
-
-        public override void AddRecipes()
-        {
-            Recipe recipe = CreateRecipe();
-            recipe.AddIngredient(ItemID.GrassSeeds, 3);
-            recipe.AddCondition(Condition.NearWater);
-            recipe.Register();
         }
     }
 }

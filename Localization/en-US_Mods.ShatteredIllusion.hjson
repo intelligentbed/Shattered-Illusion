@@ -146,6 +146,49 @@ Items: {
 		DisplayName: Living Wood Great Club
 		Tooltip: ""
 	}
+
+	DuneRendPincers: {
+		DisplayName: Dune Rend Pincers
+		Tooltip: ""
+	}
+
+	SpecialIronBricksItem: {
+		Tooltip: ""
+		DisplayName: Special Iron Bricks Item
+	}
+
+	RustyKeys: {
+		DisplayName: Rusty Keys
+		Tooltip: ""
+	}
+
+	Rustylocker: {
+		DisplayName: Rusty Locker
+		Tooltip: "[DUBUG] YOU ARENT SUPPOSED SEE THIS"
+	}
+
+	MossChestplate: {
+		DisplayName: Moss Chestplate
+		Tooltip: ""
+	}
+
+	MossHelmet: {
+		DisplayName: Moss Hood
+		Tooltip:
+			'''
+			Increases maximum mana by 20
+			5% Inceased magical damage
+			'''
+	}
+
+	MossLeggings: {
+		DisplayName: Moss Leggings
+		Tooltip:
+			'''
+			Increases maximum mana by 20
+			5% Inceased magical damage
+			'''
+	}
 }
 
 Buffs: {
@@ -168,12 +211,18 @@ Buffs: {
 		Description: Summon Damage is increase by 15%
 		DisplayName: Sprouted
 	}
+
+	Bleeding: {
+		DisplayName: Bleeding
+		Description: Mods.ShatteredIllusion.Buffs.Bleeding.Description
+	}
 }
 
 Tiles: {
 	MossBlock.MapEntry: Moss Block
 	MossTile.MapEntry: Moss Tile
 	AntlionBossAltar.MapEntry: Antlion Boss Altar
+	SpecialIronBricks.MapEntry: Special Iron Bricks
 }
 
 Projectiles: {
@@ -186,6 +235,7 @@ Projectiles: {
 	LivingWoodGreatClubProjectile.DisplayName: Living Wood Great Club Projectile
 	LivingWoodRubble.DisplayName: Living Wood Rubble
 	LivingWoodGreatClubHoldout.DisplayName: Living Wood Great Club Holdout
+	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
 }
 
 Keybinds: {
