@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using ShatteredIllusion.Content.Buffs.StatBuffs;
 using ShatteredIllusionKeybinds;
@@ -21,11 +22,14 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
     public class ParryPlayer : ModPlayer
     {
-        private static readonly SoundStyle ParryFullSound = new SoundStyle("ShatteredIllusion/Sounds/ParryFull");
-        private static readonly SoundStyle SteeledUseSound = new SoundStyle("ShatteredIllusion/Sounds/dry-fart");
+        private static readonly SoundStyle ParryFullSound = new SoundStyle("ShatteredIllusion/Sounds/ParrySounds/ParryBarFull");
+        private static readonly SoundStyle SteeledUseSound = new SoundStyle("ShatteredIllusion/Sounds/ParrySounds/dry-fart");
+        private static readonly SoundStyle FailedParry = new SoundStyle("ShatteredIllusion/Sounds/ParrySounds/FailedParry");
+        private static readonly SoundStyle SuccessfulParry = new SoundStyle("ShatteredIllusion/Sounds/ParrySounds/SuccessfulParry");
 
         public int CooldownTimer = 0;
         public int parrySlowTimer = 0;
+        private bool parrySucceededThisWindow = false;
 
         public const int MaxCooldown = 120;
         public bool IsParrying => parrySlowTimer > 0;
@@ -81,6 +85,12 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             if (parrySlowTimer > 0)
             {
                 parrySlowTimer--;
+
+                // Window just expired without a successful parry
+                if (parrySlowTimer <= 0 && !parrySucceededThisWindow)
+                {
+                    SoundEngine.PlaySound(FailedParry, Player.position);
+                }
             }
 
             if (steeledDrainTimer > 0)
@@ -96,10 +106,10 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                 // Active parry window is now 15 since some of the devs are buns at the game
                 parrySlowTimer = 15;
                 CooldownTimer = MaxCooldown;
+                parrySucceededThisWindow = false;
 
                 Player.velocity.X *= 0.2f;
 
-                SoundEngine.PlaySound(SoundID.Item37, Player.position);
                 SpawnDustExplosion(DustID.Silver, 25, 6f);
 
                 SpawnRing(Player.Center, DustID.Silver, 30f, 14, 3.5f, alpha: 80, scale: 1.3f);
@@ -146,6 +156,10 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                 float ringRadius = 35f + i * 22f;
                 SpawnRing(Player.Center, DustID.BlueTorch, ringRadius, 16, 2f + i * 0.5f, alpha: 100, scale: 1.4f);
             }
+
+            // Shield sigil flashes outward on activation, bigger/brighter the stronger the buff
+            float shieldSize = MathHelper.Lerp(40f, 80f, scale);
+            SpawnShieldSymbol(Player.Center, DustID.BlueTorch, shieldSize, alpha: 70, dustScale: 1.4f + scale * 0.6f, outwardSpeed: 1.5f);
         }
 
         public override bool FreeDodge(Player.HurtInfo info)
@@ -168,7 +182,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                             Player.position
                         );
 
-                        SoundEngine.PlaySound(SoundID.Item4, Player.position);
+                        SoundEngine.PlaySound(SuccessfulParry, Player.position);
                         SpawnDustExplosion(DustID.Gold, 40, 9f);
 
 
@@ -192,7 +206,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                         bool wasFull = SturdinessMeter >= MaxSturdinessMeter;
 
-                        steeledDrainTimer = 0;
+                        parrySucceededThisWindow = true;
                         SturdinessMeter += SturdinessMeterGainPerParry;
 
                         if (SturdinessMeter > MaxSturdinessMeter)
@@ -205,7 +219,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                             OnSturdinessMeterFull();
                         }
 
-                        // Steeled heal parry payoff 
+                        // Steeled heal parry  
                         if (steeledHealPerParry > 0 && Player.HasBuff(ModContent.BuffType<SteeledBuff>()))
                         {
                             Player.statLife = Math.Min(Player.statLife + steeledHealPerParry, Player.statLifeMax2);
@@ -333,6 +347,66 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                 Dust ring = Dust.NewDustPerfect(spawnPos, dustType, velocity, Alpha: alpha, Scale: scale);
                 ring.noGravity = true;
+            }
+        }
+
+        private static readonly Vector2[] ShieldOutlinePoints = BuildShieldOutline();
+
+        private static Vector2[] BuildShieldOutline()
+        {
+            List<Vector2> points = new List<Vector2>();
+
+            Vector2 topLeft = new Vector2(-0.8f, -1.0f);
+            Vector2 topRight = new Vector2(0.8f, -1.0f);
+            Vector2 rightShoulder = new Vector2(1.0f, -0.35f);
+            Vector2 rightWaist = new Vector2(0.8f, 0.65f);
+            Vector2 bottomTip = new Vector2(0f, 1.3f);
+            Vector2 leftWaist = new Vector2(-0.8f, 0.65f);
+            Vector2 leftShoulder = new Vector2(-1.0f, -0.35f);
+
+            AddLineSegment(points, topLeft, topRight, 8);                                          // flat top edge
+            AddCurveSegment(points, topRight, new Vector2(1.05f, -1.0f), rightShoulder, 8);         // small rounded shoulder, not a bulge
+            AddLineSegment(points, rightShoulder, rightWaist, 10);                                  // mostly straight side
+            AddCurveSegment(points, rightWaist, new Vector2(0.35f, 1.15f), bottomTip, 10);          // curves inward into the point
+            AddCurveSegment(points, bottomTip, new Vector2(-0.35f, 1.15f), leftWaist, 10);          // mirrored curve out of the point
+            AddLineSegment(points, leftWaist, leftShoulder, 10);                                    // mostly straight side
+            AddCurveSegment(points, leftShoulder, new Vector2(-1.05f, -1.0f), topLeft, 8);          // mirrored shoulder
+
+            return points.ToArray();
+        }
+
+        private static void AddLineSegment(List<Vector2> points, Vector2 start, Vector2 end, int count)
+        {
+            // Skip the final t=1 point so segments don't double up their shared corner.
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)count;
+                points.Add(Vector2.Lerp(start, end, t));
+            }
+        }
+
+        private static void AddCurveSegment(List<Vector2> points, Vector2 start, Vector2 control, Vector2 end, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)count;
+                Vector2 a = Vector2.Lerp(start, control, t);
+                Vector2 b = Vector2.Lerp(control, end, t);
+                points.Add(Vector2.Lerp(a, b, t));
+            }
+        }
+
+        private void SpawnShieldSymbol(Vector2 center, int dustType, float size, int alpha = 70, float dustScale = 1.6f, float outwardSpeed = 1.5f)
+        {
+            foreach (Vector2 unitPoint in ShieldOutlinePoints)
+            {
+                Vector2 spawnPos = center + unitPoint * size;
+
+                Vector2 direction = unitPoint == Vector2.Zero ? Vector2.Zero : Vector2.Normalize(unitPoint);
+                Vector2 velocity = direction * outwardSpeed;
+
+                Dust glyph = Dust.NewDustPerfect(spawnPos, dustType, velocity, Alpha: alpha, Scale: dustScale);
+                glyph.noGravity = true;
             }
         }
     }
