@@ -12,6 +12,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
     {
         private ref float State => ref Projectile.ai[0];
 
+
+        private ref float CachedEndY => ref Projectile.localAI[0];
+        private ref float CachedStartY => ref Projectile.localAI[1];
+
+        private const int TelegraphTicks = 50; 
+        private const int DustPerTick = 2;     
         public override void SetStaticDefaults()
         {
             ProjectileID.Sets.TrailCacheLength[Projectile.type] = 5;
@@ -35,14 +41,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             {
                 Projectile.rotation = Main.rand.NextFloat(MathHelper.TwoPi);
                 Projectile.scale = Main.rand.NextFloat(1.5f, 2.0f);
+                CalculateTelegraphLine();
                 State = 1f;
             }
 
-            if (Projectile.timeLeft > 550)
+            if (Projectile.timeLeft > 600 - TelegraphTicks)
             {
                 Projectile.hostile = false;
                 Projectile.tileCollide = false;
                 Projectile.velocity = Vector2.Zero;
+
+                DoTelegraphDust();
                 return;
             }
 
@@ -68,77 +77,77 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
         }
 
-        public override bool PreDraw(ref Color lightColor)
+        /// <summary>
+        /// Raycasts down from the rubble to find where the telegraph line should end.
+        /// Computed once (on spawn) rather than every tick/frame.
+        /// </summary>
+        private void CalculateTelegraphLine()
         {
-            if (Projectile.timeLeft > 550)
+            float startY = Projectile.Center.Y + (Projectile.height / 2f);
+            float endY = Projectile.Center.Y + 400f;
+
+            int tileX = (int)(Projectile.Center.X / 16f);
+            int startTileY = (int)(Projectile.Center.Y / 16f);
+
+            if (tileX >= 10 && tileX < Main.maxTilesX - 10)
             {
-                Texture2D telegraphTex = ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/RubbleTelegraph").Value;
-
-                float startY = Projectile.Center.Y - 25f;
-                float endY = Projectile.Center.Y + 400f;
-
-                int tileX = (int)(Projectile.Center.X / 16f);
-                int startTileY = (int)(Projectile.Center.Y / 16f);
-
-                if (tileX >= 10 && tileX < Main.maxTilesX - 10)
+                int maxSearchY = Math.Min(Main.maxTilesY - 10, startTileY + 35);
+                for (int y = startTileY; y < maxSearchY; y++)
                 {
-                    int maxSearchY = Math.Min(Main.maxTilesY - 10, startTileY + 35);
-                    for (int y = startTileY; y < maxSearchY; y++)
-                    {
-                        Tile tile = Main.tile[tileX, y];
+                    Tile tile = Main.tile[tileX, y];
 
-                        if (tile.HasTile && !tile.IsActuated && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
-                        {
-                            endY = y * 16f;
-                            break;
-                        }
+                    if (tile.HasTile && !tile.IsActuated && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
+                    {
+                        endY = y * 16f;
+                        break;
                     }
                 }
+            }
 
-                float totalLength = MathHelper.Clamp(endY - startY, 50f, 600f);
-                Vector2 drawPos = new Vector2(Projectile.Center.X, startY) - Main.screenPosition;
+            CachedStartY = startY;
+            CachedEndY = endY;
+        }
 
-                float progress = (600 - Projectile.timeLeft) / 50f;
-                float alpha = MathHelper.Clamp(1f - progress, 0.4f, 1.0f);
-                Color drawColor = Color.Red * alpha;
+        /// <summary>
+        /// Spawns telegraph dust along the cached line. Runs in AI() so it fires every
+        /// logic tick regardless of whether the projectile is currently on-screen, and
+        /// is rate-limited so many simultaneous rubble instances don't exhaust the
+        /// global dust pool (Main.dust has a hard cap around 6000, shared by everything
+        /// in the world - torches, liquids, other effects, etc).
+        /// </summary>
+        private void DoTelegraphDust()
+        {
+            float startY = CachedStartY;
+            float totalLength = MathHelper.Clamp(CachedEndY - startY, 50f, 600f);
 
-                float rotation = MathHelper.PiOver2;
-                Vector2 origin = new Vector2(0f, telegraphTex.Height / 2f);
-                Vector2 scale = new Vector2(totalLength / telegraphTex.Width, 6f);
+            float progress = MathHelper.Clamp((TelegraphTicks - Projectile.timeLeft + (600 - TelegraphTicks)) / (float)TelegraphTicks, 0f, 1f);
+            float intensity = MathHelper.Lerp(0.6f, 1.4f, progress);
 
-                Main.spriteBatch.End();
-                Main.spriteBatch.Begin(
-                    SpriteSortMode.Deferred,
-                    BlendState.Additive,
-                    Main.DefaultSamplerState,
-                    DepthStencilState.None,
-                    RasterizerState.CullCounterClockwise,
-                    null,
-                    Main.GameViewMatrix.TransformationMatrix
-                );
+            for (int i = 0; i < DustPerTick; i++)
+            {
+                float t = Main.rand.NextFloat();
+                Vector2 pos = new Vector2(Projectile.Center.X + Main.rand.NextFloat(-6f, 6f), startY + t * totalLength);
 
-                Main.EntitySpriteDraw(
-                    telegraphTex,
-                    drawPos,
-                    null,
-                    drawColor,
-                    rotation,
-                    origin,
-                    scale,
-                    SpriteEffects.None,
-                    0
-                );
+                Dust d = Dust.NewDustPerfect(pos, Main.rand.NextBool() ? DustID.Stone : DustID.Sandstorm, Vector2.Zero, 0, default, 1.6f * intensity);
+                d.noGravity = true;
+                d.fadeIn = 0.3f;
 
-                Main.spriteBatch.End();
-                Main.spriteBatch.Begin(
-                    SpriteSortMode.Deferred,
-                    BlendState.AlphaBlend,
-                    Main.DefaultSamplerState,
-                    DepthStencilState.None,
-                    RasterizerState.CullCounterClockwise,
-                    null,
-                    Main.GameViewMatrix.TransformationMatrix
-                );
+                if (Main.rand.NextBool(8))
+                {
+                    Dust flare = Dust.NewDustPerfect(pos, DustID.RedTorch, Vector2.Zero, 0, default, 2.0f * intensity);
+                    flare.noGravity = true;
+                }
+            }
+
+            Lighting.AddLight(new Vector2(Projectile.Center.X, startY + totalLength / 2f), 0.9f * intensity, 0.15f, 0.15f);
+        }
+
+        public override bool PreDraw(ref Color lightColor)
+        {
+
+            if (Projectile.timeLeft > 600 - TelegraphTicks)
+            {
+                return false;
             }
 
             return true;

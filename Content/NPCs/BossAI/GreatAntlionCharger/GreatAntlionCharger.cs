@@ -19,7 +19,8 @@ using ShatteredIllusion.Content.Items.Placeables.Relics;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 {
-    [AutoloadBossHead] // ID LIKE TO THANK MERLIN FOR HELPING ME OUT ALSO FOR CLEANING MY DIRTY NASTY CODE A LITTLE
+    [AutoloadBossHead] //First real attempt at making boss Ai
+                       //ID LIKE TO THANK MERLIN FOR HELPING ME OUT ALSO FOR CLEANING MY DIRTY NASTY CODE A LITTLE
     public class GreatAntlionCharger : ModNPC, IParryable
     {
         private const int MainFrameCount = 4;
@@ -38,8 +39,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private const int BurrowTelegraphEnd = 215;
         private const int BurrowEnd = 250;
 
-        private const int SpitWindupFrameCount = 3; 
-        private const int SpitFireFrame = 3; 
+        private const int SpitWindupFrameCount = 3;
+        private const int SpitFireFrame = 3;
         private const int SpitRecoverFrame = 4;
         private const float SpitFireTiming = 90f; // must match the Timer == 90f 
 
@@ -80,6 +81,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         private const string SpitTexturePath =
             "ShatteredIllusion/Content/NPCs/BossAI/GreatAntlionCharger/GreatAntlionChargerSpit";
+
+        private static readonly SoundStyle Roar1 = new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/GreatAntlionRoar1"); 
+        private static readonly SoundStyle Roar2 = new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/GreatAntlionRoar2"); 
+        private static readonly SoundStyle Roar3 = new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/GreatAntlionRoar3"); 
 
 
         public enum AIState
@@ -142,16 +147,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         };
 
 
-        public override void SetStaticDefaults()
-        {
-            // 5 frames bro. 5 frames for the default walking animation
-            Main.npcFrameCount[NPC.type] = MainFrameCount;
-        }
-
         public override void SetDefaults()
         {
-            NPC.width = 160; 
-            NPC.height = 70; 
+            NPC.width = 160;
+            NPC.height = 70;
             NPC.damage = 40;
             NPC.defense = 10;
             NPC.lifeMax = 3500;
@@ -166,6 +165,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.noGravity = false;
             NPC.noTileCollide = false;
             Main.npcFrameCount[NPC.type] = MainFrameCount;
+
+            if (ModLoader.TryGetMod("ShatteredMusiMod", out Mod musicMod))
+            {
+                Music = MusicLoader.GetMusicSlot(musicMod, "Music/GreatAntlionCharger");
+                SceneEffectPriority = SceneEffectPriority.BossHigh;
+            }
         }
 
         public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment)
@@ -253,9 +258,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 return false;
             }
 
-            // We lost the dedicated dive-flight sprite in this resprite pass, so the arc through the air
-            // and the phase 2 roar just fall through to the default idle texture below - no clue how to
-            // compensate for the dive, but we made the phase 2 transition itself flashier to make up for the roar.
 
             // Pop Texture
             bool isPhase2PopDrawing = CurrentState == AIState.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
@@ -310,7 +312,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 return false;
             }
 
-            // The Dig animation is gone now, so the Burrow texture just covers the whole digging-in window itself.
             //Burrow Texture
             bool isPhase1Burrowing = CurrentState == AIState.Burrow && Timer <= BurrowDigTime;
             bool isPhase2Burrowing = CurrentState == AIState.Phase2BurrowDive && Timer <= 45f;
@@ -421,7 +422,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (parryTexture != null && parryTexture.IsLoaded)
                 {
-                    float maxStun = Main.masterMode ? 1f : 15f;
+                    float maxStun = Main.masterMode ? 5f : 15f;
                     float progress = MathHelper.Clamp(Math.Abs(Timer) / maxStun, 0f, 1f);
                     int frame = (int)(progress * ParryFrameCount);
                     frame = Math.Min(frame, ParryFrameCount - 1);
@@ -434,8 +435,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            // We lost the dive-flight and roar sprites in this resprite pass, so both of those just drop
-            // through to the default idle frame handling further down instead of getting their own animation.
 
             // PHASE 2 POP ANIMATION
             bool phase2PopAnimation = CurrentState == AIState.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
@@ -464,8 +463,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            //checks if the boss is in either of the burrows
-            // The Dig animation is gone now, so the normal burrow window just covers the entire digging-in time.
             bool phase2DiveAnimation = CurrentState == AIState.Phase2BurrowDive && Timer <= 45f;
             bool normalBurrowAnimation = CurrentState == AIState.Burrow && Timer <= BurrowDigTime;
 
@@ -506,9 +503,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (spitTexture != null && spitTexture.IsLoaded)
                 {
-                    // Fixed a bug where the spit frame played way before the projectile actually fired
-                    // (used to jump to the fire frame at Timer 30-40 while the real spit happens at Timer == 90).
-                    // Now the windup frames ease across the telegraph and the fire frame lands right on Timer == 90.
                     int spitFrame;
 
                     if (Timer < SpitFireTiming)
@@ -592,9 +586,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         public override void AI()
         {
 
-            // === Despawn check ===
-            // If every player is dead or too far away, count up toward a silent despawn.
-            // As soon as someone valid comes back in range, the timer resets.
+            // Despawn check
             if (!AnyPlayerPresentNearby())
             {
                 DespawnTimer++;
@@ -616,6 +608,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.color = Color.White;
             IsParryable = false;
+
+            if (NPC.alpha < 255)
+            {
+                Lighting.AddLight(NPC.Center, 0.85f, 0.65f, 0.35f);
+            }
 
             // Phase 2 begins at 55% HP
             if (!Phase2 && !Phase2Transitioning && NPC.life <= NPC.lifeMax * 0.55f)
@@ -761,7 +758,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                     if (Timer <= 8f)
                     {
-                        SoundEngine.PlaySound(SoundID.Roar);
+                        SoundEngine.PlaySound(Roar1);
                     }
 
                     // Don't let this idiot launch himself into the depths of Terraria
@@ -807,7 +804,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                         if (Timer == 18f)
                         {
-                            SoundEngine.PlaySound(SoundID.Roar, NPC.Center);
+                            SoundEngine.PlaySound(Roar1, NPC.Center);
                         }
 
                         return;
@@ -970,7 +967,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         if (!SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound sound) || !sound.IsPlaying)
                         {
                             rumbleSoundSlot = SoundEngine.PlaySound(
-                                new SoundStyle("ShatteredIllusion/Sounds/AntlionBurrowing")
+                                new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/AntlionBurrowing")
                                 {
                                     IsLooped = true,
                                     Volume = 0.4f
@@ -1079,7 +1076,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                             NPC.netUpdate = true;
 
-                            SoundEngine.PlaySound(SoundID.Roar, NPC.Center);
+                            SoundEngine.PlaySound(Roar2, NPC.Center);
 
 
                             for (int i = 0; i < 35; i++)
@@ -1389,7 +1386,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             Vector2 diveOrigin = NPC.Center;
                             Vector2 landingPoint = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
 
-                            const float previewArcHeight = 350f; // tune this to match/preview the real arc's height
+                            const float previewArcHeight = 350f;
 
                             for (int d = 1; d <= 10; d++)
                             {
@@ -1454,7 +1451,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                         if (Timer == 76f)
                         {
                             SoundEngine.PlaySound(
-                                SoundID.Roar,
+                                Roar3,
                                 NPC.Center
                             );
                         }
@@ -1482,7 +1479,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             NPC.netUpdate = true;
 
                             SoundEngine.PlaySound(
-                                SoundID.Roar,
+                                Roar3,
                                 NPC.Center
                             );
                         }
@@ -1672,10 +1669,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.netUpdate = true;
 
-            SoundEngine.PlaySound(SoundID.Roar, NPC.Center);
-            ScreenShake(7f, 18); // bumped up from 5f/15 - no dedicated roar sprite anymore so the shake has to sell it
+            SoundEngine.PlaySound(Roar2, NPC.Center);
+            ScreenShake(7f, 18);
 
-            for (int i = 0; i < 60; i++) // bumped up from 40 to help compensate for losing the roar animation
+            for (int i = 0; i < 60; i++)
             {
                 Vector2 velocity = Main.rand.NextVector2Circular(8f, 6f);
                 velocity.Y -= 3f;
@@ -1701,7 +1698,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.noTileCollide = false;
             NPC.alpha = 0;
 
-            // No dedicated roar sprite anymore, so flash the tint between white and red to help sell the transition.
             float flashPulse = (float)Math.Sin(Timer * 0.6f) * 0.5f + 0.5f;
             NPC.color = Color.Lerp(Color.White, new Color(255, 90, 90), flashPulse);
 
@@ -1710,7 +1706,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.position.X += Main.rand.NextFloat(-1.5f, 1.5f);
 
-            int dustCount = Timer < 30f ? 6 : 10; // bumped up from 4/7 to compensate for losing the roar animation
+            int dustCount = Timer < 30f ? 6 : 10;
 
             for (int i = 0; i < dustCount; i++)
             {
@@ -1733,7 +1729,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 dust.noGravity = true;
             }
 
-            // Extra shake punctuation throughout, since we no longer have a roar animation to lean on visually.
             if (Timer % 15 == 0)
             {
                 ScreenShake(3f, 8);
@@ -1742,9 +1737,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             if (Timer == 30f)
             {
                 SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
-                ScreenShake(6f, 14); // bumped up from 4f/10
+                ScreenShake(6f, 14);
 
-                for (int i = 0; i < 45; i++) // bumped up from 30
+                for (int i = 0; i < 45; i++)
                 {
                     Dust dust = Dust.NewDustPerfect(
                         NPC.Center,
@@ -1775,7 +1770,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             CurrentState = AIState.Cooldown;
 
             // Master mode gets a 5 tick stun instead of the normal 15 because I HATE YOU.
-            Timer = Main.masterMode ? -1f : -15f;
+            Timer = Main.masterMode ? -5f : -15f;
 
             IsParryable = false;
             NPC.netUpdate = true;
