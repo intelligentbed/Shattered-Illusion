@@ -54,7 +54,7 @@ namespace ShatteredIllusion.Content.Tiles
                 if (player.HeldItem.stack > 0)
                 {
                     player.HeldItem.stack--;
-                    SoundEngine.PlaySound(new SoundStyle("ShatteredIllusion/Sounds/AntlionRumble"));
+                    SoundEngine.PlaySound(new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/AntlionRumble"));
                     if (player.HeldItem.stack <= 0)
                     {
                         player.HeldItem.TurnToAir();
