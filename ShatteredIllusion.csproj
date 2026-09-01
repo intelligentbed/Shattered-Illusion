@@ -17,8 +17,6 @@
 	</ItemGroup>
 	<ItemGroup>
 	  <Folder Include="Content\Buffs\Debuffs\" />
-	  <Folder Include="Content\Items\Weapons\Summoner\" />
-	  <Folder Include="Content\Items\Weapons\Ranger\" />
 	</ItemGroup>
 
 	<!-- References -->
