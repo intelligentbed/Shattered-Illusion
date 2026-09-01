@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
@@ -32,7 +32,6 @@ namespace ShatteredIllusion.Content.Projectiles.Ranger
         {
             if (Projectile.ai[1] == 0f && Start == Target)
             {
-                // fallback if Start/Target somehow never got set
                 Start = Projectile.Center;
                 Target = Projectile.Center + Vector2.UnitX * 200f;
             }
@@ -57,7 +56,7 @@ namespace ShatteredIllusion.Content.Projectiles.Ranger
             Projectile.Center = newPos;
             Projectile.velocity = Vector2.Zero;
 
-            // Trailing dust
+            // dust
             Dust trail = Dust.NewDustPerfect(Projectile.Center, DustID.Sandstorm, delta * 0.1f, 0, default, 1.1f);
             trail.noGravity = true;
             trail.fadeIn = 0.5f;
