@@ -8,13 +8,13 @@ namespace ShatteredIllusion.Content.Projectiles.Ranger
 {
     internal class MandibleShooterBullet : ModProjectile
     {
-        private const int TravelTime = 45;   // ticks from muzzle to cursor
-        private const float MaxSpread = 90f; // widest sideways bulge, in pixels
+        private const int TravelTime = 45;   
+        private const float MaxSpread = 90f; 
 
         public Vector2 Start;
         public Vector2 Target;
 
-        private float Side => Projectile.ai[0]; // +1 / -1, set by the item
+        private float Side => Projectile.ai[0];
 
         public override void SetDefaults()
         {
@@ -45,16 +45,11 @@ namespace ShatteredIllusion.Content.Projectiles.Ranger
 
             Vector2 basePos = Vector2.Lerp(Start, Target, t);
 
-            // single smooth bulge: 0 at t=0, peaks at t=0.5, back to 0 at t=1
             float amplitude = MaxSpread * (float)System.Math.Sin(t * MathHelper.Pi);
             Vector2 offset = right * amplitude * Side;
 
             Vector2 newPos = basePos + offset;
 
-            // Use the delta purely to figure out facing, then zero velocity out.
-            // Otherwise the engine's own Position += Velocity step runs on top of
-            // our manual Center assignment and doubles the movement, which is
-            // what was causing the jitter.
             Vector2 delta = newPos - Projectile.Center;
             if (delta != Vector2.Zero)
                 Projectile.rotation = delta.ToRotation();
