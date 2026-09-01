@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Terraria;
+﻿using Terraria;
+using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
+using ShatteredIllusion.Content.Items.Weapons.Melee;
+using ShatteredIllusion.Content.Items.Weapons.Mage;
+using ShatteredIllusion.Content.Items.Weapons.Ranger;
+using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 
 namespace ShatteredIllusion.Content.Items.TreasureBags
 {
@@ -13,37 +13,38 @@ namespace ShatteredIllusion.Content.Items.TreasureBags
     {
         public override void SetStaticDefaults()
         {
+            Item.ResearchUnlockCount = 3;
             ItemID.Sets.BossBag[Item.type] = true;
         }
 
         public override void SetDefaults()
         {
-            Item.width = 20;
-            Item.height = 20;
-            Item.maxStack = 9999;
+            Item.width = 24;
+            Item.height = 24;
+            Item.maxStack = Item.CommonMaxStack;
+            Item.consumable = true;
+            Item.expert = true;
             Item.rare = ItemRarityID.Blue;
             Item.value = 50;
-            Item.expert = true; 
         }
 
-        public override bool CanRightClick()
+        public override void ModifyResearchSorting(ref ContentSamples.CreativeHelper.ItemGroup itemGroup)
         {
-            return true;
+            itemGroup = ContentSamples.CreativeHelper.ItemGroup.BossBags;
         }
 
-        public override void RightClick(Player player)
+        public override bool CanRightClick() => true;
+
+        public override void ModifyItemLoot(ItemLoot itemLoot)
         {
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Wood, 100);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.RecallPotion, 10);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SwiftnessPotion, 5);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Torch, 40);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.CopperBow, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.BabyBirdStaff, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.AmethystStaff, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.SilverBroadsword, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenArrow, 100);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.WoodenHammer, 1);
-            player.QuickSpawnItem(player.GetSource_OpenItem(Item.type), ItemID.Rope, 10);
+            // Money — tied to the boss's value
+            itemLoot.Add(ItemDropRule.CoinsBasedOnNPCValue(ModContent.NPCType<GreatAntlionCharger>()));
+
+            // Weapon pool — one random pick from these
+            itemLoot.Add(ItemDropRule.OneFromOptions(1, new int[]
+            {
+                ModContent.ItemType<MandibleShooter>()
+            }));
         }
     }
 }

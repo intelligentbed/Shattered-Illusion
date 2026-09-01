@@ -4,7 +4,7 @@ using Terraria.Audio;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.Projectiles
+namespace ShatteredIllusion.Content.Projectiles.Melee
 {
     public class JadeSprout : ModProjectile
     {

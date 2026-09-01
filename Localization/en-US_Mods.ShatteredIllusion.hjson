@@ -13,11 +13,6 @@ Items: {
 			'''
 	}
 
-	DeleteThisLater: {
-		DisplayName: Delete This Later
-		Tooltip: ""
-	}
-
 	LivingWoodHelmet: {
 		DisplayName: Living Wood Helmet
 		Tooltip: Increases summon damage by 2%
@@ -55,7 +50,7 @@ Items: {
 
 	FrostChestplate: {
 		DisplayName: Tundra Chestplate
-		Tooltip: Increases Ranger damage by 3%
+		Tooltip: Increases Ranged damage by 3%
 		SetBonus: Ranged hits inflict Frostburn
 	}
 
@@ -76,7 +71,7 @@ Items: {
 	EvergreenJadeCharm: {
 		Tooltip:
 			'''
-			Melee Speed is increased by 5% 
+			Melee Speed is increased by 5%
 			Striking an enemy with Melee Damage has a 50% chance spawn a projectile towards the cursor
 			'''
 		DisplayName: EverJade Charm
@@ -128,7 +123,7 @@ Items: {
 	}
 
 	MycelialHelmet: {
-		Tooltip: 4% increased melee critial hit chance
+		Tooltip: 4% increased melee critical hit chance
 		DisplayName: Mycelial Helmet
 	}
 
@@ -153,8 +148,8 @@ Items: {
 	}
 
 	SpecialIronBricksItem: {
-		Tooltip: ""
-		DisplayName: Special Iron Bricks Item
+		Tooltip: "[DEBUG] YOU AREN'T SUPPOSED TO SEE THIS"
+		DisplayName: Special Iron Bricks
 	}
 
 	RustyKeys: {
@@ -164,7 +159,7 @@ Items: {
 
 	Rustylocker: {
 		DisplayName: Rusty Locker
-		Tooltip: "[DUBUG] YOU ARENT SUPPOSED SEE THIS"
+		Tooltip: "[DEBUG] YOU AREN'T SUPPOSED TO SEE THIS"
 	}
 
 	MossChestplate: {
@@ -173,11 +168,11 @@ Items: {
 	}
 
 	MossHelmet: {
-		DisplayName: Moss Hood
+		DisplayName: Moss Helmet
 		Tooltip:
 			'''
 			Increases maximum mana by 20
-			5% Inceased magical damage
+			5% Increased magical damage
 			'''
 	}
 
@@ -186,8 +181,13 @@ Items: {
 		Tooltip:
 			'''
 			Increases maximum mana by 20
-			5% Inceased magical damage
+			5% Increased magical damage
 			'''
+	}
+
+	MandibleShooter: {
+		Tooltip: Fires two shots that arc together and converge on your cursor
+		DisplayName: Mandible Shooter
 	}
 }
 
@@ -208,7 +208,7 @@ Buffs: {
 	}
 
 	SproutedBuff: {
-		Description: Summon Damage is increase by 15%
+		Description: Summon Damage is increased by 15%
 		DisplayName: Sprouted
 	}
 
@@ -236,13 +236,14 @@ Projectiles: {
 	LivingWoodRubble.DisplayName: Living Wood Rubble
 	LivingWoodGreatClubHoldout.DisplayName: Living Wood Great Club Holdout
 	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
+	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 }
 
 Keybinds: {
 	Parry.DisplayName: Parry
-	"Use Resolve Meter.DisplayName": Use  Resolve  Meter
-	"Resolve Meter.DisplayName": Resolve  Meter
-	"Sturdiness Meter.DisplayName": Sturdiness  Meter
+	"Use Resolve Meter.DisplayName": Use Resolve Meter
+	"Resolve Meter.DisplayName": Resolve Meter
+	"Sturdiness Meter.DisplayName": Sturdiness Meter
 }
 
 NPCs: {

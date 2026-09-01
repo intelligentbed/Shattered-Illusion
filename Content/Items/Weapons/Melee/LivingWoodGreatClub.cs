@@ -383,7 +383,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
     public class LivingWoodRubble : ModProjectile
     {
         public override string Texture =>
-            "ShatteredIllusion/Content/Projectiles/LivingWoodRubble";
+            "ShatteredIllusion/Content/Projectiles/Melee/LivingWoodRubble";
 
         public override void SetDefaults()
         {

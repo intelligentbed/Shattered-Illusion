@@ -1,6 +1,6 @@
-﻿using Microsoft.Xna.Framework; 
+﻿using Microsoft.Xna.Framework;
 using ShatteredIllusion.Content.Items.Materials;
-using ShatteredIllusion.Content.Projectiles;
+using ShatteredIllusion.Content.Projectiles.Melee;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,7 +74,6 @@ namespace ShatteredIllusion.Content.Items.Accessories
 
         private void TrySpawnJadeSprout(IEntitySource source)
         {
-            // the chance to spawn a Jade Sprout is 1 in 2 so 50% chance
             if (Main.rand.NextBool(2) && Player.whoAmI == Main.myPlayer)
             {
                 Vector2 direction = Vector2.Normalize(Main.MouseWorld - Player.Center);
