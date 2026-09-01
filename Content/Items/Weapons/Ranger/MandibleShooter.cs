@@ -26,11 +26,9 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             Item.shoot = ModContent.ProjectileType<Projectiles.Ranger.MandibleShooterBullet>();
             Item.shootSpeed = 12f; // unused directly, see Shoot() below
 
-            Item.useAmmo = AmmoID.None; // no ammo required
+            Item.useAmmo = AmmoID.None; 
         }
-
-        // We hijack Shoot() completely so we can spawn a *pair* of projectiles
-        // and hand each one the cursor's world position as its target.
+        
         public override bool Shoot(Player player, EntitySource_ItemUse_WithAmmo source,
             Vector2 position, Vector2 velocity, int type, int damage, float knockback)
         {
@@ -39,7 +37,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: 1f);
             SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: -1f);
 
-            return false; // stop the default single-projectile spawn
+            return false; 
         }
 
         private void SpawnBullet(EntitySource_ItemUse_WithAmmo source, Vector2 position,
