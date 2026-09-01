@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
@@ -69,7 +69,7 @@ namespace ShatteredIllusion.MainMenu
 
         /// <summary>
         /// Draws the logo in its own spritebatch pass so its blend mode doesn't bleed
-        /// into the background pass above it.
+        /// into the background pass above it. thank you cal github for showing me that much love 
         /// </summary>
         private void DrawLogoIsolated(SpriteBatch spriteBatch, Color drawColor)
         {
