@@ -29,7 +29,7 @@ namespace ShatteredIllusion.World.World_Gen
                     ModContent.GetInstance<ShatteredIllusion>().Logger.Info($"[GenPass {i}] {tasks[i].Name}");
                 }
 
-                passIndex = tasks.Count - 1; 
+                passIndex = tasks.Count - 1;
             }
 
             tasks.Insert(
@@ -100,6 +100,76 @@ namespace ShatteredIllusion.World.World_Gen
             }
 
             HighwayArea = new Rectangle(targetX, targetY, StructureWidth, StructureHeight);
+
+            // Use the ACTUAL final center of the placed structure, not the earlier guess,
+            // so the surface marker always lines up with where the highway really ended up.
+            progress.Message = "Marking the surface above the highway...";
+
+            try
+            {
+                GenerateSurfaceMarker(targetX + StructureWidth / 2);
+            }
+            catch (System.Exception ex)
+            {
+                ModContent.GetInstance<ShatteredIllusion>().Logger.Error(
+                    $"Highway surface marker FAILED above centerX {targetX + StructureWidth / 2}: {ex}"
+                );
+            }
+        }
+
+        // A jagged strip of broken ancient roadway breaching the dunes directly above
+        // the buried highway. Deliberately uneven (random height + occasional gaps) so
+        // it reads as ruins that eroded/cracked over time, not a placed marker.
+        private const int MarkerHalfWidth = 6;
+
+        private void GenerateSurfaceMarker(int centerX)
+        {
+            for (int dx = -MarkerHalfWidth; dx <= MarkerHalfWidth; dx++)
+            {
+                int x = centerX + dx;
+
+                if (!WorldGen.InWorld(x, 0, 20))
+                    continue;
+
+                // Occasional missing slab breaks up the line so it looks weathered/broken
+                // rather than a solid, obviously man-made bar.
+                if (WorldGen.genRand.NextFloat() < 0.15f)
+                    continue;
+
+                int groundY = FindSurfaceY(x);
+
+                if (groundY == -1)
+                    continue;
+
+                int slabHeight = WorldGen.genRand.Next(2, 5);
+
+                for (int dy = 0; dy < slabHeight; dy++)
+                {
+                    int y = groundY - dy;
+
+                    if (!WorldGen.InWorld(x, y, 20))
+                        continue;
+
+                    WorldGen.PlaceTile(x, y, TileID.GrayBrick, mute: true, forced: true);
+                }
+            }
+        }
+
+        // Scans down from just above the world's surface line to find the first solid
+        // tile at a given x - i.e. the actual ground level a player would walk on.
+        private static int FindSurfaceY(int x)
+        {
+            int startY = System.Math.Max((int)Main.worldSurface - 60, 10);
+
+            for (int y = startY; y < Main.maxTilesY - 50; y++)
+            {
+                Tile tile = Framing.GetTileSafely(x, y);
+
+                if (tile.HasTile && Main.tileSolid[tile.TileType])
+                    return y;
+            }
+
+            return -1;
         }
 
         public override void SaveWorldData(TagCompound tag)

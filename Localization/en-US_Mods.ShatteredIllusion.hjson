@@ -248,6 +248,7 @@ Projectiles: {
 	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 	StarryProjectile.DisplayName: Starry Projectile
+	JournalMeteor.DisplayName: Journal Meteor
 }
 
 Keybinds: {
@@ -272,7 +273,7 @@ Configs: {
 			ParryBar: Parry Bar Header
 			ResolveBar: Resolve Bar Header
 			SturdinessBar: Sturdiness Bar Header
-			Client: Client Header
+			Client: Client
 		}
 
 		ParryBarLocked: {
@@ -345,3 +346,5 @@ Configs: {
 		Tooltip: ""
 	}
 }
+
+Bosses.GreatAntlionCharger.SpawnInfo: Use an [i:5948] while in the Underground Desert.

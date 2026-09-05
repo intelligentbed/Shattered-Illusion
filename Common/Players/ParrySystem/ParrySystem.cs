@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using ShatteredIllusion.Content.Buffs.StatBuffs;
+using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusionKeybinds;
 using Terraria;
 using Terraria.Audio;
@@ -9,6 +10,7 @@ using Terraria.DataStructures;
 using Terraria.GameInput;
 using Terraria.ID;
 using Terraria.ModLoader;
+using Terraria.ModLoader.IO;
 
 namespace ShatteredIllusion.Common.Players.ParrySystem
 {
@@ -65,6 +67,21 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
 
         public bool MycelialSetActive;
+
+        // Global cap across King Slime / Great Antlion Charger / Eye of Cthulhu combined -
+        // once this many parryable windows have been shown to the player, the tutorial
+        // prompt never appears again for any of the three.
+        public int ParryTutorialProcCount = 0;
+
+        public override void SaveData(TagCompound tag)
+        {
+            tag["ParryTutorialProcCount"] = ParryTutorialProcCount;
+        }
+
+        public override void LoadData(TagCompound tag)
+        {
+            ParryTutorialProcCount = tag.GetInt("ParryTutorialProcCount");
+        }
 
         private const float MycelialExplosionRadius = 200f;
         private const int MycelialExplosionDamage = 15;
@@ -172,7 +189,21 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                     NPC attacker = Main.npc[info.DamageSource.SourceNPCIndex];
 
                     // if the boss has IParryable and the attack has IsParryable then boom parry
-                    if (attacker.ModNPC is IParryable boss && boss.IsParryable)
+                    //
+                    // Vanilla-ID bosses (King Slime, Eye of Cthulhu) are driven by
+                    // NPCBehaviorOverride, not a custom ModNPC, so attacker.ModNPC is null
+                    // for them. Fall back to checking the registered override for IParryable
+                    // too - a boss override class can implement IParryable directly
+                    // (e.g. public class KingSlimeOverride : NPCBehaviorOverride, IParryable).
+                    IParryable boss = attacker.ModNPC as IParryable;
+
+                    if (boss is null &&
+                        NPCBehaviorOverrideLoader.TryGet(attacker.type, out var parryOverrideContainer))
+                    {
+                        boss = parryOverrideContainer.BehaviorOverride as IParryable;
+                    }
+
+                    if (boss is not null && boss.IsParryable)
                     {
                         boss.OnParried(Player);
                         Player.SetImmuneTimeForAllTypes(60);

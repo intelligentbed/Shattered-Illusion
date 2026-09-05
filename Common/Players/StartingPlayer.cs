@@ -1,12 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using Microsoft.Xna.Framework;
+using ShatteredIllusion.Content.Items.TreasureBags;
+using System.Collections.Generic;
 using Terraria;
 using Terraria.ModLoader;
+using Terraria.ModLoader.IO;
 
 namespace ShatteredIllusion.Common.Players
 {
     public class StartingPlayer : ModPlayer
     {
-        //I'd like to thank Cal devs for leaving thier githubup as a reference
+
         public override IEnumerable<Item> AddStartingItems(bool mediumCoreDeath)
         {
             if (!mediumCoreDeath)
@@ -17,8 +21,8 @@ namespace ShatteredIllusion.Common.Players
 
         public override void ResetEffects()
         {
-            Player.moveSpeed += 0.05f;  
-            Player.pickSpeed -= 0.05f;  
+            Player.moveSpeed += 0.05f;
+            Player.pickSpeed -= 0.05f;
         }
     }
 }
