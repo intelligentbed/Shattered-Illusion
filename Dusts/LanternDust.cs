@@ -6,7 +6,8 @@ namespace ShatteredIllusion.Dusts
 {
     public class LanternDust : ModDust
     {
-        public override string Texture => "ShatteredIllusion/Dusts/LanternDust"; //DRAGONLENDS DOENST WANT TO WORK
+        public override string Texture => "ShatteredIllusion/Dusts/LanternDust";
+
         public override void OnSpawn(Dust dust)
         {
             dust.noGravity = true;
@@ -16,8 +17,9 @@ namespace ShatteredIllusion.Dusts
             dust.fadeIn = 1.2f;
         }
 
-        public override bool MidUpdate(Dust dust)
+        public override bool Update(Dust dust)
         {
+            dust.position += dust.velocity;
             dust.velocity *= 0.96f;
             dust.rotation += 4f * (dust.velocity.X > 0 ? 1f : -1f);
 
@@ -34,12 +36,13 @@ namespace ShatteredIllusion.Dusts
                 dust.active = false;
             }
 
-            return true;
+            return false;
         }
 
         public override Color? GetAlpha(Dust dust, Color lightColor)
         {
-            return new Color(lightColor.R, lightColor.G, lightColor.B, (int)(255 - dust.alpha * 0.6f));
+            int a = (int)MathHelper.Clamp(255 - dust.alpha * 0.6f, 0, 255);
+            return new Color(lightColor.R, lightColor.G, lightColor.B, a);
         }
     }
 }

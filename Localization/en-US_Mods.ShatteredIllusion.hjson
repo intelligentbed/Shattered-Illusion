@@ -189,6 +189,16 @@ Items: {
 		Tooltip: Fires two shots that arc together and converge on your cursor
 		DisplayName: Mandible Shooter
 	}
+
+	DeleteThisLater: {
+		Tooltip: ""
+		DisplayName: Delete This Later
+	}
+
+	StarryNight: {
+		DisplayName: Starry Night
+		Tooltip: ""
+	}
 }
 
 Buffs: {
@@ -237,6 +247,7 @@ Projectiles: {
 	LivingWoodGreatClubHoldout.DisplayName: Living Wood Great Club Holdout
 	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
+	StarryProjectile.DisplayName: Starry Projectile
 }
 
 Keybinds: {
@@ -261,6 +272,7 @@ Configs: {
 			ParryBar: Parry Bar Header
 			ResolveBar: Resolve Bar Header
 			SturdinessBar: Sturdiness Bar Header
+			Client: Client Header
 		}
 
 		ParryBarLocked: {
@@ -307,5 +319,29 @@ Configs: {
 			Label: Sturdiness Bar Pos Y
 			Tooltip: ""
 		}
+
+		MenuButtonPosition: {
+			Tooltip: Which side of the screen the main menu buttons (Single Player, Multiplayer, etc.) are drawn on.
+			Label: Menu Button Side
+		}
+
+		EnableMenuParticles: {
+			Label: Menu Ember Particles
+			Tooltip: Ambient floating embers on the main menu. Disable for a small performance saving on very low-end systems.
+		}
+	}
+
+	HorizontalPosition: {
+		Right: {
+			Tooltip: ""
+			Label: Right
+		}
+
+		Left: {
+			Tooltip: ""
+			Label: Left
+		}
+
+		Tooltip: ""
 	}
 }

@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using Terraria;
+using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -12,74 +13,194 @@ namespace ShatteredIllusion.MainMenu
     {
         public override string DisplayName => "Shattered Illusion";
 
-        public override Asset<Texture2D> Logo => ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/Logo");
-        public override Asset<Texture2D> SunTexture => ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/BlankPixel");
-        public override Asset<Texture2D> MoonTexture => ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/BlankPixel");
+        public override Asset<Texture2D> Logo =>
+            ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/Logo");
+
+        public override Asset<Texture2D> SunTexture =>
+            ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/BlankPixel");
+
+        public override Asset<Texture2D> MoonTexture =>
+            ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/BlankPixel");
 
         public override int Music => MusicID.Title;
 
-        public override bool PreDrawLogo(SpriteBatch spriteBatch, ref Vector2 logoDrawCenter, ref float logoRotation, ref float logoScale, ref Color drawColor)
+        // -------------------------------
+        // INTRO ANIMATION
+        // -------------------------------
+        private const float IntroDuration = 1.6f;
+        private const float IntroLogoScaleStart = 0.85f;
+        private const float IntroLogoScaleEnd = 1f;
+        private const float FrameStep = 1f / 60f;
+
+        private static bool _introPlayed;
+        private static float _introTimer;
+
+        // -------------------------------
+        // LOGO LAYOUT
+        // -------------------------------
+        private const float LogoBaseScale = 0.85f;
+        private const float LogoPaddingX = 80f;
+        private const float LogoPaddingY = 60f;
+
+        // -------------------------------
+        // VIGNETTE
+        // -------------------------------
+        private const float VignetteAlpha = 0.18f;
+
+        // Frozen at midday so the background/sky rendering (Sun/Moon textures
+        // are blanked out above) stays static behind the menu.
+        private const double FrozenTimeOfDay = 27000;
+
+        // The batch/blend state PreDrawLogo must be left in when it returns,
+        // per the ModMenu contract (see SpriteBatchUtil's doc comment). Used
+        // both for the normal exit path and the crash-recovery path below.
+        private static readonly BlendState ReturnBlendState = BlendState.AlphaBlend;
+        private static readonly SamplerState ReturnSamplerState = SamplerState.LinearClamp;
+
+        public override bool PreDrawLogo(
+            SpriteBatch spriteBatch,
+            ref Vector2 logoDrawCenter,
+            ref float logoRotation,
+            ref float logoScale,
+            ref Color drawColor)
         {
-            DrawBackdrop(spriteBatch);
+            try
+            {
+                AdvanceIntroTimer();
 
-            FreezeTimeOfDay();
-            drawColor = Color.White;
+                DrawBackdrop(spriteBatch);
+                DrawVignette(spriteBatch);
+                FreezeTimeOfDay();
 
-            DrawLogoIsolated(spriteBatch, drawColor);
+                float introEase = EaseOutCubic(_introTimer / IntroDuration);
+
+                drawColor = Color.White * introEase;
+
+                DrawLogoIsolated(spriteBatch, drawColor, introEase);
+            }
+            catch (Exception ex)
+            {
+                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.Warn($"Menu backdrop/logo draw failed: {ex}");
+
+                // Whatever failed and wherever it failed, PreDrawLogo still
+                // has to hand back an open batch in the expected state, or
+                // everything drawn after this point this frame (including
+                // our own button pass in MenuHook) inherits a broken batch.
+                SpriteBatchUtil.Restart(spriteBatch, ReturnBlendState, ReturnSamplerState);
+            }
 
             return false;
         }
 
-        // Draws the background art scaling it so it always covers the screen regardless of aspect ratio.
-        private static void DrawBackdrop(SpriteBatch spriteBatch)
+        private static void AdvanceIntroTimer()
         {
-            Texture2D backdrop = ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/Background").Value;
-            Vector2 offset = GetCoverOffsetAndScale(backdrop, out float coverScale);
+            if (_introPlayed)
+            {
+                _introTimer = IntroDuration;
+                return;
+            }
 
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.None, Main.Rasterizer, null, Main.UIScaleMatrix);
-            spriteBatch.Draw(backdrop, offset, null, Color.White, 0f, Vector2.Zero, coverScale, SpriteEffects.None, 0f);
+            _introTimer += FrameStep;
+
+            if (_introTimer >= IntroDuration)
+            {
+                _introTimer = IntroDuration;
+                _introPlayed = true;
+            }
         }
 
-        /// <summary>
-        /// Works out the scale needed for a texture to fully cover the current screen
-        /// dimensions, plus the offset required to keep it centered once scaled.
-        /// </summary>
-        private static Vector2 GetCoverOffsetAndScale(Texture2D texture, out float coverScale)
+        private static float EaseOutCubic(float t)
         {
-            float widthRatio = (float)Main.screenWidth / texture.Width;
-            float heightRatio = (float)Main.screenHeight / texture.Height;
+            t = MathHelper.Clamp(t, 0f, 1f);
 
-            coverScale = Math.Max(widthRatio, heightRatio);
+            float inv = 1f - t;
 
-            Vector2 offset = Vector2.Zero;
-            if (widthRatio > heightRatio)
-                offset.Y -= (texture.Height * coverScale - Main.screenHeight) * 0.5f;
-            else if (heightRatio > widthRatio)
-                offset.X -= (texture.Width * coverScale - Main.screenWidth) * 0.5f;
+            return 1f - inv * inv * inv;
+        }
 
-            return offset;
+        private static void DrawBackdrop(SpriteBatch spriteBatch)
+        {
+            Texture2D background = ModContent.Request<Texture2D>("ShatteredIllusion/MainMenu/Background").Value;
+
+            float widthRatio = (float)Main.screenWidth / background.Width;
+            float heightRatio = (float)Main.screenHeight / background.Height;
+            float scale = MathHelper.Max(widthRatio, heightRatio);
+
+            Vector2 size = new(background.Width * scale, background.Height * scale);
+            Vector2 position = new((Main.screenWidth - size.X) * 0.5f, (Main.screenHeight - size.Y) * 0.5f);
+
+            // Left open on purpose: DrawVignette draws into this same batch
+            // right after, and DrawLogoIsolated closes it before the logo pass.
+            SpriteBatchUtil.Restart(spriteBatch, BlendState.AlphaBlend, SamplerState.PointClamp);
+
+            spriteBatch.Draw(
+                background,
+                position,
+                null,
+                Color.White,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+        }
+
+        private static void DrawVignette(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Draw(
+                TextureAssets.MagicPixel.Value,
+                new Rectangle(0, 0, Main.screenWidth, Main.screenHeight),
+                Color.Black * VignetteAlpha);
         }
 
         private static void FreezeTimeOfDay()
         {
-            Main.time = 27000;
+            Main.time = FrozenTimeOfDay;
             Main.dayTime = true;
         }
 
-        /// <summary>
-        /// Draws the logo in its own spritebatch pass so its blend mode doesn't bleed
-        /// into the background pass above it. thank you cal github for showing me that much love 
-        /// </summary>
-        private void DrawLogoIsolated(SpriteBatch spriteBatch, Color drawColor)
+        private void DrawLogoIsolated(SpriteBatch spriteBatch, Color drawColor, float introEase)
         {
-            Vector2 logoPosition = new Vector2(Main.screenWidth / 2f, 100f);
+            ShatteredIllusionConfig config = ModContent.GetInstance<ShatteredIllusionConfig>();
 
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp, DepthStencilState.None, Main.Rasterizer, null, Main.UIScaleMatrix);
-            spriteBatch.Draw(Logo.Value, logoPosition, null, drawColor, 0f, Logo.Value.Size() * 0.5f, 1f, SpriteEffects.None, 0f);
-            spriteBatch.End();
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, Main.Rasterizer, null, Main.UIScaleMatrix);
+            bool buttonsOnLeft = config.MenuButtonPosition == HorizontalPosition.Left;
+
+            Texture2D logoTex = Logo.Value;
+
+            float logoScale = LogoBaseScale * MathHelper.Lerp(IntroLogoScaleStart, IntroLogoScaleEnd, introEase);
+
+            Vector2 logoSize = new Vector2(logoTex.Width, logoTex.Height) * logoScale;
+
+            // Logo sits opposite the buttons so the two never overlap.
+            float x = buttonsOnLeft
+                ? Main.screenWidth - LogoPaddingX - logoSize.X / 2f
+                : LogoPaddingX + logoSize.X / 2f;
+
+            float y = LogoPaddingY + logoSize.Y / 2f;
+
+            Vector2 logoPosition = new(x, y);
+
+            // NonPremultiplied so the logo's alpha edges blend correctly
+            // regardless of how its source texture was authored.
+            SpriteBatchUtil.Restart(spriteBatch, BlendState.NonPremultiplied, SamplerState.PointClamp);
+
+            spriteBatch.Draw(
+                logoTex,
+                logoPosition,
+                null,
+                drawColor,
+                0f,
+                logoTex.Size() * 0.5f,
+                logoScale,
+                SpriteEffects.None,
+                0f);
+
+            // Hand control back in the state vanilla's menu code (and our own
+            // MenuHook button pass) expect to find the batch in, per the
+            // ModMenu.PreDrawLogo contract — confirmed against tModLoader's
+            // official ExampleModMenu, which draws directly into an
+            // already-open batch without ever calling Begin/End itself.
+            SpriteBatchUtil.Restart(spriteBatch, ReturnBlendState, ReturnSamplerState);
         }
     }
 }
