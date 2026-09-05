@@ -8,8 +8,8 @@ namespace ShatteredIllusion.Content.Projectiles.Ranger
 {
     internal class MandibleShooterBullet : ModProjectile
     {
-        private const int TravelTime = 45;   
-        private const float MaxSpread = 90f; 
+        private const int TravelTime = 45;
+        private const float MaxSpread = 90f;
 
         public Vector2 Start;
         public Vector2 Target;

@@ -122,8 +122,8 @@ namespace ShatteredIllusion.Content.Tiles
 
             ItemID.Sets.AnimatesAsSoul[Item.type] = true;
 
-            Item.width = 16;
-            Item.height = 16;
+            Item.width = 32;
+            Item.height = 32;
             Item.maxStack = 1;
             Item.useTurn = true;
             Item.autoReuse = true;

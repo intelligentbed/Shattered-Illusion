@@ -1,6 +1,8 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ShatteredIllusion.Common.Cutscenes;
+using ShatteredIllusion.Common.Players.ParrySystem;
+using ShatteredIllusion.Core.OverrideSystem;
 using System;
 using System.IO;
 using Terraria;
@@ -14,9 +16,9 @@ using Terraria.ModLoader.IO;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
 {
-    public class KingSlimeOverride : GlobalNPC
+    public class KingSlimeOverride : NPCBehaviorOverride
     {
-        public override bool InstancePerEntity => true;
+        public override int NPCOverrideType => NPCID.KingSlime;
 
         private bool hasTriggeredCutscene = false;
 
@@ -69,12 +71,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
         private static bool IsAuthority =>
             Main.netMode != NetmodeID.MultiplayerClient;
 
-        public override bool AppliesToEntity(NPC entity, bool lateRequest)
-        {
-            return entity.type == NPCID.KingSlime;
-        }
-
-        public override void SendExtraAI(NPC npc, BitWriter bitWriter, BinaryWriter binaryWriter)
+        public override void SendExtraData(NPC npc, BinaryWriter binaryWriter)
         {
             binaryWriter.Write((byte)CurrentState);
             binaryWriter.Write(Timer);
@@ -85,7 +82,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
             binaryWriter.Write(splitVertical);
         }
 
-        public override void ReceiveExtraAI(NPC npc, BitReader bitReader, BinaryReader binaryReader)
+        public override void ReceiveExtraData(NPC npc, BinaryReader binaryReader)
         {
             CurrentState = (AIState)binaryReader.ReadByte();
             Timer = binaryReader.ReadSingle();
@@ -97,15 +94,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
 
         public override bool PreAI(NPC npc)
         {
-            if (npc.type != NPCID.KingSlime)
-                return true;
-
-            npc.aiStyle = -1;
-
-            npc.ai[0] = 0f;
-            npc.ai[1] = 0f;
-            npc.ai[2] = 1f;
-            npc.localAI[1] = 0f;
 
             if (!hasTriggeredCutscene)
             {
@@ -194,8 +182,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 AttackSequenceIndex = (AttackSequenceIndex + 1) % NormalAttackOrder.Length;
                 CurrentState = NormalAttackOrder[AttackSequenceIndex];
 
-                // Decide this split's orientation up front (50/50) so the windup telegraph
-                // and the clones that spawn later both agree on it.
+                // Decide this split's orientation
                 if (CurrentState == AIState.SplitAttack && IsAuthority)
                     splitVertical = Main.rand.NextBool(2);
 
@@ -303,7 +290,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 npc.noTileCollide = true;
                 npc.alpha += 15;
 
-                // Shrink in on the teleport vanish
                 npc.scale = MathHelper.Max(BaseScale * 0.2f, npc.scale - 0.05f);
 
                 for (int i = 0; i < 2; i++)
@@ -722,15 +708,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                     Vector2 screenPos,
                     Color drawColor)
         {
-            if (npc.type != NPCID.KingSlime)
-                return true;
-
-            // Draw the custom King Slime sprite sheet from Assets/ExtraTextures.
             Texture2D kingSlimeTexture = ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Assets/ExtraTextures/Resprites/NPC_50"
             ).Value;
 
-            // Fargo-style frame handling.
             var frameCount = Main.npcFrameCount[npc.type];
             var frameVertical = npc.frame.Y / npc.frame.Height;
             var frame = kingSlimeTexture.Frame(1, frameCount, 0, frameVertical);
@@ -741,7 +722,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                     ? SpriteEffects.None
                     : SpriteEffects.FlipHorizontally;
 
-            // Draw the body from the bottom like Fargo does.
             var bodyDraw = new DrawData(
                 kingSlimeTexture,
                 npc.Bottom - screenPos + new Vector2(0f, 2f),
@@ -858,7 +838,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 );
             }
 
-            // Render the crown normally without the shader.
             Texture2D crownTexture = ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Assets/ExtraTextures/Resprites/Extra_39"
             ).Value;
