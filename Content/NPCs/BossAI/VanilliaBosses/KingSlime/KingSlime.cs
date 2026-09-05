@@ -1,14 +1,16 @@
-using System;
-using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ShatteredIllusion.Common.Cutscenes;
+using System;
+using System.IO;
 using Terraria;
 using Terraria.Audio;
+using Terraria.DataStructures;
+using Terraria.GameContent;
 using Terraria.Graphics.CameraModifiers;
 using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
-using ShatteredIllusion.Common.Cutscenes;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
 {
@@ -644,7 +646,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                     // Re-merge and fire shockwave
                     if (IsAuthority)
                     {
-                        npc.scale = SplitPopScale; 
+                        npc.scale = SplitPopScale;
 
                         SoundEngine.PlaySound(SoundID.NPCDeath19 with { Pitch = -0.4f, Volume = 1.6f }, npc.Center);
                         ScreenShake(npc, 18f, 28, 22f);
@@ -722,6 +724,37 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
         {
             if (npc.type != NPCID.KingSlime)
                 return true;
+
+            // Draw the custom King Slime sprite sheet from Assets/ExtraTextures.
+            Texture2D kingSlimeTexture = ModContent.Request<Texture2D>(
+                "ShatteredIllusion/Assets/ExtraTextures/Resprites/NPC_50"
+            ).Value;
+
+            // Fargo-style frame handling.
+            var frameCount = Main.npcFrameCount[npc.type];
+            var frameVertical = npc.frame.Y / npc.frame.Height;
+            var frame = kingSlimeTexture.Frame(1, frameCount, 0, frameVertical);
+            frame.Inflate(0, -2);
+
+            SpriteEffects spriteEffects =
+                npc.spriteDirection == 1
+                    ? SpriteEffects.None
+                    : SpriteEffects.FlipHorizontally;
+
+            // Draw the body from the bottom like Fargo does.
+            var bodyDraw = new DrawData(
+                kingSlimeTexture,
+                npc.Bottom - screenPos + new Vector2(0f, 2f),
+                frame,
+                npc.GetAlpha(drawColor),
+                npc.rotation,
+                frame.Size() * new Vector2(0.5f, 1f),
+                npc.scale,
+                spriteEffects,
+                0f
+            );
+
+            bodyDraw.Draw(spriteBatch);
 
             // Draw the Huge Jump landing indicator while King Slime is hovering overhead.
             if (CurrentState == AIState.HugeJump &&
@@ -825,7 +858,27 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanilliaBosses.KingSlime
                 );
             }
 
-            return true;
+            // Render the crown normally without the shader.
+            Texture2D crownTexture = ModContent.Request<Texture2D>(
+                "ShatteredIllusion/Assets/ExtraTextures/Resprites/Extra_39"
+            ).Value;
+            var center = npc.Center;
+
+            var yOffset = (npc.frame.Y / npc.frame.Height) switch
+            {
+                0 => 2f,
+                1 => -6f,
+                2 => 2f,
+                3 => 10f,
+                4 => 2f,
+                5 => 0f,
+                _ => 0f,
+            };
+
+            center.Y += npc.gfxOffY - (70f - yOffset) * npc.scale;
+            spriteBatch.Draw(crownTexture, center - screenPos, null, Color.White, 0f, crownTexture.Size() / 2f, npc.scale, spriteEffects, 0f);
+
+            return false;
         }
     }
 }
