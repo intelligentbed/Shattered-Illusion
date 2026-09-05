@@ -26,9 +26,21 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             Item.shoot = ModContent.ProjectileType<Projectiles.Ranger.MandibleShooterBullet>();
             Item.shootSpeed = 12f; // unused directly, see Shoot() below
 
-            Item.useAmmo = AmmoID.None; 
+            Item.useAmmo = AmmoID.None;
         }
-        
+
+        public override Vector2? HoldoutOffset()
+        {
+            return new Vector2(2f, -4f);
+        }
+        public override void ModifyShootStats(Player player, ref Vector2 position, ref Vector2 velocity,
+            ref int type, ref int damage, ref float knockback)
+        {
+            Vector2 aimDir = (Main.MouseWorld - position).SafeNormalize(Vector2.UnitX * player.direction);
+            float muzzleLength = 34f; // distance in pixels from hand 
+            position += aimDir * muzzleLength;
+        }
+
         public override bool Shoot(Player player, EntitySource_ItemUse_WithAmmo source,
             Vector2 position, Vector2 velocity, int type, int damage, float knockback)
         {
@@ -37,7 +49,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: 1f);
             SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: -1f);
 
-            return false; 
+            return false;
         }
 
         private void SpawnBullet(EntitySource_ItemUse_WithAmmo source, Vector2 position,
