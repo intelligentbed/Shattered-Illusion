@@ -9,7 +9,7 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.Items.Other
+namespace ShatteredIllusion.Content.Items.Potion.Food
 {
     public class MossSoup : ModItem
     {

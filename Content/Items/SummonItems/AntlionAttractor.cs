@@ -1,9 +1,9 @@
 ﻿using Terraria;
+using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace ShatteredIllusion.Content.Items.SummonItems
-
 {
     public class AntlionAttractor : ModItem
     {
@@ -18,7 +18,20 @@ namespace ShatteredIllusion.Content.Items.SummonItems
             Item.useTime = 10;
             Item.useStyle = ItemUseStyleID.Swing;
             Item.consumable = false;
-            //lwk just copy and pasted the moss item since im lazy 
+        }
+    }
+    public class AntlionAttractorDrop : GlobalNPC
+    {
+        public override void ModifyNPCLoot(NPC npc, NPCLoot npcLoot)
+        {
+            if (npc.type is NPCID.Antlion or NPCID.WalkingAntlion or NPCID.GiantFlyingAntlion)
+            {
+                npcLoot.Add(ItemDropRule.Common(
+                    ModContent.ItemType<Items.SummonItems.AntlionAttractor>(),
+                    chanceDenominator: 4,
+                    minimumDropped: 1,
+                    maximumDropped: 2));
+            }
         }
     }
 }

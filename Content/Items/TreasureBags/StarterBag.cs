@@ -8,7 +8,7 @@ using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Common.Players
+namespace ShatteredIllusion.Content.Items.TreasureBags
 {
     public class StarterBag : ModItem
     {

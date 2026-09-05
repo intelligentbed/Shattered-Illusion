@@ -43,7 +43,8 @@ namespace ShatteredIllusion.Content.Items.TreasureBags
             // Weapon pool — one random pick from these
             itemLoot.Add(ItemDropRule.OneFromOptions(1, new int[]
             {
-                ModContent.ItemType<MandibleShooter>()
+                ModContent.ItemType<MandibleShooter>(),
+                ModContent.ItemType<DuneRendPincers>()
             }));
         }
     }
