@@ -751,7 +751,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                             new Vector2(-1, -1)  // Up-Left
                         };
 
-                        const float secondPulseDelay = 16f; // frames before the counter-spin pulse launches
+                        const float secondPulseDelay = 16f; // frames before the counter spin pulse launches
                         const float secondPulseRotation = MathHelper.PiOver4 * 0.5f; // 22.5 degrees
 
                         foreach (var dir in xDirections)
@@ -898,7 +898,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 slamTargetPos != Vector2.Zero)
             {
                 Texture2D telegraphTex = ModContent.Request<Texture2D>(
-                    "ShatteredIllusion/Content/NPCs/BossAI/VanilliaBosses/KingSlime/HugeJumpTelegraph"
+                    "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/HugeJumpTelegraph"
                 ).Value;
 
                 float startYOffset = 35f; // how much higher to start the beam
@@ -951,7 +951,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             if (CurrentState == AIState.SplitAttack && SubState == 0)
             {
                 Texture2D telegraphTex = ModContent.Request<Texture2D>(
-                    "ShatteredIllusion/Content/NPCs/BossAI/VanilliaBosses/KingSlime/HugeJumpTelegraph"
+                    "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/HugeJumpTelegraph"
                 ).Value;
 
                 Vector2 drawPos = npc.Center - screenPos;
