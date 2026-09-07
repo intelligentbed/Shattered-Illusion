@@ -6,14 +6,12 @@ using Terraria.ID;
 using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
+using ShatteredIllusion.Common.Players.ParrySystem;
+using ShatteredIllusion.Common.Cutscenes;
+using ShatteredIllusion.Core.Packets;
 
 namespace ShatteredIllusion
 {
-    public enum MessageType : byte
-    {
-        DownedGreatAntlionCharger
-    }
-
     public class ShatteredIllusion : Mod
     {
         public override void Unload()
@@ -50,19 +48,57 @@ namespace ShatteredIllusion
 
         public override void HandlePacket(BinaryReader reader, int whoAmI)
         {
+            if (reader.BaseStream.Position >= reader.BaseStream.Length)
+                return;
+
             var messageType = (MessageType)reader.ReadByte();
 
             switch (messageType)
             {
-                case MessageType.DownedGreatAntlionCharger:
-                    DownedSystem.downedGreatAntlionCharger = true;
+                case MessageType.SyncDownedGreatAntlionCharger:
+                    // World progression is authored by the server. A packet from a
+                    // client using this ID is intentionally ignored.
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
+                        DownedSystem.ReceiveDownedState(reader.ReadBoolean());
+                    break;
 
+                case MessageType.TutorialProcUpdate:
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
+                        ParryTutorialSystem.ReceiveProcUpdate(reader.ReadInt32());
+                    break;
+
+                case MessageType.RequestParry:
                     if (Main.netMode == NetmodeID.Server)
+                        ParryPlayer.HandleParryRequest(whoAmI);
+                    break;
+
+                case MessageType.RequestActivateSteeled:
+                    if (Main.netMode == NetmodeID.Server)
+                        ParryPlayer.HandleActivateSteeledRequest(whoAmI);
+                    break;
+
+                case MessageType.SyncParryState:
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
+                        ParryPlayer.ReceiveSyncedState(reader);
+                    break;
+
+                case MessageType.ParryVisualEffect:
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
+                        ParryPlayer.ReceiveVisualEffect(reader);
+                    break;
+
+                case MessageType.StartBossCutscene:
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
                     {
-                        ModPacket packet = GetPacket();
-                        packet.Write((byte)MessageType.DownedGreatAntlionCharger);
-                        packet.Send(-1, whoAmI);
+                        int npcIndex = reader.ReadInt32();
+                        int npcType = reader.ReadInt32();
+
+                        BossCutsceneSystem.ReceiveStart(npcIndex, npcType);
                     }
+                    break;
+
+                default:
+                    Logger.Warn($"Ignoring unknown packet type {(byte)messageType} from player {whoAmI}.");
                     break;
             }
         }
@@ -71,16 +107,30 @@ namespace ShatteredIllusion
     public class DownedSystem : ModSystem
     {
         public static bool downedGreatAntlionCharger;
+
         public static void SetDownedGreatAntlionCharger()
         {
+            // Clients never decide world progression. This method is called by the
+            // boss's server-side OnKill hook.
+            if (Main.netMode == NetmodeID.MultiplayerClient || downedGreatAntlionCharger)
+                return;
+
             downedGreatAntlionCharger = true;
 
-            if (Main.netMode != NetmodeID.SinglePlayer)
+            if (Main.netMode == NetmodeID.Server)
             {
                 ModPacket packet = ModContent.GetInstance<ShatteredIllusion>().GetPacket();
-                packet.Write((byte)MessageType.DownedGreatAntlionCharger);
+
+                packet.Write((byte)MessageType.SyncDownedGreatAntlionCharger);
+                packet.Write(downedGreatAntlionCharger);
+
                 packet.Send();
             }
+        }
+
+        internal static void ReceiveDownedState(bool isDowned)
+        {
+            downedGreatAntlionCharger = isDowned;
         }
 
         public override void OnWorldLoad()
@@ -103,7 +153,18 @@ namespace ShatteredIllusion
 
         public override void LoadWorldData(TagCompound tag)
         {
-            downedGreatAntlionCharger = tag.ContainsKey("downedGreatAntlionCharger");
+            downedGreatAntlionCharger =
+                tag.ContainsKey("downedGreatAntlionCharger");
+        }
+
+        public override void NetSend(BinaryWriter writer)
+        {
+            writer.Write(downedGreatAntlionCharger);
+        }
+
+        public override void NetReceive(BinaryReader reader)
+        {
+            downedGreatAntlionCharger = reader.ReadBoolean();
         }
     }
 }

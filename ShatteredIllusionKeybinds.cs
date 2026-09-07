@@ -6,17 +6,20 @@ namespace ShatteredIllusionKeybinds
     {
         public static ModKeybind ParryKeybind { get; private set; }
         public static ModKeybind SturdinessMeterUseKeybind { get; private set; }
+        public static ModKeybind JournalKeybind { get; private set; }
 
-        public override void Load()  
+        public override void Load()
         {
             ParryKeybind = KeybindLoader.RegisterKeybind(Mod, "Parry", "V");
             SturdinessMeterUseKeybind = KeybindLoader.RegisterKeybind(Mod, "Sturdiness Meter", "C");
+            JournalKeybind = KeybindLoader.RegisterKeybind(Mod, "Toggle Journal", "J");
         }
 
         public override void Unload()
         {
             ParryKeybind = null;
             SturdinessMeterUseKeybind = null;
+            JournalKeybind = null;
         }
     }
 }
