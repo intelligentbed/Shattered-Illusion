@@ -101,7 +101,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
 
-            Texture2D texture = ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/VanilliaBosses/KingSlime/KingSlimeClone").Value;
+            Texture2D texture = ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/KingSlimeClone").Value;
 
             Rectangle sourceRectangle = new Rectangle(0, 0, texture.Width, texture.Height);
             Vector2 drawOrigin = new Vector2(texture.Width / 2f, texture.Height / 2f);

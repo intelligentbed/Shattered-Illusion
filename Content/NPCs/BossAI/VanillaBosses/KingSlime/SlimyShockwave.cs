@@ -10,12 +10,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 {
     public class SlimyShockwave : ModProjectile
     {
-        // ai[0] = spin direction (+1 clockwise / -1 counter-clockwise)
-        // ai[1] = frames to "charge" in place before launching (used for the staggered second pulse)
 
-        private const float CurlDegreesTotal = 65f; // total curl applied over the ramp - NOT per tick, NOT unbounded
-        private const float CurlRampTicks = 35f;     // ticks over which that curl is applied, then it flies straight
-        private const float MaxTravelDistance = 420f; // shockwave dissipates past this range instead of chasing forever
+
+        private const float CurlDegreesTotal = 65f; 
+        private const float CurlRampTicks = 35f;    
+        private const float MaxTravelDistance = 420f; 
 
         private Vector2 _launchVelocity;
         private Vector2 _spawnPos;
@@ -131,7 +130,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         public override void Kill(int timeLeft)
         {
-            SoundEngine.PlaySound(SoundID.Shatter, Projectile.Center);
+            SoundEngine.PlaySound(SoundID.Item30, Projectile.Center);
 
             for (int i = 0; i < 10; i++)
             {

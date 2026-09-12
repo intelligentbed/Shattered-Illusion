@@ -22,7 +22,7 @@ namespace ShatteredIllusion.World.WorldGeneration
         private const int MarkerHalfWidth = 6;
 
         private const string StructurePath =
-            "World/Structures/AntlionBossArena.shstruct";
+            "Content/World/Structures/AntlionBossArena.shstruct";
 
         public override void ModifyWorldGenTasks(
             List<GenPass> tasks,

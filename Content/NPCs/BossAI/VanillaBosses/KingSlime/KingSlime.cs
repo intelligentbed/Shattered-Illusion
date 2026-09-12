@@ -2,6 +2,9 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ShatteredIllusion.Common.Cutscenes;
 using ShatteredIllusion.Core.OverrideSystem;
+using ShatteredIllusion.Content.Particles;
+using ParticleLibrary.Core.V3.Particles;
+using ParticleLibrary.Utilities;
 using System;
 using System.IO;
 using Terraria;
@@ -10,6 +13,7 @@ using Terraria.DataStructures;
 using Terraria.Graphics.CameraModifiers;
 using Terraria.ID;
 using Terraria.ModLoader;
+using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 {
@@ -17,9 +21,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
     {
         public override int NPCOverrideType => NPCID.KingSlime;
 
-        private bool hasTriggeredCutscene;
-
-        public enum AIState
+        public enum AttackPhase
         {
             Jump,
             BigJump,
@@ -31,34 +33,24 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         }
 
         //Attack order as you know
-        private static readonly AIState[] NormalAttackOrder =
+        private static readonly AttackPhase[] AttackSequence =
         {
-            AIState.Jump,
-            AIState.BigJump,
-            AIState.BigJump,
-            AIState.Teleport,
-            AIState.HugeJump,
-            AIState.SplitAttack,
-            AIState.BigJump,
-            AIState.HugeJump,
+            AttackPhase.Jump,
+            AttackPhase.BigJump,
+            AttackPhase.BigJump,
+            AttackPhase.Teleport,
+            AttackPhase.HugeJump,
+            AttackPhase.SplitAttack,
+            AttackPhase.BigJump,
+            AttackPhase.HugeJump,
         };
 
-
-        public AIState CurrentState = AIState.Jump;
-        public float Timer;
-        public int SubState;
-        public int AttackSequenceIndex;
-
-        public int ForceDespawnTimer;
         private const float ForceDespawnRange = 3000f;
         private const int ForceDespawnDelay = 60;
         private const float DespawnFadeDuration = 40f;
 
         private int spawnGraceTimer = 0;
         private const int SpawnGracePeriod = 120;
-
-        // Stores the position the Huge Jump slam is targeting so the landing point can be telegraphed.
-        private Vector2 slamTargetPos = Vector2.Zero;
 
         // OMG THE NINJA NOT BEING VISIBLE WAS DRIVING ME CRAZY NEVER LET ME CODE AGAIN 
         private const int SlimeAlpha = 25;
@@ -73,8 +65,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const float CrownDropHeight = 46f;
         private const float CrownDropDuration = 24f;
 
-        private bool splitVertical;
-
         private const float ShockwaveTelegraphWindow = 15f;
 
         private float squishOffset = 0f;
@@ -85,47 +75,69 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private static bool IsAuthority =>
             Main.netMode != NetmodeID.MultiplayerClient;
 
+        private const int Slot_Phase = 0;
+        private const int Slot_Timer = 1;
+        private const int Slot_Step = 2;
+        private const int Slot_SequenceIndex = 3;
+
+        private const int Local_SlamTargetX = 0;
+        private const int Local_SlamTargetY = 1;
+        private const int Local_SplitVertical = 2;
+        private const int Local_ForceDespawnTimer = 3;
+
+        // Named sub-steps within each attack phase, replacing the old raw 0/1/2 SubState values.
+        private const int JumpWindupStep = 0;
+        private const int JumpAirborneStep = 1;
+
+        private const int TeleportSubmergingStep = 0;
+        private const int TeleportResurfacingStep = 1;
+
+        private const int HugeJumpLiftoffStep = 0;
+        private const int HugeJumpHoveringStep = 1;
+        private const int HugeJumpSlammingStep = 2;
+
+        private const int SplitAttackWindupStep = 0;
+        private const int SplitAttackDivergingStep = 1;
+        private const int SplitAttackSettlingStep = 2;
+
+        private static AttackPhase CurrentPhase(NPC npc) => (AttackPhase)(int)npc.ai[Slot_Phase];
+        private static void SetPhase(NPC npc, AttackPhase phase) => npc.ai[Slot_Phase] = (int)phase;
+
+        private static int CurrentStep(NPC npc) => (int)npc.ai[Slot_Step];
+        private static void SetStep(NPC npc, int step) => npc.ai[Slot_Step] = step;
+
+        private static int SequenceIndex(NPC npc) => (int)npc.ai[Slot_SequenceIndex];
+
+        private static Vector2 SlamTargetPos(NPC npc) =>
+            new(npc.localAI[Local_SlamTargetX], npc.localAI[Local_SlamTargetY]);
+
+        private static void SetSlamTargetPos(NPC npc, Vector2 pos)
+        {
+            npc.localAI[Local_SlamTargetX] = pos.X;
+            npc.localAI[Local_SlamTargetY] = pos.Y;
+        }
+
+        private static bool SplitVertical(NPC npc) => npc.localAI[Local_SplitVertical] == 1f;
+        private static void SetSplitVertical(NPC npc, bool value) => npc.localAI[Local_SplitVertical] = value ? 1f : 0f;
+
         public override void SendExtraData(NPC npc, BinaryWriter binaryWriter)
         {
-            binaryWriter.Write((byte)CurrentState);
-            binaryWriter.Write(Timer);
-            binaryWriter.Write((byte)SubState);
-            binaryWriter.Write((byte)AttackSequenceIndex);
-            binaryWriter.Write(slamTargetPos.X);
-            binaryWriter.Write(slamTargetPos.Y);
-            binaryWriter.Write(splitVertical);
+            binaryWriter.Write(npc.localAI[Local_SlamTargetX]);
+            binaryWriter.Write(npc.localAI[Local_SlamTargetY]);
+            binaryWriter.Write(npc.localAI[Local_SplitVertical]);
+            binaryWriter.Write(npc.localAI[Local_ForceDespawnTimer]);
         }
 
         public override void ReceiveExtraData(NPC npc, BinaryReader binaryReader)
         {
-            CurrentState = (AIState)binaryReader.ReadByte();
-            Timer = binaryReader.ReadSingle();
-            SubState = binaryReader.ReadByte();
-            AttackSequenceIndex = binaryReader.ReadByte();
-            slamTargetPos = new Vector2(binaryReader.ReadSingle(), binaryReader.ReadSingle());
-            splitVertical = binaryReader.ReadBoolean();
+            npc.localAI[Local_SlamTargetX] = binaryReader.ReadSingle();
+            npc.localAI[Local_SlamTargetY] = binaryReader.ReadSingle();
+            npc.localAI[Local_SplitVertical] = binaryReader.ReadSingle();
+            npc.localAI[Local_ForceDespawnTimer] = binaryReader.ReadSingle();
         }
 
         public override bool PreAI(NPC npc)
         {
-            if (npc.localAI[3] == 0f)
-            {
-                npc.localAI[3] = 1f;
-                hasTriggeredCutscene = false;
-                CurrentState = AIState.Jump;
-                Timer = 0f;
-                SubState = 0;
-                AttackSequenceIndex = 0;
-                ForceDespawnTimer = 0;
-                spawnGraceTimer = 0;
-                slamTargetPos = Vector2.Zero;
-                splitVertical = false;
-                squishOffset = 0f;
-                squishSpringVel = 0f;
-                lastVelocityY = 0f;
-                wobbleClock = 0f;
-            }
-
             CutscenePlayer cutscenePlayer =
                 Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
 
@@ -138,26 +150,28 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             npc.TargetClosest(true);
             Player target = Main.player[npc.target];
 
+            ref float forceDespawnTimer = ref npc.localAI[Local_ForceDespawnTimer];
+
             if (spawnGraceTimer < SpawnGracePeriod)
             {
                 spawnGraceTimer++;
             }
             else if (!npc.HasValidTarget || npc.Distance(target.Center) > ForceDespawnRange)
             {
-                if (++ForceDespawnTimer > ForceDespawnDelay && CurrentState != AIState.Despawn && IsAuthority)
+                if (++forceDespawnTimer > ForceDespawnDelay && CurrentPhase(npc) != AttackPhase.Despawn && IsAuthority)
                 {
                     EnterDespawn(npc);
                 }
             }
             else
             {
-                ForceDespawnTimer = 0;
+                forceDespawnTimer = 0;
                 npc.timeLeft = 3600;
             }
 
-            if (CurrentState == AIState.Despawn)
+            if (CurrentPhase(npc) == AttackPhase.Despawn)
             {
-                ExecuteDespawn(npc);
+                DoDespawn(npc);
                 return false;
             }
 
@@ -167,7 +181,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 return false;
             }
 
-            Timer++;
+            npc.ai[Slot_Timer]++;
             UpdateJellyWobble(npc);
 
             // Keep the sprite facing the direction King Slime is moving.
@@ -177,30 +191,30 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 npc.spriteDirection = npc.direction;
             }
 
-            switch (CurrentState) //testing out a new way to make this since the antlion wasnt the best 
+            switch (CurrentPhase(npc)) //testing out a new way to make this since the antlion wasnt the best 
             {
-                case AIState.Jump:
-                    ExecuteJump(npc, target, isBigJump: false);
+                case AttackPhase.Jump:
+                    DoJump(npc, target, isBigJump: false);
                     break;
 
-                case AIState.BigJump:
-                    ExecuteJump(npc, target, isBigJump: true);
+                case AttackPhase.BigJump:
+                    DoJump(npc, target, isBigJump: true);
                     break;
 
-                case AIState.Teleport:
-                    ExecuteTeleport(npc, target);
+                case AttackPhase.Teleport:
+                    DoTeleport(npc, target);
                     break;
 
-                case AIState.HugeJump:
-                    ExecuteHugeJump(npc, target);
+                case AttackPhase.HugeJump:
+                    DoHugeJump(npc, target);
                     break;
 
-                case AIState.SplitAttack:
-                    ExecuteSplitAttack(npc, target);
+                case AttackPhase.SplitAttack:
+                    DoSplitAttack(npc, target);
                     break;
 
-                case AIState.Cooldown:
-                    ExecuteCooldown(npc);
+                case AttackPhase.Cooldown:
+                    DoCooldown(npc);
                     break;
             }
 
@@ -225,15 +239,18 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             squishOffset = MathHelper.Clamp(squishOffset, -0.35f, 0.35f);
         }
 
-        private void EnterCooldown()
+        private void EnterCooldown(NPC npc)
         {
-            CurrentState = AIState.Cooldown;
-            Timer = 0f;
-            SubState = 0;
-            slamTargetPos = Vector2.Zero;
+            SetPhase(npc, AttackPhase.Cooldown);
+            npc.ai[Slot_Timer] = 0f;
+            SetStep(npc, 0);
+            SetSlamTargetPos(npc, Vector2.Zero);
+
+            if (IsAuthority)
+                npc.netUpdate = true;
         }
 
-        private void ExecuteCooldown(NPC npc)
+        private void DoCooldown(NPC npc)
         {
             npc.noGravity = false;
             npc.noTileCollide = false;
@@ -243,33 +260,39 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             const float cooldownTime = 20f;
 
-            if (Timer >= cooldownTime)
+            ref float timer = ref npc.ai[Slot_Timer];
+
+            if (timer >= cooldownTime)
             {
-                AttackSequenceIndex = (AttackSequenceIndex + 1) % NormalAttackOrder.Length;
-                CurrentState = NormalAttackOrder[AttackSequenceIndex];
+                int nextSequenceIndex = (SequenceIndex(npc) + 1) % AttackSequence.Length;
+                npc.ai[Slot_SequenceIndex] = nextSequenceIndex;
+
+                AttackPhase nextPhase = AttackSequence[nextSequenceIndex];
+                SetPhase(npc, nextPhase);
 
                 // Decide this split's orientation
-                if (CurrentState == AIState.SplitAttack && IsAuthority)
-                    splitVertical = Main.rand.NextBool(2);
+                if (nextPhase == AttackPhase.SplitAttack && IsAuthority)
+                    SetSplitVertical(npc, Main.rand.NextBool(2));
 
-                Timer = 0f;
-                SubState = 0;
+                timer = 0f;
+                SetStep(npc, 0);
                 npc.netUpdate = true;
             }
         }
 
         private void EnterDespawn(NPC npc)
         {
-            CurrentState = AIState.Despawn;
-            SubState = 0;
-            Timer = 0f;
-            slamTargetPos = Vector2.Zero;
+            SetPhase(npc, AttackPhase.Despawn);
+            SetStep(npc, 0);
+            npc.ai[Slot_Timer] = 0f;
+            SetSlamTargetPos(npc, Vector2.Zero);
             npc.netUpdate = true;
         }
 
-        private void ExecuteDespawn(NPC npc)
+        private void DoDespawn(NPC npc)
         {
-            Timer++;
+            ref float timer = ref npc.ai[Slot_Timer];
+            timer++;
             npc.noGravity = false;
             npc.noTileCollide = false;
             npc.scale = MathHelper.Lerp(npc.scale, BaseScale, 0.1f);
@@ -278,10 +301,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             npc.velocity.Y += 0.75f;
 
             // Fade out as he drops.
-            float fadeT = MathHelper.Clamp(Timer / DespawnFadeDuration, 0f, 1f);
+            float fadeT = MathHelper.Clamp(timer / DespawnFadeDuration, 0f, 1f);
             npc.alpha = (int)MathHelper.Lerp(SlimeAlpha, 255, fadeT);
 
-            if (Timer >= DespawnFadeDuration && IsAuthority)
+            if (timer >= DespawnFadeDuration && IsAuthority)
             {
                 npc.active = false;
 
@@ -292,14 +315,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
-        private void ExecuteJump(NPC npc, Player player, bool isBigJump)
+        private void DoJump(NPC npc, Player player, bool isBigJump)
         {
             npc.noGravity = false;
             npc.noTileCollide = false;
             npc.alpha = SlimeAlpha;
             npc.scale = BaseScale;
 
-            if (SubState == 0)
+            ref float timer = ref npc.ai[Slot_Timer];
+            int step = CurrentStep(npc);
+
+            if (step == JumpWindupStep)
             {
                 npc.velocity.X *= 0.8f;
 
@@ -309,7 +335,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
 
                 // Give King Slime a short pause before committing to the jump
-                if (Timer >= 30f)
+                if (timer >= 30f)
                 {
                     if (IsAuthority)
                     {
@@ -347,11 +373,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         npc.Center
                     );
 
-                    SubState = 1;
-                    Timer = 0f;
+                    SetStep(npc, JumpAirborneStep);
+                    timer = 0f;
                 }
             }
-            else if (SubState == 1)
+            else if (step == JumpAirborneStep)
             {
                 if (isBigJump && Main.rand.NextBool(2))
                 {
@@ -359,7 +385,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
 
                 // Wait until the jump has landed before moving to the next attack.
-                if (Timer > 10f && HasLanded(npc))
+                if (timer > 10f && HasLanded(npc))
                 {
 
                     SoundEngine.PlaySound(
@@ -376,16 +402,37 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         Dust.NewDust(npc.position, npc.width, npc.height, DustID.BlueCrystalShard, Main.rand.NextFloat(-4f, 4f), Main.rand.NextFloat(-3f, 0f), 100, Color.Cyan, 1.4f);
                     }
 
-                    EnterCooldown();
+                    // Sharper embers on top of the dust to punch up the landing impact.
+                    if (!Main.dedServ)
+                    {
+                        for (int i = 0; i < (isBigJump ? 10 : 6); i++)
+                        {
+                            Vector2 sparkVelocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(3f, 7f);
+
+                            BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                                position: npc.Center.ToNumerics(),
+                                velocity: sparkVelocity.ToNumerics(),
+                                rotation: 0f,
+                                scale: new SystemVector2(12f, 12f),
+                                color: new Color(120, 210, 255, 0),
+                                duration: Main.rand.Next(20, 32)
+                            ));
+                        }
+                    }
+
+                    EnterCooldown(npc);
                 }
             }
         }
 
-        private void ExecuteTeleport(NPC npc, Player player)
+        private void DoTeleport(NPC npc, Player player)
         {
             npc.velocity *= 0.7f;
 
-            if (SubState == 0)
+            ref float timer = ref npc.ai[Slot_Timer];
+            int step = CurrentStep(npc);
+
+            if (step == TeleportSubmergingStep)
             {
                 npc.noTileCollide = true;
                 npc.alpha += 15;
@@ -424,11 +471,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         npc.netUpdate = true;
                     }
 
-                    SubState = 1;
-                    Timer = 0f;
+                    SetStep(npc, TeleportResurfacingStep);
+                    timer = 0f;
                 }
             }
-            else if (SubState == 1)
+            else if (step == TeleportResurfacingStep)
             {
                 npc.alpha -= 20;
 
@@ -436,7 +483,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 float targetMaterializeScale = BaseScale;
                 npc.scale = MathHelper.Lerp(npc.scale, targetMaterializeScale, 0.15f);
 
-                if (Timer <= 12f)
+                if (timer <= 12f)
                 {
                     for (int i = 0; i < 3; i++)
                     {
@@ -466,17 +513,38 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         npc.Center
                     );
 
-                    EnterCooldown();
+                    // A burst of embers to sell the "snapping back into existence" moment.
+                    if (!Main.dedServ)
+                    {
+                        for (int i = 0; i < 8; i++)
+                        {
+                            Vector2 sparkVelocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(2f, 6f);
+
+                            BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                                position: npc.Center.ToNumerics(),
+                                velocity: sparkVelocity.ToNumerics(),
+                                rotation: 0f,
+                                scale: new SystemVector2(11f, 11f),
+                                color: new Color(0, 170, 255, 0),
+                                duration: Main.rand.Next(18, 28)
+                            ));
+                        }
+                    }
+
+                    EnterCooldown(npc);
                 }
             }
         }
 
-        private void ExecuteHugeJump(NPC npc, Player player)
+        private void DoHugeJump(NPC npc, Player player)
         {
             npc.alpha = SlimeAlpha;
             npc.scale = BaseScale;
 
-            if (SubState == 0)
+            ref float timer = ref npc.ai[Slot_Timer];
+            int step = CurrentStep(npc);
+
+            if (step == HugeJumpLiftoffStep)
             {
                 npc.noGravity = true;
                 npc.noTileCollide = true;
@@ -500,12 +568,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     npc.Center
                 );
 
-                SubState = 1;
-                Timer = 0f;
+                SetStep(npc, HugeJumpHoveringStep);
+                timer = 0f;
             }
-            else if (SubState == 1)
+            else if (step == HugeJumpHoveringStep)
             {
-                if (Timer % 4f == 0f)
+                if (timer % 4f == 0f)
                 {
                     for (int i = 0; i < 4; i++)
                     {
@@ -538,27 +606,51 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 );
 
                 // Lock in the landing position used by the visual telegraph.
-                slamTargetPos = new Vector2(
+                SetSlamTargetPos(npc, new Vector2(
                     npc.Center.X,
                     player.Bottom.Y
-                );
+                ));
+
+                if (!Main.dedServ && timer % 6f == 0f)
+                {
+                    Vector2 slamTargetPos = SlamTargetPos(npc);
+                    Vector2 beamStart = npc.Bottom - new Vector2(0f, 35f);
+                    float beamLength = slamTargetPos.Y - beamStart.Y;
+
+                    if (beamLength > 0f)
+                    {
+                        for (int i = 0; i < 2; i++)
+                        {
+                            Vector2 segmentPos = beamStart + new Vector2(0f, beamLength * Main.rand.NextFloat());
+
+                            BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
+                                position: segmentPos.ToNumerics(),
+                                velocity: SystemVector2.Zero,
+                                rotation: 0f,
+                                scale: new SystemVector2(24f, 8f),
+                                color: new Color(0, 170, 255, 0),
+                                duration: 18
+                            ));
+                        }
+                    }
+                }
 
                 // Hold overhead long enough for the player to react to the incoming slam (hopefully)
-                if (Timer >= 65f)
+                if (timer >= 65f)
                 {
                     if (IsAuthority)
                         npc.netUpdate = true;
 
-                    SubState = 2;
-                    Timer = 0f;
+                    SetStep(npc, HugeJumpSlammingStep);
+                    timer = 0f;
                 }
             }
-            else if (SubState == 2)
+            else if (step == HugeJumpSlammingStep)
             {
                 npc.noTileCollide = false;
                 npc.noGravity = false;
 
-                if (Timer > 5f && HasLanded(npc))
+                if (timer > 5f && HasLanded(npc))
                 {
                     // yo this sound sounds so yunky i love it
                     SoundEngine.PlaySound(
@@ -577,9 +669,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime, Main.rand.NextFloat(-8f, 8f), Main.rand.NextFloat(-6f, 2f), 100, Color.Cyan, 1.8f);
                     }
 
+                    // One big expanding ring to sell the slam's impact radius.
+                    if (!Main.dedServ)
+                    {
+                        BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                            position: npc.Bottom.ToNumerics(),
+                            velocity: SystemVector2.Zero,
+                            rotation: 0f,
+                            scale: new SystemVector2(260f, 260f),
+                            color: new Color(0, 170, 255, 0),
+                            duration: 24
+                        ));
+                    }
+
                     // The slam releases a spread of Spiked Slime projectiles on landing
                     // Classic: 2, Expert: 4, Master: 6.
-                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    if (IsAuthority)
                     {
                         int halfCount = Main.masterMode ? 3 : (Main.expertMode ? 2 : 1);
 
@@ -602,7 +707,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         }
                     }
 
-                    EnterCooldown();
+                    EnterCooldown(npc);
                     return;
                 }
 
@@ -611,14 +716,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
-        private void ExecuteSplitAttack(NPC npc, Player player)
+        private void DoSplitAttack(NPC npc, Player player)
         {
             npc.noGravity = true;
             npc.noTileCollide = true;
             npc.velocity = Vector2.Zero;
             npc.alpha = SlimeAlpha;
 
-            if (SubState == 0)
+            ref float timer = ref npc.ai[Slot_Timer];
+            int step = CurrentStep(npc);
+
+            if (step == SplitAttackWindupStep)
             {
                 npc.scale = MathHelper.Max(SplitMinScale, npc.scale - 0.02f);
 
@@ -630,7 +738,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     );
                 }
 
-                float windupT = MathHelper.Clamp(Timer / 60f, 0f, 1f);
+                float windupT = MathHelper.Clamp(timer / 60f, 0f, 1f);
                 int dustCount = (int)MathHelper.Lerp(2f, 14f, windupT);
 
                 for (int i = 0; i < dustCount; i++)
@@ -646,8 +754,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     d.noGravity = true;
                 }
 
-                if (Timer >= 60f)
+
+                if (!Main.dedServ)
                 {
+                    int streakCount = (int)MathHelper.Lerp(1f, 3f, windupT);
+
+                    for (int i = 0; i < streakCount; i++)
+                    {
+                        Vector2 spawnOffset = Main.rand.NextVector2Circular(npc.width * 0.9f, npc.height * 0.9f);
+                        Vector2 inwardVelocity = -spawnOffset * Main.rand.NextFloat(0.05f, 0.09f);
+
+                        BossParticleSystem.SandStreaks.Create(new ParticleInfo(
+                            position: (npc.Center + spawnOffset).ToNumerics(),
+                            velocity: inwardVelocity.ToNumerics(),
+                            rotation: 0f,
+                            scale: new SystemVector2(24f, 5f),
+                            color: new Color(0, 170, 255, 0),
+                            duration: 20
+                        ));
+                    }
+                }
+
+                if (timer >= 60f)
+                {
+                    bool splitVertical = SplitVertical(npc);
+
                     if (IsAuthority)
                     {
                         Vector2 splitAnchor = npc.Center + new Vector2(0f, SplitAnchorYOffset);
@@ -679,13 +810,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         SoundEngine.PlaySound(SoundID.Item8 with { Pitch = -0.6f, Volume = 1.3f }, npc.Center);
                     }
 
-                    SubState = 1;
-                    Timer = 0f;
+                    SetStep(npc, SplitAttackDivergingStep);
+                    timer = 0f;
                     npc.netUpdate = true;
                 }
             }
             //Clones traveling out and back 
-            else if (SubState == 1)
+            else if (step == SplitAttackDivergingStep)
             {
                 npc.scale = SplitMinScale;
 
@@ -695,7 +826,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
 
                 // Telegraph the incoming shockwave
-                float framesUntilFire = 70f - Timer;
+                float framesUntilFire = 70f - timer;
                 if (framesUntilFire <= ShockwaveTelegraphWindow && framesUntilFire >= 0f)
                 {
                     float warnT = 1f - (framesUntilFire / ShockwaveTelegraphWindow);
@@ -724,10 +855,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     }
                 }
 
-                if (Timer >= 70f)
+                if (timer >= 70f)
                 {
-                    SubState = 2;
-                    Timer = 0f;
+                    SetStep(npc, SplitAttackSettlingStep);
+                    timer = 0f;
 
                     // Re-merge and fire shockwave
                     if (IsAuthority)
@@ -740,6 +871,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         for (int i = 0; i < 40; i++)
                         {
                             Dust.NewDust(npc.position, npc.width, npc.height, DustID.TintableDust, Main.rand.NextFloat(-8f, 8f), Main.rand.NextFloat(-8f, 8f), 100, Color.Cyan, 2.0f);
+                        }
+
+                        // One big expanding ring to sell the re-merge before the shockwave fires.
+                        if (!Main.dedServ)
+                        {
+                            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                                position: npc.Center.ToNumerics(),
+                                velocity: SystemVector2.Zero,
+                                rotation: 0f,
+                                scale: new SystemVector2(220f, 220f),
+                                color: new Color(0, 170, 255, 0),
+                                duration: 22
+                            ));
                         }
 
 
@@ -788,14 +932,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     }
                 }
             }
-            else if (SubState == 2)
+            else if (step == SplitAttackSettlingStep)
             {
                 npc.scale = MathHelper.Lerp(npc.scale, BaseScale, 0.1f);
 
-                if (Timer >= 35f)
+                if (timer >= 35f)
                 {
                     npc.scale = BaseScale;
-                    EnterCooldown();
+                    EnterCooldown(npc);
                 }
             }
         }
@@ -892,9 +1036,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             bodyDraw.Draw(spriteBatch);
 
+            AttackPhase currentPhase = CurrentPhase(npc);
+            int currentStep = CurrentStep(npc);
+            Vector2 slamTargetPos = SlamTargetPos(npc);
+            float timer = npc.ai[Slot_Timer];
+
             // Draw the Huge Jump landing indicator while King Slime is hovering overhead.
-            if (CurrentState == AIState.HugeJump &&
-                SubState == 1 &&
+            if (currentPhase == AttackPhase.HugeJump &&
+                currentStep == HugeJumpHoveringStep &&
                 slamTargetPos != Vector2.Zero)
             {
                 Texture2D telegraphTex = ModContent.Request<Texture2D>(
@@ -948,22 +1097,24 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
 
             // the split telegraph 
-            if (CurrentState == AIState.SplitAttack && SubState == 0)
+            if (currentPhase == AttackPhase.SplitAttack && currentStep == SplitAttackWindupStep)
             {
                 Texture2D telegraphTex = ModContent.Request<Texture2D>(
                     "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/HugeJumpTelegraph"
                 ).Value;
 
                 Vector2 drawPos = npc.Center - screenPos;
-                float maxSpanLength = 240f;
+
+                float maxSpanLength = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
 
                 float scaleX = 20f / telegraphTex.Height;
                 float scaleY = maxSpanLength / telegraphTex.Width;
                 Vector2 origin = new Vector2(0, telegraphTex.Height / 2f);
 
-                Color warningTint = new Color(0, 180, 255, 200) * (Timer / 60f);
+                Color warningTint = new Color(0, 180, 255, 200) * (timer / 60f);
 
                 // Rotations for a +/- pair along whichever axis this split is using.
+                bool splitVertical = SplitVertical(npc);
                 float rotationA = splitVertical ? -MathHelper.PiOver2 : 0f;
                 float rotationB = splitVertical ? MathHelper.PiOver2 : MathHelper.Pi;
 
@@ -1014,9 +1165,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             center.Y += npc.gfxOffY + yOffset * npc.scale * squishY;
 
-            if (CurrentState == AIState.SplitAttack && SubState == 2)
+            if (currentPhase == AttackPhase.SplitAttack && currentStep == SplitAttackSettlingStep)
             {
-                float dropT = MathHelper.Clamp(Timer / CrownDropDuration, 0f, 1f);
+                float dropT = MathHelper.Clamp(timer / CrownDropDuration, 0f, 1f);
                 center.Y -= CrownDropHeight * (1f - EaseOutBounce(dropT));
             }
 
