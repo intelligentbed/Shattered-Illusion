@@ -5,6 +5,10 @@ using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
 using Terraria.ModLoader;
+using ShatteredIllusion.Content.Particles;
+using ParticleLibrary.Core.V3.Particles;
+using ParticleLibrary.Utilities;
+using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 {
@@ -16,8 +20,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private ref float CachedEndY => ref Projectile.localAI[0];
         private ref float CachedStartY => ref Projectile.localAI[1];
 
-        private const int TelegraphTicks = 50; 
-        private const int DustPerTick = 2;     
+        private const int TelegraphTicks = 50;
+        private const int DustPerTick = 2;
         public override void SetStaticDefaults()
         {
             ProjectileID.Sets.TrailCacheLength[Projectile.type] = 5;
@@ -136,7 +140,57 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 {
                     Dust flare = Dust.NewDustPerfect(pos, DustID.RedTorch, Vector2.Zero, 0, default, 2.0f * intensity);
                     flare.noGravity = true;
+
+                    // A brighter spark to go with the dust flare - flies up and out
+                    // instead of just sitting there, sells "danger" more than dust alone.
+                    Vector2 sparkVelocity = new Vector2(Main.rand.NextFloat(-1.5f, 1.5f), Main.rand.NextFloat(-3f, -1f));
+
+                    BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                        position: pos.ToNumerics(),
+                        velocity: sparkVelocity.ToNumerics(),
+                        rotation: 0f,
+                        scale: new SystemVector2(8f, 8f),
+                        color: new Color(255, 110, 70, 0),
+                        duration: Main.rand.Next(14, 22)
+                    ));
                 }
+            }
+
+            // Stacked flickering glow bars along the whole line - this is what turns
+            // "some dust falling" into a readable warning beam. More of them, bigger,
+            // and brighter as impact gets closer.
+            int segmentCount = (int)MathHelper.Lerp(1f, 3f, progress);
+
+            for (int i = 0; i < segmentCount; i++)
+            {
+                float t = Main.rand.NextFloat();
+                Vector2 segmentPos = new Vector2(Projectile.Center.X, startY + t * totalLength);
+
+                BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
+                    position: segmentPos.ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(MathHelper.Lerp(7f, 12f, progress), MathHelper.Lerp(22f, 36f, progress)),
+                    color: new Color(255, 60, 40, 0) * intensity,
+                    duration: 18
+                ));
+            }
+
+            // A pulsing warning ring right where the rubble is about to land -
+            // the beat speeds up as impact approaches, like a heartbeat.
+            int elapsedTicks = 600 - (int)Projectile.timeLeft;
+            int pulseInterval = (int)MathHelper.Lerp(14f, 5f, progress);
+
+            if (elapsedTicks % Math.Max(1, pulseInterval) == 0)
+            {
+                BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                    position: new Vector2(Projectile.Center.X, CachedEndY).ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(MathHelper.Lerp(36f, 80f, progress), MathHelper.Lerp(14f, 28f, progress)),
+                    color: new Color(255, 80, 55, 0),
+                    duration: 20
+                ));
             }
 
             Lighting.AddLight(new Vector2(Projectile.Center.X, startY + totalLength / 2f), 0.9f * intensity, 0.15f, 0.15f);
