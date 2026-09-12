@@ -483,6 +483,26 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
     internal static class CutsceneDefinition
     {
+        public static bool IsRegistered(int npcType)
+        {
+            return npcType == ModContent.NPCType<GreatAntlionCharger>() ||
+                   npcType == NPCID.KingSlime;
+        }
+
+        // Whether the boss's velocity/AI should be frozen while its cutscene
+        // plays. Read from each boss's own cutscene class so the flag lives
+        // right next to the rest of that boss's cutscene tuning.
+        public static bool ShouldFreezeMovement(int npcType)
+        {
+            if (npcType == ModContent.NPCType<GreatAntlionCharger>())
+                return GreatAntlionChargerCutscene.FreezeMovement;
+
+            if (npcType == NPCID.KingSlime)
+                return KingSlimeCutscene.FreezeMovement;
+
+            return true;
+        }
+
         public static void Apply(int npcType, CutscenePlayer player)
         {
             if (npcType == ModContent.NPCType<GreatAntlionCharger>())
@@ -507,6 +527,8 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
     internal static class GreatAntlionChargerCutscene
     {
+        public const bool FreezeMovement = true;
+
         public static void Apply(CutscenePlayer player)
         {
             player.SetDefinition(
@@ -519,6 +541,8 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
     internal static class KingSlimeCutscene
     {
+        public const bool FreezeMovement = false;
+
         public static void Apply(CutscenePlayer player)
         {
             player.SetDefinition(
@@ -554,13 +578,19 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
             if (cutsceneTimer > 0)
             {
-                npc.velocity = Vector2.Zero;
+                bool freezeMovement = CutsceneDefinition.ShouldFreezeMovement(npc.type);
+
+                if (freezeMovement)
+                {
+                    npc.velocity = Vector2.Zero;
+                }
+
                 npc.dontTakeDamage = true;
 
                 cutsceneWasActive = true;
                 cutsceneTimer--;
 
-                return false;
+                return !freezeMovement;
             }
 
             if (cutsceneWasActive)
@@ -616,8 +646,7 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
         private static bool IsRegisteredBoss(int type)
         {
-            return type == ModContent.NPCType<GreatAntlionCharger>() ||
-                   type == NPCID.KingSlime;
+            return CutsceneDefinition.IsRegistered(type);
         }
     }
 

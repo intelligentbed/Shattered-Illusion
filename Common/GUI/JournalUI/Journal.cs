@@ -94,6 +94,8 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
         // TODO: ACTUALLY MAKE THE SYMBOL IMAGE 
         private const string SymbolTexturePath = "ShatteredIllusion/Assets/UI/Journal_Symbol";
 
+        private static readonly SoundStyle PageTurnSound = new SoundStyle("ShatteredIllusion/Sounds/Journal/JournalPageTurn");
+
         private const float Scale = 1.75f;
         private const float TextureWidth = 466f;
         private const float TextureHeight = 344f;
@@ -104,9 +106,9 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
         private const int CoverPageIndex = -1; //-1 indicates the cover spread 
 
-        // TODO: replace with your real title/emblem caption.
-        private const string BookTitle = "        BOOK NAME HERE";
-        private const string SymbolLabel = "        SYMBOL HERE";
+        // TODO: replace with a real title/emblem caption.
+        private const string BookTitle = "          BOOK NAME HERE";
+        private const string SymbolLabel = "          SYMBOL HERE";
 
         private static readonly string[] Pages =
         {
@@ -114,16 +116,35 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             "How to read\n\nClick the right page to turn forward. Click the left page to turn back. but this is currently that that well implemented.",
             "Entry I\n\nI like Fargo's Sata mode.",
             "Entry II\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
+            "Entry III\n\n;iouahfbli;uhsdfgliuhsdfgliuhdfg",
+            "Entry IV\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
+            "Entry V\n\npioajgf[iopsjdfg[oisjdfgpoiuj",
+            "Entry VI\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
+            "Entry VII\n\nsgoijsdhg;oijsdfg;oisjdfg",
+            "Entry VIII\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
+            "Entry IX\n\nauahsdgliauhsflaisdfhasdff",
+            "Entry X\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
+            "Credits\n\nIn memory of those who have contributed to the journal.\n\n Project Lead : Pickle",
+            "Credits\n\nIn memory of those who have contributed to the journal.\n\n Artist : Tomato",
         };
 
-        // TODO: add one entry per topic, targeting the left-page index of that spread.
+        // TODO: add one entry per topic for the left-page index of that spread.
         private static readonly TocEntry[] TableOfContents =
         {
             new TocEntry("How to read", 0),
             new TocEntry("Entry I", 2),
             new TocEntry("Entry II", 2),
+            new TocEntry("Entry III", 4),
+            new TocEntry("Entry IV", 4),
+            new TocEntry("Entry V", 6),
+            new TocEntry("Entry VI", 6),
+            new TocEntry("Entry VII", 8),
+            new TocEntry("Entry VIII", 8),
+            new TocEntry("Entry IX", 10),
+            new TocEntry("Entry X", 10),
+            new TocEntry("Credits", 12),
         };
-
+        //Note: The table of contents does things in double, so the left page index of the spread is used for the target page index.
         private Asset<Texture2D> _texture;
         private Asset<Texture2D> _symbolTexture;
         private bool _isOpen;
@@ -220,7 +241,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             target = Math.Clamp(target, 0, maxStart);
 
             _leftPageIndex = target;
-            SoundEngine.PlaySound(SoundID.MenuTick);
+            SoundEngine.PlaySound(PageTurnSound);
         }
 
         private void TurnForward()
@@ -233,7 +254,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
                 }
 
                 _leftPageIndex = 0;
-                SoundEngine.PlaySound(SoundID.MenuTick);
+                SoundEngine.PlaySound(PageTurnSound);
                 return;
             }
 
@@ -243,7 +264,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             }
 
             _leftPageIndex += 2;
-            SoundEngine.PlaySound(SoundID.MenuTick);
+            SoundEngine.PlaySound(PageTurnSound);
         }
 
         private void TurnBackward()
@@ -256,12 +277,12 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             if (_leftPageIndex == 0)
             {
                 _leftPageIndex = CoverPageIndex;
-                SoundEngine.PlaySound(SoundID.MenuTick);
+                SoundEngine.PlaySound(PageTurnSound);
                 return;
             }
 
             _leftPageIndex -= 2;
-            SoundEngine.PlaySound(SoundID.MenuTick);
+            SoundEngine.PlaySound(PageTurnSound);
         }
 
         protected override void DrawSelf(SpriteBatch spriteBatch)

@@ -16,14 +16,14 @@ namespace ShatteredIllusion.Assets.MainMenu
         {
             TryEnd(spriteBatch);
 
-            spriteBatch.Begin(
-                SpriteSortMode.Deferred,
-                blendState,
-                samplerState,
-                DepthStencilState.None,
-                Main.Rasterizer,
-                null,
-                Main.UIScaleMatrix);
+        spriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            blendState,
+            samplerState,
+            DepthStencilState.None,
+            Main.Rasterizer,
+            null,
+            Main.UIScaleMatrix);
         }
 
         /// <summary>

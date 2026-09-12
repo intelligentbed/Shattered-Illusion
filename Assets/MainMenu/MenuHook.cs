@@ -34,13 +34,13 @@ namespace ShatteredIllusion.Assets.MainMenu
         // Main menu buttons.
         private static readonly MenuButton[] Buttons =
         {
-            new("Single Player", () => Main.menuMode = 1),
-            new("Multiplayer", () => Main.menuMode = 12),
-            new("Achievements", OpenAchievements),
-            new("Settings", () => Main.menuMode = 11),
-            new("Workshop", OpenWorkshop),
-            new("Exit", () => Main.instance.Exit()),
-        };
+        new("Single Player", () => Main.menuMode = 1),
+        new("Multiplayer", () => Main.menuMode = 12),
+        new("Achievements", OpenAchievements),
+        new("Settings", () => Main.menuMode = 11),
+        new("Workshop", OpenWorkshop),
+        new("Exit", () => Main.instance.Exit()),
+    };
 
         // Button layout settings.
         private const float ButtonStartY = 300f;
@@ -90,16 +90,21 @@ namespace ShatteredIllusion.Assets.MainMenu
         // Tracks the exit animation.
         private static bool _exiting;
         private static float _exitStartedAt;
-        private static Action _pendingAction;
+        private static Action? _pendingAction;
 
         private static float _themeSwitchHover;
 
+        private static double _animationTime;
+
         private static DynamicSpriteFont MenuFont => FontAssets.DeathText.Value;
 
-        private static MethodInfo _offsetModMenu;
-        private static FieldInfo _currentMenuField;
-        private static FieldInfo _switchToMenuField;
-        private static FieldInfo _lastSelectedModMenuField;
+        // These are resolved lazily via reflection in EnsureMenuLoaderAccess() and are legitimately
+        // null until that runs (or if the members can't be found), so they're nullable rather than
+        // being force-initialized here.
+        private static MethodInfo? _offsetModMenu;
+        private static FieldInfo? _currentMenuField;
+        private static FieldInfo? _switchToMenuField;
+        private static FieldInfo? _lastSelectedModMenuField;
         private static bool _menuLoaderAccessResolved;
 
         // Text shown for the theme switcher.
@@ -115,15 +120,40 @@ namespace ShatteredIllusion.Assets.MainMenu
         public override void Unload()
         {
             On_Main.DrawMenu -= Main_DrawMenu;
+
+            _wasActive = false;
+            _enteredAt = -1000f;
+            _mouseWasDown = false;
+            _mouseWasRightDown = false;
+            _exiting = false;
+            _exitStartedAt = 0f;
+            _pendingAction = null;
+            _themeSwitchHover = 0f;
+            _animationTime = 0d;
+
+            foreach (MenuButton button in Buttons)
+                button.Hover = 0f;
+
+            _offsetModMenu = null;
+            _currentMenuField = null;
+            _switchToMenuField = null;
+            _lastSelectedModMenuField = null;
+            _menuLoaderAccessResolved = false;
         }
 
         // Handles drawing and menu input.
-        private void Main_DrawMenu(On_Main.orig_DrawMenu orig, Main self, GameTime gameTime)
+        // Static: MonoMod's On_Main.DrawMenu hook already passes the Main instance in as "self",
+        // so this doesn't need to be an instance method — and all the state it touches is static
+        // menu/animation state shared across the whole hook, not per-instance state.
+        private static void Main_DrawMenu(On_Main.orig_DrawMenu orig, Main self, GameTime gameTime)
         {
-            if (_exiting && Main.GlobalTimeWrappedHourly - _exitStartedAt >= TotalExitDuration)
+            _animationTime += gameTime.ElapsedGameTime.TotalSeconds;
+
+            if (_exiting && _animationTime - _exitStartedAt >= TotalExitDuration)
             {
                 _exiting = false;
-                Action action = _pendingAction;
+
+                Action? action = _pendingAction;
                 _pendingAction = null;
                 action?.Invoke();
             }
@@ -132,17 +162,26 @@ namespace ShatteredIllusion.Assets.MainMenu
 
             if (active && !_wasActive)
             {
-                _enteredAt = Main.GlobalTimeWrappedHourly;
+                _enteredAt = (float)_animationTime;
                 _exiting = false;
                 _pendingAction = null;
+
+                _themeSwitchHover = 0f;
+
+                foreach (MenuButton button in Buttons)
+                    button.Hover = 0f;
             }
 
             _wasActive = active;
 
             if (!active)
             {
+                _exiting = false;
+                _pendingAction = null;
+
                 _mouseWasDown = Main.mouseLeft;
                 _mouseWasRightDown = Main.mouseRight;
+
                 orig(self, gameTime);
                 return;
             }
@@ -156,6 +195,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             return Main.menuMode == 0 &&
                    MenuLoader.CurrentMenu is ShatteredIllusionMainMenu;
         }
+
         /// <summary>
         /// Ive been trying to tone down the comments and learn to make good ones so here it gets 
         /// the entrance animation 
@@ -166,7 +206,7 @@ namespace ShatteredIllusion.Assets.MainMenu
         /// </summary>
         private static float GetEntranceEase(int index)
         {
-            float elapsed = Main.GlobalTimeWrappedHourly - _enteredAt - index * StaggerDelay;
+            float elapsed = (float)_animationTime - _enteredAt - index * StaggerDelay;
             float t = MathHelper.Clamp(elapsed / StaggerDuration, 0f, 1f);
             float inv = 1f - t;
             return 1f - inv * inv * inv;
@@ -177,7 +217,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             if (!_exiting)
                 return 0f;
 
-            float elapsed = Main.GlobalTimeWrappedHourly - _exitStartedAt - index * ExitStagger;
+            float elapsed = (float)_animationTime - _exitStartedAt - index * ExitStagger;
             float t = MathHelper.Clamp(elapsed / ExitButtonDuration, 0f, 1f);
             return t * t * t;
         }
@@ -185,9 +225,14 @@ namespace ShatteredIllusion.Assets.MainMenu
         private static float GetFooterEase()
         {
             if (_exiting)
-                return 1f - MathHelper.Clamp((Main.GlobalTimeWrappedHourly - _exitStartedAt) / TotalExitDuration, 0f, 1f);
+            {
+                return 1f - MathHelper.Clamp(
+                    (float)((_animationTime - _exitStartedAt) / TotalExitDuration),
+                    0f,
+                    1f);
+            }
 
-            float elapsed = Main.GlobalTimeWrappedHourly - _enteredAt;
+            float elapsed = (float)_animationTime - _enteredAt;
             return MathHelper.Clamp(elapsed / StaggerDuration, 0f, 1f);
         }
 
@@ -316,6 +361,12 @@ namespace ShatteredIllusion.Assets.MainMenu
             Main.SaveSettings();
         }
 
+        // Reflection is used here to read/write MenuLoader's private static fields (currentMenu,
+        // switchToMenu, LastSelectedModMenu) so this menu can cycle mod menu themes the same way
+        // tModLoader's own vanilla-menu UI does internally. There is no public API for this in
+        // tModLoader as of writing. Every access is guarded by null checks at the call site
+        // (CycleMenuTheme), and if any member can't be found, theme switching is simply disabled
+        // with a logged warning rather than throwing.
         private static void EnsureMenuLoaderAccess()
         {
             if (_menuLoaderAccessResolved)
@@ -337,7 +388,7 @@ namespace ShatteredIllusion.Assets.MainMenu
                 return;
 
             _exiting = true;
-            _exitStartedAt = Main.GlobalTimeWrappedHourly;
+            _exitStartedAt = (float)_animationTime;
             _pendingAction = action;
         }
 
@@ -366,7 +417,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             }
             catch (Exception ex)
             {
-                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.Warn($"Menu draw failed: {ex}");
+                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.WarnFormat("Menu draw failed: {0}", ex);
             }
             finally
             {
@@ -455,7 +506,7 @@ namespace ShatteredIllusion.Assets.MainMenu
         // Draws the version text and theme switcher.
         private static void DrawFooter(SpriteBatch spriteBatch)
         {
-            Mod mod = ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod;
+            Mod? mod = ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod;
             if (mod == null)
                 return;
 
@@ -528,9 +579,10 @@ namespace ShatteredIllusion.Assets.MainMenu
             }
             catch (Exception ex)
             {
-                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.Warn($"Failed to open achievements: {ex}");
+                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.WarnFormat("Failed to open achievements: {0}", ex);
             }
         }
+
         private static void OpenWorkshop()
         {
             try
@@ -542,7 +594,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             }
             catch (Exception ex)
             {
-                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.Warn($"Failed to open workshop: {ex}");
+                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.WarnFormat("Failed to open workshop: {0}", ex);
             }
         }
     }

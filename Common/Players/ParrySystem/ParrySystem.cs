@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.Xna.Framework;
 using ShatteredIllusion.Content.Buffs.StatBuffs;
+using ShatteredIllusion.Content.Particles;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
 using ShatteredIllusionKeybinds;
+using ParticleLibrary.Core.V3.Particles;
+using ParticleLibrary.Utilities;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
@@ -13,6 +16,7 @@ using Terraria.GameInput;
 using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
+using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Common.Players.ParrySystem
 {
@@ -24,7 +28,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
         void OnParried(Player player);
     }
 
-    /// <summary>Presentation-only events sent by the server to the player who triggered them.</summary>
     public enum ParryVisualEffect : byte
     {
         Started,
@@ -402,6 +405,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                 case ParryVisualEffect.Started:
                     SpawnDustExplosion(DustID.Silver, 25, 6f);
                     SpawnRing(Player.Center, DustID.Silver, 30f, 14, 3.5f, alpha: 80, scale: 1.3f);
+                    SpawnParrySparks(Player.Center, count: 8, speedMin: 2f, speedMax: 4f, color: new Color(215, 225, 255, 0), sparkScale: 6f, duration: 16);
                     break;
 
                 case ParryVisualEffect.Succeeded:
@@ -435,6 +439,9 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             SpawnRing(Player.Center, DustID.Gold, 20f, 18, 9f, alpha: 40, scale: 1.7f);
             SpawnRing(Player.Center, DustID.GoldFlame, 45f, 22, 5f, alpha: 70, scale: 1.4f);
 
+            // Bright gold sparks bursting off the player 
+            SpawnParrySparks(Player.Center, count: 16, speedMin: 3f, speedMax: 7f, color: new Color(255, 210, 110, 0), sparkScale: 10f, duration: 26);
+
             if (attackerIndex < 0 || attackerIndex >= Main.maxNPCs || !Main.npc[attackerIndex].active)
                 return;
 
@@ -449,6 +456,9 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                     Scale: 1.6f);
                 clash.noGravity = true;
             }
+
+            // Sharper white-hot sparks right at the clash point 
+            SpawnParrySparks(attacker.Center, count: 18, speedMin: 4f, speedMax: 9f, color: new Color(255, 250, 225, 0), sparkScale: 9f, duration: 20);
         }
 
         private void PlaySturdinessMeterFullEffects()
@@ -547,6 +557,23 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
                 Dust ring = Dust.NewDustPerfect(spawnPos, dustType, velocity, Alpha: alpha, Scale: scale);
                 ring.noGravity = true;
+            }
+        }
+
+        private void SpawnParrySparks(Vector2 center, int count, float speedMin, float speedMax, Color color, float sparkScale, int duration)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 velocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(speedMin, speedMax);
+
+                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                    position: center.ToNumerics(),
+                    velocity: velocity.ToNumerics(),
+                    rotation: 0f,
+                    scale: new SystemVector2(sparkScale, sparkScale),
+                    color: color,
+                    duration: duration
+                ));
             }
         }
 

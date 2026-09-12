@@ -56,8 +56,7 @@ namespace ShatteredIllusion
             switch (messageType)
             {
                 case MessageType.SyncDownedGreatAntlionCharger:
-                    // World progression is authored by the server. A packet from a
-                    // client using this ID is intentionally ignored.
+
                     if (Main.netMode == NetmodeID.MultiplayerClient)
                         DownedSystem.ReceiveDownedState(reader.ReadBoolean());
                     break;

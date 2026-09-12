@@ -1,4 +1,4 @@
 displayName = Shattered Illusion Mod
 author = Shattered Illusion Team
 version = 0.2
-modReferences = StructureHelper
+modReferences = StructureHelper, ParticleLibrary

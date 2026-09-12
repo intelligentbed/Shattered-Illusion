@@ -89,6 +89,8 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
         private const float AnimationSeconds = 0.35f;
         private const float MaxDarkenAlpha = 0.6f;
 
+        private static readonly SoundStyle PullSound = new SoundStyle("ShatteredIllusion/Sounds/Journal/JournalPullUp");
+
         public Journal JournalButton;
         public JournalPanel JournalPanel;
         private DarkenOverlay _darkenOverlay;
@@ -144,7 +146,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             _openTarget = true;
             JournalPanel.SetOpen(true);
             JournalButton.SetOpenVisual(true);
-            SoundEngine.PlaySound(SoundID.MenuOpen);
+            SoundEngine.PlaySound(PullSound);
         }
 
         public void Close()
@@ -156,7 +158,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
             _openTarget = false;
             JournalButton.SetOpenVisual(false);
-            SoundEngine.PlaySound(SoundID.MenuClose);
+            SoundEngine.PlaySound(PullSound);
         }
 
         public override void Update(GameTime gameTime)

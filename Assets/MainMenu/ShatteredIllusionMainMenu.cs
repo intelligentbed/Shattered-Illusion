@@ -14,7 +14,7 @@ namespace ShatteredIllusion.Assets.MainMenu
         public override string DisplayName => "Shattered Illusion";
 
         public override Asset<Texture2D> Logo =>
-            ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Logo");
+        ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Logo");
 
         public override Asset<Texture2D> SunTexture =>
             ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/BlankPixel");

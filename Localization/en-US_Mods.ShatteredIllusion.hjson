@@ -199,6 +199,16 @@ Items: {
 		DisplayName: Starry Night
 		Tooltip: ""
 	}
+
+	AshenSandItem: {
+		Tooltip: ""
+		DisplayName: Ashen Sand Item
+	}
+
+	AshenDirtItem: {
+		Tooltip: ""
+		DisplayName: Ashen Dirt Item
+	}
 }
 
 Buffs: {
@@ -233,6 +243,9 @@ Tiles: {
 	MossTile.MapEntry: Moss Tile
 	AntlionBossAltar.MapEntry: Antlion Boss Altar
 	SpecialIronBricks.MapEntry: Special Iron Bricks
+	AshenSand.MapEntry: Ashen Sand
+	AshenDirt.MapEntry: Ashen Dirt
+	VolcanicStone.MapEntry: Volcanic Stone
 }
 
 Projectiles: {
@@ -349,3 +362,10 @@ Configs: {
 }
 
 Bosses.GreatAntlionCharger.SpawnInfo: Use an [i:5948] while in the Underground Desert.
+
+Biomes: {
+	AshenShoreBiome: {
+		TownNPCDialogueName: the Ashen Shore Biome
+		DisplayName: Ashen Shore Biome
+	}
+}

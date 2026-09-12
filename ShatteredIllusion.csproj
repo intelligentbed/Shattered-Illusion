@@ -7,6 +7,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Reference Include="ParticleLibrary">
+		  <HintPath>Lib\ParticleLibrary.dll</HintPath>
+		</Reference>
 		<Reference Include="ShatteredMusiMod">
 			<HintPath>lib\ShatteredMusiMod.dll</HintPath>
 		</Reference>
