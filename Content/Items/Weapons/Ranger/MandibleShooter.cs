@@ -24,7 +24,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             Item.UseSound = SoundID.Item11;
             Item.autoReuse = true;
             Item.shoot = ModContent.ProjectileType<Projectiles.Ranger.MandibleShooterBullet>();
-            Item.shootSpeed = 12f; // unused directly, see Shoot() below
+            Item.shootSpeed = 12f; // unused 
 
             Item.useAmmo = AmmoID.None;
         }
