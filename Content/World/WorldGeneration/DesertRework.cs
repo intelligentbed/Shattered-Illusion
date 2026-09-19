@@ -186,7 +186,9 @@ namespace ShatteredIllusion.World.WorldGeneration
                     Tile tile = Main.tile[x, y];
 
                     if (tile.HasTile && IsDesertTile(tile.TileType))
-                        tile.TileType = tileType;
+                        // PlaceTile only takes (i, j, type, mute, forced, plr, style) -
+                        // forced:true replaces the existing desert tile in place.
+                        WorldGen.PlaceTile(x, y, tileType, mute: true, forced: true);
                 }
             }
         }
@@ -476,7 +478,9 @@ namespace ShatteredIllusion.World.WorldGeneration
                     Tile tile = Main.tile[x, y];
 
                     if (tile.HasTile && IsDesertTile(tile.TileType))
-                        tile.TileType = tileType;
+                        // PlaceTile has no "fallbackToForeground" parameter -
+                        // forced:true is the equivalent for overwriting existing tiles.
+                        WorldGen.PlaceTile(x, y, tileType, mute: true, forced: true);
                 }
             }
         }
@@ -581,4 +585,3 @@ namespace ShatteredIllusion.World.WorldGeneration
         }
     }
 }
-

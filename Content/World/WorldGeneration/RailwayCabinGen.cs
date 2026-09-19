@@ -17,7 +17,7 @@ namespace ShatteredIllusion.World.WorldGeneration
             "railcabin5", "railcabin6", "railcabin7"
         };
 
-        private const string StructurePath = "World/Structures/RailwayCabins/";
+        private const string StructurePath = "Content/World/Structures/RailwayCabins/";
 
         private const int YJitter = 12;
         private const int SlotPadding = 40;

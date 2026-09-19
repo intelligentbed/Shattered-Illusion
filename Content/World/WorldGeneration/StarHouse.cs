@@ -11,7 +11,7 @@ namespace ShatteredIllusion.World.WorldGeneration
 {
     public class StarHouseGen : ModSystem
     {
-        private const string StructurePath = "World/Structures/starhouse.shstruct";
+        private const string StructurePath = "Content/World/Structures/starhouse.shstruct";
 
         private const int MinCount = 2;
         private const int MaxCount = 6;

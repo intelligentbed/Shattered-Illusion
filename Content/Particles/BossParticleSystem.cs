@@ -26,6 +26,12 @@ namespace ShatteredIllusion.Content.Particles
         /// <summary>Flickering vertical warning bars - falling/telegraphed attack lines.</summary>
         public static ParticleBuffer<TelegraphSegmentParticle> TelegraphSegments { get; private set; }
 
+        /// <summary>Stationary pulsing rings - "this exact spot is about to get hit" markers.</summary>
+        public static ParticleBuffer<GroundWarningRingParticle> GroundWarnings { get; private set; }
+
+        /// <summary>Single growing focal point for long charge-up windups (e.g. King Slime's split).</summary>
+        public static ParticleBuffer<ChargeCoreParticle> ChargeCores { get; private set; }
+
         // Never build particle buffers on the server - there's nothing to draw.
         public override bool IsLoadingEnabled(Mod mod) => !Main.dedServ;
 
@@ -53,6 +59,16 @@ namespace ShatteredIllusion.Content.Particles
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(TelegraphSegments);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, TelegraphSegments);
+
+            GroundWarnings = new ParticleBuffer<GroundWarningRingParticle>(16)
+                .SetBlendState(BlendState.Additive); // glowy ring
+            ParticleManagerV3.RegisterUpdatable(GroundWarnings);
+            ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, GroundWarnings);
+
+            ChargeCores = new ParticleBuffer<ChargeCoreParticle>(8)
+                .SetBlendState(BlendState.Additive);
+            ParticleManagerV3.RegisterUpdatable(ChargeCores);
+            ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, ChargeCores);
         }
     }
 }

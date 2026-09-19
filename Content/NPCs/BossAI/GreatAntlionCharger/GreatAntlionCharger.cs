@@ -118,10 +118,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             // the player) while buried and teleporting off-screen.
             (CurrentState == AttackPhase.Phase2BurrowDive && Timer > 30f && Timer <= 90f);
 
-        private Asset<Texture2D> burrowTexture;
-        private Asset<Texture2D> popTexture;
-        private Asset<Texture2D> parryTexture;
-        private Asset<Texture2D> spitTexture;
+        private Asset<Texture2D>? burrowTexture;
+        private Asset<Texture2D>? popTexture;
+        private Asset<Texture2D>? parryTexture;
+        private Asset<Texture2D>? spitTexture;
 
         // we are in the attack loop SO ARE YOU
         private static readonly AttackPhase[] Phase1AttackOrder =
@@ -237,8 +237,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             // The underground-pursuit rumble is a looped sound that only stops itself
             // when the burrow state naturally finishes. If the boss dies mid-pursuit
             // (e.g. from an on-death effect) the loop was previously left playing forever.
-            if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound sound))
-                sound.Stop();
+            if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound))
+                sound?.Stop();
 
             DownedSystem.SetDownedGreatAntlionCharger();
         }
@@ -273,6 +273,32 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             return hitboxHalfHeight - visualHalfHeight;
         }
 
+        // Timer only ever advances in whole-frame steps, but it's stored as a float
+        // (it's backed by NPC.ai), so we compare with a small tolerance instead of
+        // exact equality.
+        private const float TimerEqualityTolerance = 0.01f;
+
+        private bool TimerAt(float target) => Math.Abs(Timer - target) < TimerEqualityTolerance;
+
+        private static bool IsZero(float value) => Math.Abs(value) < 0.0001f;
+
+        // Picks a value based on the current difficulty tier, replacing the
+        // "masterMode ? a : (expertMode ? b : c)" nested-ternary pattern used
+        // all over the attack code.
+        private static int DifficultyValue(int normal, int expert, int master)
+        {
+            if (Main.masterMode) return master;
+            if (Main.expertMode) return expert;
+            return normal;
+        }
+
+        private static float DifficultyValue(float normal, float expert, float master)
+        {
+            if (Main.masterMode) return master;
+            if (Main.expertMode) return expert;
+            return normal;
+        }
+
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
             if (CurrentState == AttackPhase.WaitingForCutscene || NPC.alpha >= 255)
@@ -291,120 +317,92 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             Color tintColor = IsParryable ? new Color(255, 120, 120) : Color.White;
             Color finalDrawColor = NPC.GetAlpha(drawColor).MultiplyRGB(tintColor);
 
-            // Parry Texture (Triggered if recently parried/stunned via negative timers in Cooldown)
+            if (TryDrawParryTexture(spriteBatch, screenPos, finalDrawColor)) return false;
+            if (TryDrawPopTexture(spriteBatch, screenPos, finalDrawColor)) return false;
+            if (TryDrawSpitTexture(spriteBatch, screenPos, finalDrawColor)) return false;
+            if (TryDrawBurrowTexture(spriteBatch, screenPos, finalDrawColor)) return false;
+
+            DrawMainTexture(spriteBatch, screenPos, finalDrawColor);
+            return false;
+        }
+
+        private SpriteEffects CurrentSpriteEffects =>
+            NPC.spriteDirection == -1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
+
+        private bool TryDrawParryTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
+        {
+            // Triggered if recently parried/stunned via negative timers in Cooldown.
             bool isParryDrawing = CurrentState == AttackPhase.Cooldown && Timer < 0f;
-            if (isParryDrawing && parryTexture != null && parryTexture.IsLoaded)
+            if (!isParryDrawing || parryTexture == null || !parryTexture.IsLoaded)
             {
-                Texture2D texture = parryTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, parryFrameHeight);
-                Vector2 origin = new Vector2(texture.Width / 2f, parryFrameHeight / 2f);
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(parryFrameHeight));
-
-                spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, effects, 0f);
                 return false;
             }
 
+            Texture2D texture = parryTexture.Value;
+            Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, parryFrameHeight);
+            Vector2 origin = new Vector2(texture.Width / 2f, parryFrameHeight / 2f);
+            Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(parryFrameHeight));
 
-            // Pop Texture
+            spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, CurrentSpriteEffects, 0f);
+            return true;
+        }
+
+        private bool TryDrawPopTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
+        {
             bool isPhase2PopDrawing = CurrentState == AttackPhase.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
-            if (isPhase2PopDrawing && popTexture != null && popTexture.IsLoaded)
+            if (!isPhase2PopDrawing || popTexture == null || !popTexture.IsLoaded)
             {
-                Texture2D texture = popTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(
-                    0,
-                    NPC.frame.Y,
-                    texture.Width,
-                    popFrameHeight
-                );
-
-                Vector2 origin = new Vector2(
-                    texture.Width / 2f,
-                    popFrameHeight / 2f
-                );
-
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(popFrameHeight));
-
-                spriteBatch.Draw(
-                    texture,
-                    drawPos,
-                    sourceRect,
-                    finalDrawColor,
-                    NPC.rotation,
-                    origin,
-                    NPC.scale * SpriteVisualScale,
-                    effects,
-                    0f
-                );
-
                 return false;
             }
 
-            // Spit Texture
+            Texture2D texture = popTexture.Value;
+            Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, popFrameHeight);
+            Vector2 origin = new Vector2(texture.Width / 2f, popFrameHeight / 2f);
+            Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(popFrameHeight));
+
+            spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, CurrentSpriteEffects, 0f);
+            return true;
+        }
+
+        private bool TryDrawSpitTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
+        {
             bool isSpitDrawing = CurrentState == AttackPhase.Spit;
-            if (isSpitDrawing && spitTexture != null && spitTexture.IsLoaded)
+            if (!isSpitDrawing || spitTexture == null || !spitTexture.IsLoaded)
             {
-                Texture2D texture = spitTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, spitFrameHeight);
-                Vector2 origin = new Vector2(texture.Width / 2f, spitFrameHeight / 2f);
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(spitFrameHeight));
-
-                spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, effects, 0f);
                 return false;
             }
 
-            //Burrow Texture
+            Texture2D texture = spitTexture.Value;
+            Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, spitFrameHeight);
+            Vector2 origin = new Vector2(texture.Width / 2f, spitFrameHeight / 2f);
+            Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(spitFrameHeight));
+
+            spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, CurrentSpriteEffects, 0f);
+            return true;
+        }
+
+        private bool TryDrawBurrowTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
+        {
             bool isPhase1Burrowing = CurrentState == AttackPhase.Burrow && Timer <= BurrowDigTime;
             bool isPhase2Burrowing = CurrentState == AttackPhase.Phase2BurrowDive && Timer <= 45f;
 
-            if ((isPhase1Burrowing || isPhase2Burrowing) && burrowTexture != null && burrowTexture.IsLoaded)
+            if ((!isPhase1Burrowing && !isPhase2Burrowing) || burrowTexture == null || !burrowTexture.IsLoaded)
             {
-                Texture2D texture = burrowTexture.Value;
-                SpriteEffects effects = NPC.spriteDirection == -1
-                    ? SpriteEffects.None
-                    : SpriteEffects.FlipHorizontally;
-
-                Rectangle sourceRect = new Rectangle(
-                    0,
-                    NPC.frame.Y,
-                    texture.Width,
-                    burrowFrameHeight
-                );
-
-                Vector2 origin = new Vector2(
-                    texture.Width / 2f,
-                    burrowFrameHeight / 2f
-                );
-
-                Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(burrowFrameHeight));
-
-                spriteBatch.Draw(
-                    texture,
-                    drawPos,
-                    sourceRect,
-                    finalDrawColor,
-                    NPC.rotation,
-                    origin,
-                    NPC.scale * SpriteVisualScale,
-                    effects,
-                    0f
-                );
-
                 return false;
             }
 
-            //Main Texture 
+            Texture2D texture = burrowTexture.Value;
+            Rectangle sourceRect = new Rectangle(0, NPC.frame.Y, texture.Width, burrowFrameHeight);
+            Vector2 origin = new Vector2(texture.Width / 2f, burrowFrameHeight / 2f);
+            Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(burrowFrameHeight));
+
+            spriteBatch.Draw(texture, drawPos, sourceRect, finalDrawColor, NPC.rotation, origin, NPC.scale * SpriteVisualScale, CurrentSpriteEffects, 0f);
+            return true;
+        }
+
+        private void DrawMainTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
+        {
             Texture2D mainTexture = TextureAssets.Npc[NPC.type].Value;
-            SpriteEffects mainEffects = NPC.spriteDirection == -1
-                ? SpriteEffects.None
-                : SpriteEffects.FlipHorizontally;
 
             Vector2 mainOrigin = new Vector2(
                 mainTexture.Width / 2f,
@@ -412,7 +410,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             );
 
             Vector2 mainDrawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(mainTexture.Height / (float)MainFrameCount));
-
 
             spriteBatch.Draw(
                 mainTexture,
@@ -422,11 +419,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 NPC.rotation,
                 mainOrigin,
                 NPC.scale * SpriteVisualScale,
-                mainEffects,
+                CurrentSpriteEffects,
                 0f
             );
-
-            return false;
         }
 
         public override bool CanHitPlayer(Player target, ref int cooldownSlot)
@@ -463,120 +458,101 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             EnsureFrameHeightsCached();
 
-            // PARRY ANIMATION FRAME HANDLING
-            if (CurrentState == AttackPhase.Cooldown && Timer < 0f)
+            if (TryFindParryFrame()) return;
+            if (TryFindPhase2PopFrame()) return;
+            if (TryFindBurrowFrame()) return;
+
+            FindDefaultFrame(frameHeight);
+        }
+
+        private bool TryFindParryFrame()
+        {
+            if (CurrentState != AttackPhase.Cooldown || Timer >= 0f)
             {
-                if (parryTexture == null) parryTexture = ModContent.Request<Texture2D>(ParryTexturePath);
-
-                if (parryTexture != null && parryTexture.IsLoaded)
-                {
-                    float maxStun = Main.masterMode ? 5f : 15f;
-                    float progress = MathHelper.Clamp(Math.Abs(Timer) / maxStun, 0f, 1f);
-                    int frame = (int)(progress * ParryFrameCount);
-                    frame = Math.Min(frame, ParryFrameCount - 1);
-
-                    NPC.frame.Width = parryTexture.Width();
-                    NPC.frame.Height = parryFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * parryFrameHeight;
-                    return;
-                }
+                return false;
             }
 
+            if (parryTexture == null) parryTexture = ModContent.Request<Texture2D>(ParryTexturePath);
+            if (parryTexture == null || !parryTexture.IsLoaded)
+            {
+                return false;
+            }
 
-            // PHASE 2 POP ANIMATION
+            float maxStun = Main.masterMode ? 5f : 15f;
+            float progress = MathHelper.Clamp(Math.Abs(Timer) / maxStun, 0f, 1f);
+            int frame = Math.Min((int)(progress * ParryFrameCount), ParryFrameCount - 1);
+
+            NPC.frame.Width = parryTexture.Width();
+            NPC.frame.Height = parryFrameHeight;
+            NPC.frame.X = 0;
+            NPC.frame.Y = frame * parryFrameHeight;
+            return true;
+        }
+
+        private bool TryFindPhase2PopFrame()
+        {
             bool phase2PopAnimation = CurrentState == AttackPhase.Phase2BurrowDive && Timer >= 91f && Timer < 111f;
-
-            if (phase2PopAnimation)
+            if (!phase2PopAnimation)
             {
-                if (popTexture == null)
-                {
-                    popTexture = ModContent.Request<Texture2D>(PopTexturePath);
-                }
-
-                if (popTexture != null && popTexture.IsLoaded)
-                {
-                    const float animationDuration = 20f;
-                    float progress = MathHelper.Clamp((Timer - 91f) / animationDuration, 0f, 1f);
-
-                    int frame = (int)(progress * PopFrameCount);
-                    frame = Math.Min(frame, PopFrameCount - 1);
-
-                    NPC.frame.Width = popTexture.Width();
-                    NPC.frame.Height = popFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * popFrameHeight;
-
-                    return;
-                }
+                return false;
             }
 
+            if (popTexture == null) popTexture = ModContent.Request<Texture2D>(PopTexturePath);
+            if (popTexture == null || !popTexture.IsLoaded)
+            {
+                return false;
+            }
+
+            const float animationDuration = 20f;
+            float progress = MathHelper.Clamp((Timer - 91f) / animationDuration, 0f, 1f);
+            int frame = Math.Min((int)(progress * PopFrameCount), PopFrameCount - 1);
+
+            NPC.frame.Width = popTexture.Width();
+            NPC.frame.Height = popFrameHeight;
+            NPC.frame.X = 0;
+            NPC.frame.Y = frame * popFrameHeight;
+            return true;
+        }
+
+        private bool TryFindBurrowFrame()
+        {
             bool phase2DiveAnimation = CurrentState == AttackPhase.Phase2BurrowDive && Timer <= 45f;
             bool normalBurrowAnimation = CurrentState == AttackPhase.Burrow && Timer <= BurrowDigTime;
 
-            if (phase2DiveAnimation || normalBurrowAnimation)
+            if (!phase2DiveAnimation && !normalBurrowAnimation)
             {
-                if (burrowTexture == null)
-                {
-                    burrowTexture = ModContent.Request<Texture2D>(BurrowTexturePath);
-                }
-
-                if (burrowTexture != null && burrowTexture.IsLoaded)
-                {
-                    float animationTime = phase2DiveAnimation ? 45f : BurrowDigTime;
-                    float adjustedTimer = Timer;
-
-                    float animationProgress = MathHelper.Clamp(adjustedTimer / animationTime, 0f, 1f);
-
-                    int frame = (int)(animationProgress * BurrowFrameCount);
-                    frame = Math.Min(frame, BurrowFrameCount - 1);
-
-                    NPC.frame.Width = burrowTexture.Width();
-                    NPC.frame.Height = burrowFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = frame * burrowFrameHeight;
-
-                    return;
-                }
+                return false;
             }
 
-            // Default animation
+            if (burrowTexture == null) burrowTexture = ModContent.Request<Texture2D>(BurrowTexturePath);
+            if (burrowTexture == null || !burrowTexture.IsLoaded)
+            {
+                return false;
+            }
+
+            float animationTime = phase2DiveAnimation ? 45f : BurrowDigTime;
+            float animationProgress = MathHelper.Clamp(Timer / animationTime, 0f, 1f);
+            int frame = Math.Min((int)(animationProgress * BurrowFrameCount), BurrowFrameCount - 1);
+
+            NPC.frame.Width = burrowTexture.Width();
+            NPC.frame.Height = burrowFrameHeight;
+            NPC.frame.X = 0;
+            NPC.frame.Y = frame * burrowFrameHeight;
+            return true;
+        }
+
+        private void FindDefaultFrame(int frameHeight)
+        {
             Texture2D mainTexture = TextureAssets.Npc[NPC.type].Value;
             NPC.frame.Width = mainTexture.Width;
             NPC.frame.Height = frameHeight;
 
-            if (CurrentState == AttackPhase.Spit)
+            if (CurrentState == AttackPhase.Spit && TryFindSpitFrame())
             {
-                if (spitTexture == null) spitTexture = ModContent.Request<Texture2D>(SpitTexturePath);
-
-                if (spitTexture != null && spitTexture.IsLoaded)
-                {
-                    int spitFrame;
-
-                    if (Timer < SpitFireTiming)
-                    {
-                        float windupProgress = MathHelper.Clamp(Timer / SpitFireTiming, 0f, 1f);
-                        spitFrame = (int)(windupProgress * SpitWindupFrameCount);
-                        spitFrame = Math.Min(spitFrame, SpitWindupFrameCount - 1);
-                    }
-                    else if (Timer < SpitFireTiming + 5f)
-                    {
-                        spitFrame = SpitFireFrame;
-                    }
-                    else
-                    {
-                        spitFrame = SpitRecoverFrame;
-                    }
-
-                    NPC.frame.Width = spitTexture.Width();
-                    NPC.frame.Height = spitFrameHeight;
-                    NPC.frame.X = 0;
-                    NPC.frame.Y = spitFrame * spitFrameHeight;
-                    return;
-                }
+                return;
             }
 
-            if (NPC.velocity.X == 0f || CurrentState == AttackPhase.WaitingForCutscene)
+            if (IsZero(NPC.velocity.X) || CurrentState == AttackPhase.WaitingForCutscene)
             {
                 NPC.frame.Y = 0;
                 return;
@@ -594,6 +570,37 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     NPC.frame.Y = 0;
                 }
             }
+        }
+
+        private bool TryFindSpitFrame()
+        {
+            if (spitTexture == null) spitTexture = ModContent.Request<Texture2D>(SpitTexturePath);
+            if (spitTexture == null || !spitTexture.IsLoaded)
+            {
+                return false;
+            }
+
+            int spitFrame;
+
+            if (Timer < SpitFireTiming)
+            {
+                float windupProgress = MathHelper.Clamp(Timer / SpitFireTiming, 0f, 1f);
+                spitFrame = Math.Min((int)(windupProgress * SpitWindupFrameCount), SpitWindupFrameCount - 1);
+            }
+            else if (Timer < SpitFireTiming + 5f)
+            {
+                spitFrame = SpitFireFrame;
+            }
+            else
+            {
+                spitFrame = SpitRecoverFrame;
+            }
+
+            NPC.frame.Width = spitTexture.Width();
+            NPC.frame.Height = spitFrameHeight;
+            NPC.frame.X = 0;
+            NPC.frame.Y = spitFrame * spitFrameHeight;
+            return true;
         }
 
         // Scans downwarda and returns the Y of the nearest solid tile.
@@ -643,8 +650,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 {
                     // Same looping-sound leak as OnKill: despawning while the burrow
                     // rumble is active would otherwise leave it playing indefinitely.
-                    if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound despawnSound))
-                        despawnSound.Stop();
+                    if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? despawnSound))
+                        despawnSound?.Stop();
 
                     NPC.active = false;
                     NPC.netUpdate = true;
@@ -699,1000 +706,1016 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             switch (CurrentState)
             {
                 case AttackPhase.WaitingForCutscene:
-
-                    NPC.velocity = Vector2.Zero;
-                    NPC.alpha = 255;
-
+                    HandleWaitingForCutscene();
                     break;
 
                 case AttackPhase.Launch:
-                    NPC.alpha = 0;
-                    Timer++;
-                    NPC.spriteDirection = NPC.direction;
-                    NPC.noTileCollide = false;
-
-                    // Hop over small ledges when velocity suddenly zeroes out
-                    if (NPC.velocity.X == 0f && NPC.oldVelocity.X != 0f)
-                    {
-                        NPC.velocity.Y = -5.5f;
-                    }
-
-                    if (Timer <= 25f && NPC.velocity.Y == 0f)
-                    {
-                        Vector2 groundPos = new Vector2(
-                            NPC.Center.X,
-                            NPC.position.Y + NPC.height
-                        );
-
-                        Dust groundDust = Dust.NewDustPerfect(
-                            groundPos + new Vector2(
-                                Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                0f
-                            ),
-                            DustID.SandstormInABottle
-                        );
-
-                        groundDust.scale = Main.rand.NextFloat(1.5f, 2.5f);
-                        groundDust.velocity = new Vector2(
-                            -NPC.direction * Main.rand.NextFloat(2f, 5f),
-                            -Main.rand.NextFloat(1f, 3f)
-                        );
-                    }
-
-                    if (Timer <= 15f)
-                    {
-                        for (int i = 0; i < 3; i++)
-                        {
-                            Dust trailDust = Dust.NewDustPerfect(
-                                NPC.Center + Main.rand.NextVector2Circular(
-                                    NPC.width / 2f,
-                                    NPC.height / 2f
-                                ),
-                                DustID.SandstormInABottle
-                            );
-
-                            trailDust.scale = Main.rand.NextFloat(2f, 3.2f);
-                            trailDust.noGravity = true;
-                            trailDust.velocity =
-                                -NPC.velocity * 0.15f +
-                                Main.rand.NextVector2Circular(1f, 1f);
-                        }
-                    }
-
-                    if (Timer <= 8f)
-                    {
-                        SoundEngine.PlaySound(Roar1);
-                    }
-
-                    // Don't let this idiot launch himself into the depths of Terraria
-                    NPC.velocity.X *= 0.96f;
-
-                    if (Timer >= 60f)
-                    {
-                        Timer = 0;
-                        CurrentState = AttackPhase.Cooldown;
-                        NPC.noTileCollide = false;
-                        NPC.netUpdate = true;
-                    }
-
+                    HandleLaunch();
                     break;
 
                 case AttackPhase.Dash:
+                    HandleDash(target);
+                    break;
+
+                case AttackPhase.Burrow:
+                    HandleBurrow(target);
+                    break;
+
+                case AttackPhase.Spit:
+                    HandleSpit(target);
+                    break;
+
+                case AttackPhase.Phase2BurrowDive:
+                    HandlePhase2BurrowDive(target);
+                    break;
+
+                case AttackPhase.Cooldown:
+                    HandleCooldown();
+                    break;
+
+            }
+        }
+
+        private void HandleWaitingForCutscene()
+        {
+            NPC.velocity = Vector2.Zero;
+            NPC.alpha = 255;
+        }
+
+        private void HandleLaunch()
+        {
+            NPC.alpha = 0;
+            Timer++;
+            NPC.spriteDirection = NPC.direction;
+            NPC.noTileCollide = false;
+
+            // Hop over small ledges when velocity suddenly zeroes out
+            if (IsZero(NPC.velocity.X) && !IsZero(NPC.oldVelocity.X))
+            {
+                NPC.velocity.Y = -5.5f;
+            }
+
+            if (Timer <= 25f && IsZero(NPC.velocity.Y))
+            {
+                Vector2 groundPos = new Vector2(
+                    NPC.Center.X,
+                    NPC.position.Y + NPC.height
+                );
+
+                Dust groundDust = Dust.NewDustPerfect(
+                    groundPos + new Vector2(
+                        Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                        0f
+                    ),
+                    DustID.SandstormInABottle
+                );
+
+                groundDust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                groundDust.velocity = new Vector2(
+                    -NPC.direction * Main.rand.NextFloat(2f, 5f),
+                    -Main.rand.NextFloat(1f, 3f)
+                );
+            }
+
+            if (Timer <= 15f)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    Dust trailDust = Dust.NewDustPerfect(
+                        NPC.Center + Main.rand.NextVector2Circular(
+                            NPC.width / 2f,
+                            NPC.height / 2f
+                        ),
+                        DustID.SandstormInABottle
+                    );
+
+                    trailDust.scale = Main.rand.NextFloat(2f, 3.2f);
+                    trailDust.noGravity = true;
+                    trailDust.velocity =
+                        -NPC.velocity * 0.15f +
+                        Main.rand.NextVector2Circular(1f, 1f);
+                }
+            }
+
+            if (Timer <= 8f)
+            {
+                SoundEngine.PlaySound(Roar1);
+            }
+
+            // Don't let this idiot launch himself into the depths of Terraria
+            NPC.velocity.X *= 0.96f;
+
+            if (Timer >= 60f)
+            {
+                Timer = 0;
+                CurrentState = AttackPhase.Cooldown;
+                NPC.noTileCollide = false;
+                NPC.netUpdate = true;
+            }
+        }
+
+        private void HandleDash(Player target)
+        {
+            NPC.alpha = 0;
+            Timer++;
+            NPC.spriteDirection = NPC.direction;
+
+            if (Timer <= 18f)
+            {
+                NPC.velocity.X *= 0.8f;
+
+                IsParryable = true;
+
+                float faceDir = target.Center.X > NPC.Center.X ? 1f : -1f;
+                NPC.direction = (int)faceDir;
+                NPC.spriteDirection = NPC.direction;
+
+                // Dust gathering visual telegraph
+                for (int i = 0; i < 2; i++)
+                {
+                    Dust d = Dust.NewDustPerfect(
+                        NPC.Center + Main.rand.NextVector2Circular(NPC.width / 2f, NPC.height / 2f),
+                        DustID.SandstormInABottle,
+                        new Vector2(-NPC.direction * Main.rand.NextFloat(2f, 5f), -1f)
+                    );
+                    d.scale = 1.4f;
+                    d.noGravity = true;
+                }
+
+                for (int i = 0; i < 2; i++)
+                {
+                    Vector2 spawnOffset = Main.rand.NextVector2Circular(NPC.width * 0.9f, NPC.height * 0.9f);
+                    Vector2 inwardVelocity = -spawnOffset * Main.rand.NextFloat(0.05f, 0.09f);
+
+                    BossParticleSystem.SandStreaks.Create(new ParticleInfo(
+                        position: (NPC.Center + spawnOffset).ToNumerics(),
+                        velocity: inwardVelocity.ToNumerics(),
+                        rotation: 0f,
+                        scale: new SystemVector2(26f, 5f),
+                        color: new Color(255, 210, 140, 0),
+                        duration: 20
+                    ));
+                }
+
+                if (TimerAt(18f))
+                {
+                    SoundEngine.PlaySound(Roar1, NPC.Center);
+                }
+
+                return;
+            }
+
+            //dash
+            if (TimerAt(19f))
+            {
+                DashStuckTimer = 0;
+                NPC.noTileCollide = false;
+
+                float directionX = target.Center.X > NPC.Center.X ? 1f : -1f;
+                float dashSpeed = DifficultyValue(10f, 19.5f, 21.5f);
+
+                NPC.velocity.X = directionX * dashSpeed;
+                NPC.velocity.Y = 0f;
+
+                NPC.direction = (int)directionX;
+                NPC.netUpdate = true;
+            }
+
+            IsParryable = true;
+
+            // STUCK PREVENTION (which works like most the time DAMMIT)
+            if (Math.Abs(NPC.velocity.X) < 1f && Math.Abs(NPC.oldVelocity.X) > 3f)
+            {
+                DashStuckTimer++;
+
+                if (DashStuckTimer == 1)
+                {
+                    NPC.velocity.Y = -8f;
+                }
+
+                if (DashStuckTimer >= 4)
+                {
+                    NPC.noTileCollide = true;
+                    NPC.velocity.X = NPC.direction * 12f;
+                    NPC.velocity.Y = -3f;
+
+                    DashStuckTimer = 0;
+                    NPC.netUpdate = true;
+                }
+            }
+            else
+            {
+                DashStuckTimer = 0;
+            }
+
+            if (NPC.noTileCollide && Math.Abs(NPC.velocity.X) > 4f)
+            {
+                NPC.noTileCollide = false;
+            }
+
+            if (Timer <= 35f)
+            {
+                Dust dust = Dust.NewDustPerfect(
+                    NPC.Center,
+                    DustID.Sand,
+                    -NPC.velocity * 0.2f
+                );
+
+                dust.scale = 1.8f;
+                dust.noGravity = true;
+            }
+
+            // Deceleration
+            NPC.velocity.X *= 0.98f;
+
+            if (Timer >= 63f)
+            {
+                DashStuckTimer = 0;
+                NPC.noTileCollide = false;
+
+                Timer = 0;
+                CurrentState = AttackPhase.Cooldown;
+                NPC.netUpdate = true;
+            }
+        }
+
+        private void HandleBurrow(Player target)
+        {
+            Timer++;
+
+            // Digging in on the surface
+            if (Timer <= BurrowDigTime)
+            {
+                float progress = Timer / BurrowDigTime;
+                float smoothProgress = progress * progress * (3f - 2f * progress);
+
+                NPC.alpha = (int)MathHelper.Lerp(0f, 190f, smoothProgress);
+
+                NPC.noTileCollide = true;
+                NPC.velocity.X *= 0.92f;
+                NPC.velocity.Y = 0f;
+
+                int dustCount = progress < 0.5f ? 3 : 5;
+
+                for (int i = 0; i < dustCount; i++)
+                {
+                    Dust d = Dust.NewDustPerfect(
+                        NPC.Bottom + new Vector2(
+                            Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                            0f
+                        ),
+                        DustID.Sand
+                    );
+
+                    d.velocity = new Vector2(
+                        Main.rand.NextFloat(-3f, 3f),
+                        -Main.rand.NextFloat(2f, 5f)
+                    );
+
+                    d.scale = Main.rand.NextFloat(1.3f, 2.1f);
+                    d.noGravity = false;
+                }
+
+                if (Main.rand.NextBool(3))
+                {
+                    Dust tungstenDust = Dust.NewDustPerfect(
+                        NPC.Bottom + new Vector2(
+                            Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                            0f
+                        ),
+                        DustID.Tungsten
+                    );
+
+                    tungstenDust.velocity = new Vector2(
+                        Main.rand.NextFloat(-2f, 2f),
+                        -Main.rand.NextFloat(1f, 3f)
+                    );
+
+                    tungstenDust.scale = Main.rand.NextFloat(0.8f, 1.3f);
+                    tungstenDust.noGravity = true;
+                }
+
+                if (TimerAt(1f))
+                {
+                    ScreenShake(2f, 5);
+                    SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+                }
+            }
+
+
+            // Underground pursuit
+            else if (Timer < BurrowPursuitEnd)
+            {
+                NPC.alpha = 255;
+                NPC.noTileCollide = true;
+                float actualGroundY = GetGroundY(target.Center) + 64f;
+
+                float deltaX = target.Center.X - NPC.Center.X;
+                float speedX = MathHelper.Clamp(
+                    deltaX * 0.08f,
+                    -16f,
+                    16f
+                );
+
+                NPC.velocity.X = speedX;
+                NPC.velocity.Y = (actualGroundY - NPC.Center.Y) * 0.2f;
+
+                if (!SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound) || !sound!.IsPlaying)
+                {
+                    rumbleSoundSlot = SoundEngine.PlaySound(
+                        new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/AntlionBurrowing")
+                        {
+                            IsLooped = true,
+                            Volume = 0.4f
+                        },
+                        NPC.Center
+                    );
+                }
+                else
+                {
+                    sound!.Position = NPC.Center;
+                    sound.Volume = 0.4f;
+                }
+
+                Vector2 groundPos = new Vector2(
+                    NPC.Center.X,
+                    actualGroundY - 64f
+                );
+
+                Dust d = Dust.NewDustPerfect(
+                    groundPos + new Vector2(
+                        Main.rand.NextFloat(-20f, 20f),
+                        0f
+                    ),
+                    DustID.SandstormInABottle
+                );
+
+                Dust tungstenDust = Dust.NewDustPerfect(
+                    groundPos + new Vector2(
+                        Main.rand.NextFloat(-20f, 20f),
+                        0f
+                    ),
+                    DustID.Tungsten
+                );
+
+                d.velocity = new Vector2(
+                    0f,
+                    -Main.rand.NextFloat(2f, 4f)
+                );
+
+                d.scale = Main.rand.NextFloat(1.5f, 2.8f);
+            }
+
+            //sandtelegraph
+            else if (Timer < BurrowTelegraphEnd)
+            {
+                if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound))
+                {
+                    sound!.Volume *= 0.95f;
+
+                    if (sound.Volume <= 0.05f)
+                    {
+                        sound.Stop();
+                    }
+                }
+
+                NPC.velocity = Vector2.Zero;
+                NPC.alpha = 255;
+
+                float actualGroundY = GetGroundY(NPC.Center);
+                Vector2 telegraphPos = new Vector2(
+                    NPC.Center.X,
+                    actualGroundY
+                );
+
+                for (int i = 0; i < 3; i++)
+                {
+                    Dust d = Dust.NewDustPerfect(
+                        telegraphPos + new Vector2(
+                            Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                            0f
+                        ),
+                        DustID.SandstormInABottle
+                    );
+
+                    d.velocity = new Vector2(
+                        0f,
+                        -Main.rand.NextFloat(4f, 8f)
+                    );
+
+                    d.scale = Main.rand.NextFloat(2f, 3.5f);
+                    d.noGravity = true;
+                }
+            }
+            // Erupt upward out of the ground
+            else
+            {
+                if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound))
+                {
+                    sound?.Stop();
+                }
+
+                if (TimerAt(BurrowTelegraphEnd))
+                {
+                    ScreenShake(5f, 8);
+                    float actualGroundY = GetGroundY(NPC.Center);
+
+                    BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                        position: new Vector2(NPC.Center.X, actualGroundY).ToNumerics(),
+                        velocity: SystemVector2.Zero,
+                        rotation: 0f,
+                        scale: new SystemVector2(220f, 90f),
+                        color: new Color(235, 200, 140, 0),
+                        duration: 24
+                    ));
+
+                    NPC.Center = new Vector2(
+                        NPC.Center.X,
+                        actualGroundY - 30f
+                    );
+
+                    NPC.velocity = new Vector2(0f, -18f);
                     NPC.alpha = 0;
-                    Timer++;
+
+                    NPC.noTileCollide = true;
+
+                    NPC.netUpdate = true;
+
+                    SoundEngine.PlaySound(Roar2, NPC.Center);
+
+
+                    for (int i = 0; i < 35; i++)
+                    {
+                        Vector2 dustVel =
+                            Main.rand.NextVector2Circular(9f, 9f) +
+                            new Vector2(0f, -5f);
+
+                        Dust d = Dust.NewDustPerfect(
+                            NPC.Center,
+                            DustID.Sand,
+                            dustVel
+                        );
+
+                        d.scale = Main.rand.NextFloat(2f, 3.8f);
+                    }
+
+                    // amount of rubble based of difficulty
+                    int rubbleCount = 6;
+
+                    if (Main.masterMode)
+                    {
+                        rubbleCount = 12;
+                    }
+                    else if (Main.expertMode)
+                    {
+                        rubbleCount = 8;
+                    }
+
+                    for (int r = 0; r < rubbleCount; r++)
+                    {
+                        float offsetX = Main.rand.NextFloat(-500f, 500f); // the spread range of rubble
+
+                        Vector2 spawnPos = new Vector2(
+                            NPC.Center.X + offsetX,
+                            NPC.Center.Y - 500f
+                        );
+
+                        Vector2 velocity = new Vector2(
+                            Main.rand.NextFloat(-2f, 2f),
+                            Main.rand.NextFloat(2f, 5f)
+                        );
+
+                        int fallDamage = DifficultyValue(15, 30, 15);
+
+                        if (Main.netMode != NetmodeID.MultiplayerClient)
+                        {
+                            Projectile.NewProjectile(
+                                NPC.GetSource_FromAI(),
+                                spawnPos,
+                                velocity,
+                                ModContent.ProjectileType<FallingRubble>(),
+                                fallDamage,
+                                2f,
+                                Main.myPlayer
+                            );
+                        }
+                    }
+                }
+
+                // Gravity back on for the actual jump out
+                NPC.velocity.Y += 0.35f;
+                if (Timer >= BurrowEnd)
+                {
+                    NPC.noTileCollide = false;
+                    Timer = 0;
+                    CurrentState = AttackPhase.Cooldown;
+                    NPC.netUpdate = true;
+                }
+            }
+        }
+
+        private void HandleSpit(Player target)
+        {
+            NPC.alpha = 0;
+            Timer++;
+
+            NPC.velocity.X *= 0.85f;
+
+            if (TimerAt(1f))
+            {
+                NPC.velocity = Vector2.Zero;
+            }
+
+            float spitDeltaX = target.Center.X - NPC.Center.X;
+
+            if (Math.Abs(spitDeltaX) > 10f)
+            {
+                int newDirection = spitDeltaX > 0f ? 1 : -1;
+
+                if (newDirection != NPC.spriteDirection)
+                {
+                    NPC.direction = newDirection;
+                    NPC.spriteDirection = newDirection;
+                    NPC.netUpdate = true;
+                }
+            }
+
+            Vector2 mouthPosition = NPC.Center + new Vector2(
+                NPC.spriteDirection * (NPC.width / 2f + MouthForwardOffset + MouthSidewaysOffset),
+                MouthVerticalOffset
+            );
+
+            // telegraph for the spit
+            if (Timer <= 90f)
+            {
+                Vector2 baseDir = target.Center - mouthPosition;
+                baseDir.Normalize();
+
+                int shotCount = DifficultyValue(1, 3, 5);
+                float spread = DifficultyValue(0f, 0.18f, 0.22f);
+
+                if (Timer % 2 == 0)
+                {
+                    for (int i = 0; i < shotCount; i++)
+                    {
+                        Vector2 shotDir = baseDir;
+
+                        if (shotCount > 1)
+                        {
+                            float offset = (i - (shotCount - 1) / 2f) * spread;
+                            shotDir = baseDir.RotatedBy(offset);
+                        }
+
+                        for (int d = 1; d <= 10; d++)
+                        {
+                            Vector2 dustPos = mouthPosition + shotDir * (d * 35f);
+
+                            Dust lineDust = Dust.NewDustPerfect(
+                                dustPos,
+                                DustID.SandstormInABottle,
+                                Vector2.Zero
+                            );
+
+                            lineDust.scale = 0.9f;
+                            lineDust.noGravity = true;
+                        }
+                    }
+                }
+
+                if (Main.rand.NextBool(2))
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        mouthPosition + Main.rand.NextVector2Circular(8f, 8f),
+                        DustID.SandstormInABottle,
+                        Main.rand.NextVector2Circular(1f, 1f)
+                    );
+
+                    dust.scale = Main.rand.NextFloat(1.2f, 2f);
+                    dust.noGravity = true;
+                }
+            }
+
+            //Spit
+            if (TimerAt(90f))
+            {
+                Vector2 predictedPosition = target.Center + target.velocity * 4f;
+                Vector2 direction = predictedPosition - mouthPosition;
+                direction.Normalize();
+
+                float aimInaccuracy = Main.rand.NextFloat(-0.05f, 0.05f);
+                direction = direction.RotatedBy(aimInaccuracy);
+
+                int shotCount = DifficultyValue(1, 3, 5);
+                float spitSpeed = DifficultyValue(12f, 13f, 14f);
+                float spread = DifficultyValue(0f, 0.18f, 0.22f);
+
+                for (int i = 0; i < shotCount; i++)
+                {
+                    Vector2 shotDirection = direction;
+
+                    if (shotCount > 1)
+                    {
+                        float offset = (i - (shotCount - 1) / 2f) * spread;
+                        shotDirection = direction.RotatedBy(offset);
+                    }
+
+                    int spitDamage = DifficultyValue(10, 25, 15);
+
+                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    {
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            mouthPosition,
+                            shotDirection * spitSpeed,
+                            ModContent.ProjectileType<SandBall>(),
+                            spitDamage,
+                            0f,
+                            Main.myPlayer
+                        );
+                    }
+                }
+
+                SoundEngine.PlaySound(SoundID.DD2_OgreSpit, mouthPosition);
+
+                for (int i = 0; i < 15; i++)
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        mouthPosition,
+                        DustID.Sand,
+                        direction * Main.rand.NextFloat(2f, 5f) +
+                        Main.rand.NextVector2Circular(2f, 2f)
+                    );
+
+                    dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                }
+            }
+
+            if (Timer >= 105f)
+            {
+                Timer = 0;
+                CurrentState = AttackPhase.Cooldown;
+                NPC.netUpdate = true;
+            }
+        }
+
+        private void HandlePhase2BurrowDive(Player target)
+        {
+            Timer++;
+
+            // BURROW DOWN FOR PHASE 2 
+            if (Timer <= 55f)
+            {
+                float progress = MathHelper.Clamp(Timer / 45f, 0f, 1f);
+                float smoothProgress = progress * progress * (3f - 2f * progress);
+
+                NPC.alpha = (int)MathHelper.Lerp(0f, 255f, smoothProgress);
+                NPC.noTileCollide = true;
+
+                NPC.velocity.X *= 0.90f;
+                NPC.velocity.Y = 0f;
+
+                for (int i = 0; i < 4; i++)
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        NPC.Bottom + new Vector2(
+                            Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                            0f
+                        ),
+                        DustID.Sand
+                    );
+
+                    dust.velocity = new Vector2(
+                        Main.rand.NextFloat(-3f, 3f),
+                        -Main.rand.NextFloat(2f, 5f)
+                    );
+
+                    dust.scale = Main.rand.NextFloat(1.3f, 2.3f);
+                }
+
+                if (TimerAt(1f))
+                {
+                    SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+                }
+            }
+
+            // REPOSITIONING FARTHER WAY FOR THE LAUNCH
+            else if (Timer <= 75f)
+            {
+                NPC.alpha = 255;
+                NPC.noTileCollide = true;
+                NPC.velocity = Vector2.Zero;
+
+                if (TimerAt(56f))
+                {
+                    float direction = target.Center.X >= NPC.Center.X
+                        ? 1f
+                        : -1f;
+
+                    float launchX = target.Center.X - direction * 800f;
+                    launchX = MathHelper.Clamp(
+                        launchX,
+                        200f,
+                        Main.maxTilesX * 16f - 200f
+                    );
+
+                    // Land BEHIND the player (hopefully)
+                    Phase2DiveLandingX =
+                        target.Center.X - direction * 180f;
+
+                    Phase2DiveLandingX = MathHelper.Clamp(
+                        Phase2DiveLandingX,
+                        200f,
+                        Main.maxTilesX * 16f - 200f
+                    );
+
+                    float launchGroundY = GetGroundY(
+                        new Vector2(launchX, target.Center.Y)
+                    );
+
+                    Phase2DiveGroundY = GetGroundY(
+                        new Vector2(
+                            Phase2DiveLandingX,
+                            target.Center.Y
+                        )
+                    );
+
+                    NPC.Center = new Vector2(
+                        launchX,
+                        launchGroundY - NPC.height / 2f
+                    );
+
+                    NPC.direction = (int)direction;
                     NPC.spriteDirection = NPC.direction;
 
-                    if (Timer <= 18f)
+                    NPC.netUpdate = true;
+                }
+
+                // telegraph for the jump
+                if (Timer % 2 == 0)
+                {
+                    Vector2 diveOrigin = NPC.Center;
+                    Vector2 landingPoint = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
+
+                    const float previewArcHeight = 350f;
+
+                    for (int d = 1; d <= 10; d++)
                     {
-                        NPC.velocity.X *= 0.8f;
+                        float t = d / 10f;
 
-                        IsParryable = true;
+                        float x = MathHelper.Lerp(diveOrigin.X, landingPoint.X, t);
+                        float y = MathHelper.Lerp(diveOrigin.Y, landingPoint.Y, t)
+                                  - previewArcHeight * 4f * t * (1f - t);
 
-                        float faceDir = target.Center.X > NPC.Center.X ? 1f : -1f;
-                        NPC.direction = (int)faceDir;
-                        NPC.spriteDirection = NPC.direction;
+                        Vector2 dustPos = new Vector2(x, y);
 
-                        // Dust gathering visual telegraph
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Dust d = Dust.NewDustPerfect(
-                                NPC.Center + Main.rand.NextVector2Circular(NPC.width / 2f, NPC.height / 2f),
-                                DustID.SandstormInABottle,
-                                new Vector2(-NPC.direction * Main.rand.NextFloat(2f, 5f), -1f)
-                            );
-                            d.scale = 1.4f;
-                            d.noGravity = true;
-                        }
+                        Dust lineDust = Dust.NewDustPerfect(
+                            dustPos,
+                            DustID.SandstormInABottle,
+                            Vector2.Zero
+                        );
 
-                        // Glowing streaks converging into the boss - reads as energy
-                        // gathering for the charge. Spawned further out than the dust
-                        // so the two effects layer instead of overlapping.
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Vector2 spawnOffset = Main.rand.NextVector2Circular(NPC.width * 0.9f, NPC.height * 0.9f);
-                            Vector2 inwardVelocity = -spawnOffset * Main.rand.NextFloat(0.05f, 0.09f);
-
-                            BossParticleSystem.SandStreaks.Create(new ParticleInfo(
-                                position: (NPC.Center + spawnOffset).ToNumerics(),
-                                velocity: inwardVelocity.ToNumerics(),
-                                rotation: 0f,
-                                scale: new SystemVector2(26f, 5f),
-                                color: new Color(255, 210, 140, 0),
-                                duration: 20
-                            ));
-                        }
-
-                        if (Timer == 18f)
-                        {
-                            SoundEngine.PlaySound(Roar1, NPC.Center);
-                        }
-
-                        return;
+                        lineDust.scale = 2f;
+                        lineDust.noGravity = true;
                     }
+                }
 
-                    //dash
-                    if (Timer == 19f)
-                    {
-                        DashStuckTimer = 0;
-                        NPC.noTileCollide = false;
+                if (Main.rand.NextBool(2))
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        NPC.Center + Main.rand.NextVector2Circular(30f, 15f),
+                        DustID.SandstormInABottle,
+                        Main.rand.NextVector2Circular(1f, 1f)
+                    );
 
-                        float directionX = target.Center.X > NPC.Center.X ? 1f : -1f;
-                        float dashSpeed = Main.masterMode ? 21.5f : (Main.expertMode ? 19.5f : 10f);
+                    dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                    dust.noGravity = true;
+                }
+            }
 
-                        NPC.velocity.X = directionX * dashSpeed;
-                        NPC.velocity.Y = 0f;
+            // TELEGRAPH FROM THE LAUNCH
+            else if (Timer <= 90f)
+            {
+                NPC.alpha = 255;
+                NPC.noTileCollide = true;
+                NPC.velocity = Vector2.Zero;
 
-                        NPC.direction = (int)directionX;
-                        NPC.netUpdate = true;
-                    }
+                for (int i = 0; i < 5; i++)
+                {
+                    Dust dust = Dust.NewDustPerfect(
+                        NPC.Bottom + new Vector2(
+                            Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
+                            0f
+                        ),
+                        DustID.Sand
+                    );
 
-                    IsParryable = true;
+                    dust.velocity = new Vector2(
+                        Main.rand.NextFloat(-4f, 4f),
+                        -Main.rand.NextFloat(4f, 8f)
+                    );
 
-                    // STUCK PREVENTION (which works like most the time DAMMIT)
-                    if (Math.Abs(NPC.velocity.X) < 1f && Math.Abs(NPC.oldVelocity.X) > 3f)
-                    {
-                        DashStuckTimer++;
+                    dust.scale = Main.rand.NextFloat(1.5f, 3f);
+                    dust.noGravity = true;
+                }
 
-                        if (DashStuckTimer == 1)
-                        {
-                            NPC.velocity.Y = -8f;
-                        }
+                if (TimerAt(76f))
+                {
+                    SoundEngine.PlaySound(
+                        Roar3,
+                        NPC.Center
+                    );
+                }
+            }
 
-                        if (DashStuckTimer >= 4)
-                        {
-                            NPC.noTileCollide = true;
-                            NPC.velocity.X = NPC.direction * 12f;
-                            NPC.velocity.Y = -3f;
 
-                            DashStuckTimer = 0;
-                            NPC.netUpdate = true;
-                        }
-                    }
-                    else
-                    {
-                        DashStuckTimer = 0;
-                    }
+            // POP ANIMATION WINDUP
+            else if (Timer < 111f)
+            {
+                NPC.alpha = 0;
+                NPC.noTileCollide = true;
+                NPC.velocity = Vector2.Zero;
 
-                    if (NPC.noTileCollide && Math.Abs(NPC.velocity.X) > 4f)
-                    {
-                        NPC.noTileCollide = false;
-                    }
+                if (TimerAt(91f))
+                {
+                    ScreenShake(3f, 6);
+                    Phase2DiveLaunchX = NPC.Center.X;
+                    Phase2DiveLaunchY = NPC.Center.Y;
 
-                    if (Timer <= 35f)
+                    NPC.direction =
+                        Phase2DiveLandingX > Phase2DiveLaunchX ? 1 : -1;
+
+                    NPC.spriteDirection = NPC.direction;
+
+                    NPC.netUpdate = true;
+
+                    SoundEngine.PlaySound(
+                        Roar3,
+                        NPC.Center
+                    );
+                }
+            }
+
+
+            // ACTUAL PHASE 2 JUMP/ARC 
+            else
+            {
+                NPC.alpha = 0;
+                NPC.noTileCollide = true;
+
+                const float airTime = 40f;
+                const float arcHeight = 500f;
+
+                if (TimerAt(111f))
+                {
+                    // Launch burst dust thingy
+                    for (int i = 0; i < 30; i++)
                     {
                         Dust dust = Dust.NewDustPerfect(
                             NPC.Center,
                             DustID.Sand,
-                            -NPC.velocity * 0.2f
+                            Main.rand.NextVector2Circular(8f, 8f)
                         );
 
-                        dust.scale = 1.8f;
+                        dust.scale = Main.rand.NextFloat(2f, 3.5f);
                         dust.noGravity = true;
                     }
 
-                    // Deceleration
-                    NPC.velocity.X *= 0.98f;
+                    // RUBBLE
+                    int rubbleCount = DifficultyValue(6, 8, 12);
 
-                    if (Timer >= 63f)
+                    for (int i = 0; i < rubbleCount; i++)
                     {
-                        DashStuckTimer = 0;
+                        float rubbleX =
+                            target.Center.X +
+                            Main.rand.NextFloat(-500f, 500f);
+
+                        Vector2 rubbleSpawn = new Vector2(
+                            rubbleX,
+                            target.Center.Y - 450f
+                        );
+
+                        Vector2 rubbleVelocity = new Vector2(
+                            Main.rand.NextFloat(-2f, 2f),
+                            Main.rand.NextFloat(2f, 5f)
+                        );
+                        int rubbleDamage = DifficultyValue(15, 30, 15);
+                        if (Main.netMode != NetmodeID.MultiplayerClient)
+                        {
+                            Projectile.NewProjectile(
+                                NPC.GetSource_FromAI(),
+                                rubbleSpawn,
+                                rubbleVelocity,
+                                ModContent.ProjectileType<FallingRubble>(),
+                                rubbleDamage,
+                                2f,
+                                Main.myPlayer
+                            );
+                        }
+                    }
+                }
+
+                if (Timer >= 111f)
+                {
+                    float rawProgress = (Timer - 111f) / airTime;
+                    float progress = MathHelper.Clamp(rawProgress, 0f, 1f);
+
+                    float landingY =
+                        Phase2DiveGroundY - NPC.height / 2f;
+
+                    float newX =
+                        MathHelper.Lerp(Phase2DiveLaunchX, Phase2DiveLandingX, progress);
+
+                    float newY =
+                        MathHelper.Lerp(Phase2DiveLaunchY, landingY, progress)
+                        - arcHeight * 4f * progress * (1f - progress);
+
+                    NPC.Center = new Vector2(newX, newY);
+
+                    // Sand trail while flying
+                    if (Main.rand.NextBool(2))
+                    {
+                        Dust dust = Dust.NewDustPerfect(
+                            NPC.Center,
+                            DustID.Sand,
+                            Main.rand.NextVector2Circular(1.5f, 1.5f)
+                        );
+
+                        dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
+                        dust.noGravity = true;
+                    }
+
+                    // CRASH LANDING
+                    if (rawProgress >= 1f)
+                    {
+                        ScreenShake(7f, 10);
+                        NPC.Center = new Vector2(
+                            Phase2DiveLandingX,
+                            landingY
+                        );
+
+                        NPC.velocity = Vector2.Zero;
                         NPC.noTileCollide = false;
 
-                        Timer = 0;
-                        CurrentState = AttackPhase.Cooldown;
-                        NPC.netUpdate = true;
-                    }
-                    break;
-
-                case AttackPhase.Burrow:
-                    Timer++;
-
-                    // Digging in on the surface
-                    if (Timer <= BurrowDigTime)
-                    {
-                        float progress = Timer / BurrowDigTime;
-                        float smoothProgress = progress * progress * (3f - 2f * progress);
-
-                        NPC.alpha = (int)MathHelper.Lerp(0f, 190f, smoothProgress);
-
-                        NPC.noTileCollide = true;
-                        NPC.velocity.X *= 0.92f;
-                        NPC.velocity.Y = 0f;
-
-                        int dustCount = progress < 0.5f ? 3 : 5;
-
-                        for (int i = 0; i < dustCount; i++)
-                        {
-                            Dust d = Dust.NewDustPerfect(
-                                NPC.Bottom + new Vector2(
-                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                    0f
-                                ),
-                                DustID.Sand
-                            );
-
-                            d.velocity = new Vector2(
-                                Main.rand.NextFloat(-3f, 3f),
-                                -Main.rand.NextFloat(2f, 5f)
-                            );
-
-                            d.scale = Main.rand.NextFloat(1.3f, 2.1f);
-                            d.noGravity = false;
-                        }
-
-                        if (Main.rand.NextBool(3))
-                        {
-                            Dust tungstenDust = Dust.NewDustPerfect(
-                                NPC.Bottom + new Vector2(
-                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                    0f
-                                ),
-                                DustID.Tungsten
-                            );
-
-                            tungstenDust.velocity = new Vector2(
-                                Main.rand.NextFloat(-2f, 2f),
-                                -Main.rand.NextFloat(1f, 3f)
-                            );
-
-                            tungstenDust.scale = Main.rand.NextFloat(0.8f, 1.3f);
-                            tungstenDust.noGravity = true;
-                        }
-
-                        if (Timer == 1f)
-                        {
-                            ScreenShake(2f, 5);
-                            SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
-                        }
-                    }
-
-
-                    // Underground pursuit
-                    else if (Timer < BurrowPursuitEnd)
-                    {
-                        NPC.alpha = 255;
-                        NPC.noTileCollide = true;
-                        float actualGroundY = GetGroundY(target.Center) + 64f;
-
-                        float deltaX = target.Center.X - NPC.Center.X;
-                        float speedX = MathHelper.Clamp(
-                            deltaX * 0.08f,
-                            -16f,
-                            16f
+                        SoundEngine.PlaySound(
+                            SoundID.Item14,
+                            NPC.Center
                         );
 
-                        NPC.velocity.X = speedX;
-                        NPC.velocity.Y = (actualGroundY - NPC.Center.Y) * 0.2f;
-
-                        if (!SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound sound) || !sound.IsPlaying)
+                        for (int i = 0; i < 50; i++)
                         {
-                            rumbleSoundSlot = SoundEngine.PlaySound(
-                                new SoundStyle("ShatteredIllusion/Sounds/GreatAntlionSounds/AntlionBurrowing")
-                                {
-                                    IsLooped = true,
-                                    Volume = 0.4f
-                                },
-                                NPC.Center
-                            );
-                        }
-                        else
-                        {
-                            sound.Position = NPC.Center;
-                            sound.Volume = 0.4f;
-                        }
+                            Vector2 dustVelocity =
+                                Main.rand.NextVector2Circular(10f, 7f);
 
-                        Vector2 groundPos = new Vector2(
-                            NPC.Center.X,
-                            actualGroundY - 64f
-                        );
+                            dustVelocity.Y -= 4f;
 
-                        Dust d = Dust.NewDustPerfect(
-                            groundPos + new Vector2(
-                                Main.rand.NextFloat(-20f, 20f),
-                                0f
-                            ),
-                            DustID.SandstormInABottle
-                        );
-
-                        Dust tungstenDust = Dust.NewDustPerfect(
-                            groundPos + new Vector2(
-                                Main.rand.NextFloat(-20f, 20f),
-                                0f
-                            ),
-                            DustID.Tungsten
-                        );
-
-                        d.velocity = new Vector2(
-                            0f,
-                            -Main.rand.NextFloat(2f, 4f)
-                        );
-
-                        d.scale = Main.rand.NextFloat(1.5f, 2.8f);
-                    }
-
-                    //sandtelegraph
-                    else if (Timer < BurrowTelegraphEnd)
-                    {
-                        if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound sound))
-                        {
-                            sound.Volume *= 0.95f;
-
-                            if (sound.Volume <= 0.05f)
-                            {
-                                sound.Stop();
-                            }
-                        }
-
-                        NPC.velocity = Vector2.Zero;
-                        NPC.alpha = 255;
-
-                        float actualGroundY = GetGroundY(NPC.Center);
-                        Vector2 telegraphPos = new Vector2(
-                            NPC.Center.X,
-                            actualGroundY
-                        );
-
-                        for (int i = 0; i < 3; i++)
-                        {
-                            Dust d = Dust.NewDustPerfect(
-                                telegraphPos + new Vector2(
-                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                    0f
-                                ),
-                                DustID.SandstormInABottle
-                            );
-
-                            d.velocity = new Vector2(
-                                0f,
-                                -Main.rand.NextFloat(4f, 8f)
-                            );
-
-                            d.scale = Main.rand.NextFloat(2f, 3.5f);
-                            d.noGravity = true;
-                        }
-                    }
-                    // Erupt upward out of the ground
-                    else
-                    {
-                        if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound sound))
-                        {
-                            sound.Stop();
-                        }
-
-                        if (Timer == BurrowTelegraphEnd)
-                        {
-                            ScreenShake(5f, 8);
-                            float actualGroundY = GetGroundY(NPC.Center);
-
-                            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                                position: new Vector2(NPC.Center.X, actualGroundY).ToNumerics(),
-                                velocity: SystemVector2.Zero,
-                                rotation: 0f,
-                                scale: new SystemVector2(220f, 90f),
-                                color: new Color(235, 200, 140, 0),
-                                duration: 24
-                            ));
-
-                            NPC.Center = new Vector2(
-                                NPC.Center.X,
-                                actualGroundY - 30f
-                            );
-
-                            NPC.velocity = new Vector2(0f, -18f);
-                            NPC.alpha = 0;
-
-                            NPC.noTileCollide = true;
-
-                            NPC.netUpdate = true;
-
-                            SoundEngine.PlaySound(Roar2, NPC.Center);
-
-
-                            for (int i = 0; i < 35; i++)
-                            {
-                                Vector2 dustVel =
-                                    Main.rand.NextVector2Circular(9f, 9f) +
-                                    new Vector2(0f, -5f);
-
-                                Dust d = Dust.NewDustPerfect(
-                                    NPC.Center,
-                                    DustID.Sand,
-                                    dustVel
-                                );
-
-                                d.scale = Main.rand.NextFloat(2f, 3.8f);
-                            }
-
-                            // amount of rubble based of difficulty
-                            int rubbleCount = 6;
-
-                            if (Main.masterMode)
-                            {
-                                rubbleCount = 12;
-                            }
-                            else if (Main.expertMode)
-                            {
-                                rubbleCount = 8;
-                            }
-
-                            for (int r = 0; r < rubbleCount; r++)
-                            {
-                                float offsetX = Main.rand.NextFloat(-500f, 500f); // the spread range of rubble
-
-                                Vector2 spawnPos = new Vector2(
-                                    NPC.Center.X + offsetX,
-                                    NPC.Center.Y - 500f
-                                );
-
-                                Vector2 velocity = new Vector2(
-                                    Main.rand.NextFloat(-2f, 2f),
-                                    Main.rand.NextFloat(2f, 5f)
-                                );
-
-                                int fallDamage = Main.masterMode ? 15 : (Main.expertMode ? 30 : 15);
-
-                                if (Main.netMode != NetmodeID.MultiplayerClient)
-                                {
-                                    Projectile.NewProjectile(
-                                        NPC.GetSource_FromAI(),
-                                        spawnPos,
-                                        velocity,
-                                        ModContent.ProjectileType<FallingRubble>(),
-                                        fallDamage,
-                                        2f,
-                                        Main.myPlayer
-                                    );
-                                }
-                            }
-                        }
-
-                        // Gravity back on for the actual jump out
-                        NPC.velocity.Y += 0.35f;
-                        if (Timer >= BurrowEnd)
-                        {
-                            NPC.noTileCollide = false;
-                            Timer = 0;
-                            CurrentState = AttackPhase.Cooldown;
-                            NPC.netUpdate = true;
-                        }
-                    }
-                    break;
-
-
-                case AttackPhase.Spit:
-                    NPC.alpha = 0;
-                    Timer++;
-
-                    NPC.velocity.X *= 0.85f;
-
-                    if (Timer == 1f)
-                    {
-                        NPC.velocity = Vector2.Zero;
-                    }
-
-                    float spitDeltaX = target.Center.X - NPC.Center.X;
-
-                    if (Math.Abs(spitDeltaX) > 10f)
-                    {
-                        int newDirection = spitDeltaX > 0f ? 1 : -1;
-
-                        if (newDirection != NPC.spriteDirection)
-                        {
-                            NPC.direction = newDirection;
-                            NPC.spriteDirection = newDirection;
-                            NPC.netUpdate = true;
-                        }
-                    }
-
-                    Vector2 mouthPosition = NPC.Center + new Vector2(
-                        NPC.spriteDirection * (NPC.width / 2f + MouthForwardOffset + MouthSidewaysOffset),
-                        MouthVerticalOffset
-                    );
-
-                    // telegraph for the spit
-                    if (Timer <= 90f)
-                    {
-                        Vector2 baseDir = target.Center - mouthPosition;
-                        baseDir.Normalize();
-
-                        int shotCount = Main.masterMode ? 5 : (Main.expertMode ? 3 : 1);
-                        float spread = Main.masterMode ? 0.22f : (Main.expertMode ? 0.18f : 0f);
-
-                        if (Timer % 2 == 0)
-                        {
-                            for (int i = 0; i < shotCount; i++)
-                            {
-                                Vector2 shotDir = baseDir;
-
-                                if (shotCount > 1)
-                                {
-                                    float offset = (i - (shotCount - 1) / 2f) * spread;
-                                    shotDir = baseDir.RotatedBy(offset);
-                                }
-
-                                for (int d = 1; d <= 10; d++)
-                                {
-                                    Vector2 dustPos = mouthPosition + shotDir * (d * 35f);
-
-                                    Dust lineDust = Dust.NewDustPerfect(
-                                        dustPos,
-                                        DustID.SandstormInABottle,
-                                        Vector2.Zero
-                                    );
-
-                                    lineDust.scale = 0.9f;
-                                    lineDust.noGravity = true;
-                                }
-                            }
-                        }
-
-                        if (Main.rand.NextBool(2))
-                        {
                             Dust dust = Dust.NewDustPerfect(
-                                mouthPosition + Main.rand.NextVector2Circular(8f, 8f),
-                                DustID.SandstormInABottle,
-                                Main.rand.NextVector2Circular(1f, 1f)
-                            );
-
-                            dust.scale = Main.rand.NextFloat(1.2f, 2f);
-                            dust.noGravity = true;
-                        }
-                    }
-
-                    //Spit
-                    if (Timer == 90f)
-                    {
-                        Vector2 predictedPosition = target.Center + target.velocity * 4f;
-                        Vector2 direction = predictedPosition - mouthPosition;
-                        direction.Normalize();
-
-                        float aimInaccuracy = Main.rand.NextFloat(-0.05f, 0.05f);
-                        direction = direction.RotatedBy(aimInaccuracy);
-
-                        int shotCount = Main.masterMode ? 5 : (Main.expertMode ? 3 : 1);
-                        float spitSpeed = Main.masterMode ? 14f : (Main.expertMode ? 13f : 12f);
-                        float spread = Main.masterMode ? 0.22f : (Main.expertMode ? 0.18f : 0f);
-
-                        for (int i = 0; i < shotCount; i++)
-                        {
-                            Vector2 shotDirection = direction;
-
-                            if (shotCount > 1)
-                            {
-                                float offset = (i - (shotCount - 1) / 2f) * spread;
-                                shotDirection = direction.RotatedBy(offset);
-                            }
-
-                            int spitDamage = Main.masterMode ? 15 : (Main.expertMode ? 25 : 10);
-
-                            if (Main.netMode != NetmodeID.MultiplayerClient)
-                            {
-                                Projectile.NewProjectile(
-                                    NPC.GetSource_FromAI(),
-                                    mouthPosition,
-                                    shotDirection * spitSpeed,
-                                    ModContent.ProjectileType<SandBall>(),
-                                    spitDamage,
-                                    0f,
-                                    Main.myPlayer
-                                );
-                            }
-                        }
-
-                        SoundEngine.PlaySound(SoundID.DD2_OgreSpit, mouthPosition);
-
-                        for (int i = 0; i < 15; i++)
-                        {
-                            Dust dust = Dust.NewDustPerfect(
-                                mouthPosition,
+                                NPC.Bottom,
                                 DustID.Sand,
-                                direction * Main.rand.NextFloat(2f, 5f) +
-                                Main.rand.NextVector2Circular(2f, 2f)
+                                dustVelocity
                             );
 
-                            dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
-                        }
-                    }
-
-                    if (Timer >= 105f)
-                    {
-                        Timer = 0;
-                        CurrentState = AttackPhase.Cooldown;
-                        NPC.netUpdate = true;
-                    }
-
-                    break;
-
-
-                case AttackPhase.Phase2BurrowDive:
-                    Timer++;
-
-                    // BURROW DOWN FOR PHASE 2 
-                    if (Timer <= 55f)
-                    {
-                        // Clamped so the smoothstep below stays well-behaved once Timer
-                        // passes 45 (it was previously unclamped, which let progress run
-                        // past 1 for the last 10 ticks of this block and made the alpha
-                        // fade briefly reverse/flicker instead of holding at fully invisible).
-                        float progress = MathHelper.Clamp(Timer / 45f, 0f, 1f);
-                        float smoothProgress = progress * progress * (3f - 2f * progress);
-
-                        NPC.alpha = (int)MathHelper.Lerp(0f, 255f, smoothProgress);
-                        NPC.noTileCollide = true;
-
-                        NPC.velocity.X *= 0.90f;
-                        NPC.velocity.Y = 0f;
-
-                        for (int i = 0; i < 4; i++)
-                        {
-                            Dust dust = Dust.NewDustPerfect(
-                                NPC.Bottom + new Vector2(
-                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                    0f
-                                ),
-                                DustID.Sand
-                            );
-
-                            dust.velocity = new Vector2(
-                                Main.rand.NextFloat(-3f, 3f),
-                                -Main.rand.NextFloat(2f, 5f)
-                            );
-
-                            dust.scale = Main.rand.NextFloat(1.3f, 2.3f);
-                        }
-
-                        if (Timer == 1f)
-                        {
-                            SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
-                        }
-                    }
-
-                    // REPOSITIONING FARTHER WAY FOR THE LAUNCH
-                    else if (Timer <= 75f)
-                    {
-                        NPC.alpha = 255;
-                        NPC.noTileCollide = true;
-                        NPC.velocity = Vector2.Zero;
-
-                        if (Timer == 56f)
-                        {
-                            float direction = target.Center.X >= NPC.Center.X
-                                ? 1f
-                                : -1f;
-
-                            float launchX = target.Center.X - direction * 800f;
-                            launchX = MathHelper.Clamp(
-                                launchX,
-                                200f,
-                                Main.maxTilesX * 16f - 200f
-                            );
-
-                            // Land BEHIND the player (hopefully)
-                            Phase2DiveLandingX =
-                                target.Center.X - direction * 180f;
-
-                            Phase2DiveLandingX = MathHelper.Clamp(
-                                Phase2DiveLandingX,
-                                200f,
-                                Main.maxTilesX * 16f - 200f
-                            );
-
-                            float launchGroundY = GetGroundY(
-                                new Vector2(launchX, target.Center.Y)
-                            );
-
-                            Phase2DiveGroundY = GetGroundY(
-                                new Vector2(
-                                    Phase2DiveLandingX,
-                                    target.Center.Y
-                                )
-                            );
-
-                            NPC.Center = new Vector2(
-                                launchX,
-                                launchGroundY - NPC.height / 2f
-                            );
-
-                            NPC.direction = (int)direction;
-                            NPC.spriteDirection = NPC.direction;
-
-                            NPC.netUpdate = true;
-                        }
-
-                        // telegraph for the jump
-                        if (Timer % 2 == 0)
-                        {
-                            Vector2 diveOrigin = NPC.Center;
-                            Vector2 landingPoint = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
-
-                            const float previewArcHeight = 350f;
-
-                            for (int d = 1; d <= 10; d++)
-                            {
-                                float t = d / 10f;
-
-                                float x = MathHelper.Lerp(diveOrigin.X, landingPoint.X, t);
-                                float y = MathHelper.Lerp(diveOrigin.Y, landingPoint.Y, t)
-                                          - previewArcHeight * 4f * t * (1f - t);
-
-                                Vector2 dustPos = new Vector2(x, y);
-
-                                Dust lineDust = Dust.NewDustPerfect(
-                                    dustPos,
-                                    DustID.SandstormInABottle,
-                                    Vector2.Zero
-                                );
-
-                                lineDust.scale = 2f;
-                                lineDust.noGravity = true;
-                            }
-                        }
-
-                        if (Main.rand.NextBool(2))
-                        {
-                            Dust dust = Dust.NewDustPerfect(
-                                NPC.Center + Main.rand.NextVector2Circular(30f, 15f),
-                                DustID.SandstormInABottle,
-                                Main.rand.NextVector2Circular(1f, 1f)
-                            );
-
-                            dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
-                            dust.noGravity = true;
-                        }
-                    }
-
-                    // TELEGRAPH FROM THE LAUNCH
-                    else if (Timer <= 90f)
-                    {
-                        NPC.alpha = 255;
-                        NPC.noTileCollide = true;
-                        NPC.velocity = Vector2.Zero;
-
-                        for (int i = 0; i < 5; i++)
-                        {
-                            Dust dust = Dust.NewDustPerfect(
-                                NPC.Bottom + new Vector2(
-                                    Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f),
-                                    0f
-                                ),
-                                DustID.Sand
-                            );
-
-                            dust.velocity = new Vector2(
-                                Main.rand.NextFloat(-4f, 4f),
-                                -Main.rand.NextFloat(4f, 8f)
-                            );
-
-                            dust.scale = Main.rand.NextFloat(1.5f, 3f);
+                            dust.scale = Main.rand.NextFloat(2f, 4f);
                             dust.noGravity = true;
                         }
 
-                        if (Timer == 76f)
-                        {
-                            SoundEngine.PlaySound(
-                                Roar3,
-                                NPC.Center
-                            );
-                        }
-                    }
-
-
-                    // POP ANIMATION WINDUP
-                    else if (Timer < 111f)
-                    {
-                        NPC.alpha = 0;
-                        NPC.noTileCollide = true;
-                        NPC.velocity = Vector2.Zero;
-
-                        if (Timer == 91f)
-                        {
-                            ScreenShake(3f, 6);
-                            Phase2DiveLaunchX = NPC.Center.X;
-                            Phase2DiveLaunchY = NPC.Center.Y;
-
-                            NPC.direction =
-                                Phase2DiveLandingX > Phase2DiveLaunchX ? 1 : -1;
-
-                            NPC.spriteDirection = NPC.direction;
-
-                            NPC.netUpdate = true;
-
-                            SoundEngine.PlaySound(
-                                Roar3,
-                                NPC.Center
-                            );
-                        }
-                    }
-
-
-                    // ACTUAL PHASE 2 JUMP/ARC 
-                    else
-                    {
-                        NPC.alpha = 0;
-                        NPC.noTileCollide = true;
-
-                        const float airTime = 40f;
-                        const float arcHeight = 500f;
-
-                        if (Timer == 111f)
-                        {
-                            // Launch burst dust thingy
-                            for (int i = 0; i < 30; i++)
-                            {
-                                Dust dust = Dust.NewDustPerfect(
-                                    NPC.Center,
-                                    DustID.Sand,
-                                    Main.rand.NextVector2Circular(8f, 8f)
-                                );
-
-                                dust.scale = Main.rand.NextFloat(2f, 3.5f);
-                                dust.noGravity = true;
-                            }
-
-                            // RUBBLE
-                            int rubbleCount = Main.masterMode
-                                ? 12
-                                : Main.expertMode
-                                    ? 8
-                                    : 6;
-
-                            for (int i = 0; i < rubbleCount; i++)
-                            {
-                                float rubbleX =
-                                    target.Center.X +
-                                    Main.rand.NextFloat(-500f, 500f);
-
-                                Vector2 rubbleSpawn = new Vector2(
-                                    rubbleX,
-                                    target.Center.Y - 450f
-                                );
-
-                                Vector2 rubbleVelocity = new Vector2(
-                                    Main.rand.NextFloat(-2f, 2f),
-                                    Main.rand.NextFloat(2f, 5f)
-                                );
-                                int rubbleDamage = Main.masterMode ? 15 : (Main.expertMode ? 30 : 15);
-                                if (Main.netMode != NetmodeID.MultiplayerClient)
-                                {
-                                    Projectile.NewProjectile(
-                                        NPC.GetSource_FromAI(),
-                                        rubbleSpawn,
-                                        rubbleVelocity,
-                                        ModContent.ProjectileType<FallingRubble>(),
-                                        rubbleDamage,
-                                        2f,
-                                        Main.myPlayer
-                                    );
-                                }
-                            }
-                        }
-
-                        if (Timer >= 111f)
-                        {
-                            float rawProgress = (Timer - 111f) / airTime;
-                            float progress = MathHelper.Clamp(rawProgress, 0f, 1f);
-
-                            float landingY =
-                                Phase2DiveGroundY - NPC.height / 2f;
-
-                            float newX =
-                                MathHelper.Lerp(Phase2DiveLaunchX, Phase2DiveLandingX, progress);
-
-                            float newY =
-                                MathHelper.Lerp(Phase2DiveLaunchY, landingY, progress)
-                                - arcHeight * 4f * progress * (1f - progress);
-
-                            NPC.Center = new Vector2(newX, newY);
-
-                            // Sand trail while flying
-                            if (Main.rand.NextBool(2))
-                            {
-                                Dust dust = Dust.NewDustPerfect(
-                                    NPC.Center,
-                                    DustID.Sand,
-                                    Main.rand.NextVector2Circular(1.5f, 1.5f)
-                                );
-
-                                dust.scale = Main.rand.NextFloat(1.5f, 2.5f);
-                                dust.noGravity = true;
-                            }
-
-                            // CRASH LANDING
-                            if (rawProgress >= 1f)
-                            {
-                                ScreenShake(7f, 10);
-                                NPC.Center = new Vector2(
-                                    Phase2DiveLandingX,
-                                    landingY
-                                );
-
-                                NPC.velocity = Vector2.Zero;
-                                NPC.noTileCollide = false;
-
-                                SoundEngine.PlaySound(
-                                    SoundID.Item14,
-                                    NPC.Center
-                                );
-
-                                for (int i = 0; i < 50; i++)
-                                {
-                                    Vector2 dustVelocity =
-                                        Main.rand.NextVector2Circular(10f, 7f);
-
-                                    dustVelocity.Y -= 4f;
-
-                                    Dust dust = Dust.NewDustPerfect(
-                                        NPC.Bottom,
-                                        DustID.Sand,
-                                        dustVelocity
-                                    );
-
-                                    dust.scale = Main.rand.NextFloat(2f, 4f);
-                                    dust.noGravity = true;
-                                }
-
-                                // Start the actual burrow animation.
-                                Timer = 0;
-                                CurrentState = AttackPhase.Burrow;
-
-                                NPC.alpha = 0;
-                                NPC.noTileCollide = true;
-
-                                NPC.netUpdate = true;
-                            }
-                        }
-                    }
-
-                    break;
-
-                case AttackPhase.Cooldown:
-                    NPC.alpha = 0;
-                    Timer++;
-                    NPC.noTileCollide = false;
-                    NPC.velocity.X *= 0.88f;
-
-                    float cooldownTime = Main.masterMode
-                        ? 45f
-                        : (Main.expertMode ? 55f : 64f);
-
-                    if (Timer >= cooldownTime)
-                    {
+                        // Start the actual burrow animation.
                         Timer = 0;
+                        CurrentState = AttackPhase.Burrow;
 
-                        AttackPhase[] attackOrder = Phase2
-                            ? Phase2AttackOrder
-                            : Phase1AttackOrder;
+                        NPC.alpha = 0;
+                        NPC.noTileCollide = true;
 
-                        AttackSequenceIndex =
-                            (AttackSequenceIndex + 1) % attackOrder.Length;
-
-                        CurrentState = attackOrder[(int)AttackSequenceIndex];
                         NPC.netUpdate = true;
                     }
-
-                    break;
+                }
             }
         }
+
+        private void HandleCooldown()
+        {
+            NPC.alpha = 0;
+            Timer++;
+            NPC.noTileCollide = false;
+            NPC.velocity.X *= 0.88f;
+
+            float cooldownTime = DifficultyValue(64f, 55f, 45f);
+
+            if (Timer >= cooldownTime)
+            {
+                Timer = 0;
+
+                AttackPhase[] attackOrder = Phase2
+                    ? Phase2AttackOrder
+                    : Phase1AttackOrder;
+
+                AttackSequenceIndex =
+                    (AttackSequenceIndex + 1) % attackOrder.Length;
+
+                CurrentState = attackOrder[(int)AttackSequenceIndex];
+                NPC.netUpdate = true;
+            }
+        }
+
 
         private void StartPhase2()
         {
@@ -1801,7 +1824,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 ScreenShake(3f, 8);
             }
 
-            if (Timer == 30f)
+            if (TimerAt(30f))
             {
                 SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
                 ScreenShake(6f, 14);
@@ -1869,34 +1892,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
         }
 
-        private void SpawnSandDustWall()
-        {
-            float xOffset = (NPC.width / 2f + 1f) * NPC.direction; // 1 pixel offset lol
-            Vector2 spawnCenter = NPC.Center + new Vector2(xOffset, 0f);
-
-            float wallHeightInPixels = 7f * 16f; // wall height in blocks
-            float halfWallHeight = wallHeightInPixels / 2f;
-
-            int dustCount = 4;
-
-            for (int i = 0; i < dustCount; i++)
-            {
-                float yOffset = Main.rand.NextFloat(-halfWallHeight, halfWallHeight);
-                Vector2 dustPos = spawnCenter + new Vector2(
-                    Main.rand.NextFloat(-4f, 4f),
-                    yOffset
-                );
-
-                Dust dust = Dust.NewDustPerfect(dustPos, DustID.Sand);
-                dust.velocity = new Vector2(
-                    NPC.direction * Main.rand.NextFloat(0.5f, 2f),
-                    Main.rand.NextFloat(-1f, 1f)
-                );
-
-                dust.noGravity = false;
-                dust.scale = Main.rand.NextFloat(1f, 1.4f);
-            }
-        }
         private void ScreenShake(float strength, int frames, float vibration = 5f)
         {
             if (Main.netMode == NetmodeID.Server)

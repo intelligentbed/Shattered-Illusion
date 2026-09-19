@@ -25,7 +25,8 @@ namespace ShatteredIllusion.World.WorldGeneration
 
             if (insertAfterIndex == -1)
             {
-                Mod.Logger.Warn($"[DuneCarapace] Could not find '{InsertAfterPassName}' gen pass; desert chest injection was skipped.");
+                Mod.Logger.Warn($"[DuneCarapace] Could not find '{InsertAfterPassName}' gen pass; desert chest injection was skipped."); 
+                //THIS COULD BE REMOVED NGL but man i dont want to deal with it right now
                 return;
             }
 

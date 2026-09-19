@@ -96,8 +96,7 @@ namespace ShatteredIllusion.World.WorldGeneration
                         if (Main.tile[i, j].HasTile &&
                             Main.tile[i, j].TileType == TileID.Dirt)
                         {
-                            Main.tile[i, j].TileType =
-                                (ushort)ModContent.TileType<MossBlock>();
+                            WorldGen.PlaceTile(i, j, ModContent.TileType<MossBlock>(), mute: true, forced: true);
                         }
                     }
                 }
@@ -163,8 +162,7 @@ namespace ShatteredIllusion.World.WorldGeneration
                                 if (Main.tile[mossX, mossY].HasTile &&
                                     Main.tile[mossX, mossY].TileType == TileID.Dirt)
                                 {
-                                    Main.tile[mossX, mossY].TileType =
-                                        (ushort)ModContent.TileType<MossBlock>();
+                                    WorldGen.PlaceTile(mossX, mossY, ModContent.TileType<MossBlock>(), mute: true, forced: true);
                                 }
                             }
                         }
