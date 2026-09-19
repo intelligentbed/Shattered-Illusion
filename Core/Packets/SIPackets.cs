@@ -7,8 +7,6 @@ namespace ShatteredIllusion.Core.Packets
 {
     public enum MessageType : byte
     {
-        // Server -> client only. Keep every network message in this one enum so
-        // two unrelated systems can never reuse the same byte value.
         SyncDownedGreatAntlionCharger = 1,
         TutorialProcUpdate = 2,
         RequestParry = 3,

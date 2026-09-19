@@ -21,7 +21,8 @@ using SystemVector2 = System.Numerics.Vector2;
 namespace ShatteredIllusion.Common.Players.ParrySystem
 {
     // ok since i know people will be confused on what iparryable means 
-    // IT MEANS THAT THE BOSS IS PARRYABLE BUT NOT THE ATTACK YOU GOTTA DO THAT YOURSELF  
+    // IT MEANS THAT THE BOSS IS PARRYABLE BUT NOT THE ATTACK YOU GOTTA DO THAT YOURSELF 
+    // AND YOU HAVE HAVE TO MAKE AN EFFECT FOR THE PARRYABLE ATTACKS 
     public interface IParryable
     {
         bool IsParryable { get; }
@@ -108,7 +109,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             MycelialSetActive = false;
         }
 
-        public override void PreUpdate()
+        public override void PostUpdate()
         {
             if (CooldownTimer > 0)
                 CooldownTimer--;

@@ -109,8 +109,7 @@ namespace ShatteredIllusion
 
         public static void SetDownedGreatAntlionCharger()
         {
-            // Clients never decide world progression. This method is called by the
-            // boss's server-side OnKill hook.
+            // Clients never decide world progression
             if (Main.netMode == NetmodeID.MultiplayerClient || downedGreatAntlionCharger)
                 return;
 

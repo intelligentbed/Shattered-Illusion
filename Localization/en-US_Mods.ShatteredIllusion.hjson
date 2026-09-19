@@ -82,6 +82,11 @@ Items: {
 		Tooltip: ""
 	}
 
+	LivingWand: {
+		Tooltip: ""
+		DisplayName: Living Wand
+	}
+
 	AntlionAltar: {
 		DisplayName: Antlion Altar
 		Tooltip: ""
@@ -277,6 +282,8 @@ NPCs: {
 	KingSlimeNinja.DisplayName: King Slime Ninja
 	Ninja.DisplayName: Ninja
 	KingSlimeClone.DisplayName: King Slime Clone
+	KingSlimeChunk.DisplayName: King Slime Chunk
+	KingSlimeMinion.DisplayName: King Slime Minion
 }
 
 Configs: {
@@ -302,21 +309,6 @@ Configs: {
 
 		ParryBarPosY: {
 			Label: Parry Bar Pos Y
-			Tooltip: ""
-		}
-
-		ResolveBarLocked: {
-			Label: Lock Resolve Bar Position
-			Tooltip: When enabled, the Resolve bar stays fixed in place. Disable to drag it anywhere on screen.
-		}
-
-		ResolveBarPosX: {
-			Label: Resolve Bar Pos X
-			Tooltip: ""
-		}
-
-		ResolveBarPosY: {
-			Label: Resolve Bar Pos Y
 			Tooltip: ""
 		}
 
