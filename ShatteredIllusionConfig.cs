@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using ShatteredIllusion.Common.GUI.SturdinessBar;
 using Terraria.ModLoader.Config;
 
 namespace ShatteredIllusion
@@ -15,15 +16,14 @@ namespace ShatteredIllusion
 
         [Header("Client")]
 
-        [DefaultValue(true)]     
+        [DefaultValue(true)]
         public bool SturdinessBarLocked;
 
-        [DefaultValue(35f)]   // NOTE: keep these in sync with ResolveBarUI DefaultPosX / DefaultPosY OR ELSE 
-        public float SturdinessBarPosX = 35f;
+        [DefaultValue(SturdinessBarUI.DefaultPosX)]
+        public float SturdinessBarPosX = SturdinessBarUI.DefaultPosX;
 
-        [DefaultValue(15f)]
-        [Label("Sturdiness Bar Y")]
-        public float SturdinessBarPosY = 15f;
+        [DefaultValue(SturdinessBarUI.DefaultPosY)]
+        public float SturdinessBarPosY = SturdinessBarUI.DefaultPosY;
 
         [DefaultValue(HorizontalPosition.Left)]
         public HorizontalPosition MenuButtonPosition;

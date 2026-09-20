@@ -40,6 +40,19 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             ProcCount = tag.GetInt("parryTutorialProcCount");
         }
 
+        // ProcCount and displayTimer are static, so without this they'd carry
+        // over from whatever world was previously loaded. ClearWorld() runs
+        // before a world is generated or loaded (and before LoadWorldData, for
+        // an existing one), so this is what actually stops a fresh world from
+        // starting with a stale, already-partially-used tutorial count - one
+        // that would otherwise get written into that new world's own save file
+        // the first time it saves.
+        public override void ClearWorld()
+        {
+            ProcCount = 0;
+            displayTimer = 0;
+        }
+
         // Keeps a newly-joining client in sync with the world's current count.
         public override void NetSend(BinaryWriter writer)
         {

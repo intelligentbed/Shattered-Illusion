@@ -361,3 +361,16 @@ Biomes: {
 		DisplayName: Ashen Shore Biome
 	}
 }
+
+Cutscenes: {
+	GreatAntlionCharger.Title:
+		'''
+		The Isolated Beast      
+		Great Antlion Charger
+		'''
+	KingSlime.Title:
+		'''
+		The Vicious Monarch      
+		           --King Slime--
+		'''
+}

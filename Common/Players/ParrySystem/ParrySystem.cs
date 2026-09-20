@@ -82,27 +82,11 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             }
         }
 
-
         public bool MycelialSetActive;
-
-        // Global cap across King Slime / Great Antlion Charger / Eye of Cthulhu combined -
-        // once this many parryable windows have been shown to the player, the tutorial
-        // prompt never appears again for any of the three.
-        public int ParryTutorialProcCount = 0;
-
-        public override void SaveData(TagCompound tag)
-        {
-            tag["ParryTutorialProcCount"] = ParryTutorialProcCount;
-        }
-
-        public override void LoadData(TagCompound tag)
-        {
-            ParryTutorialProcCount = tag.GetInt("ParryTutorialProcCount");
-        }
 
         private const float MycelialExplosionRadius = 200f;
         private const int MycelialExplosionDamage = 15;
-        private const int MycelialPoisonedDuration = 180; // 3 seconds
+        private const int MycelialPoisonedDuration = 180; 
 
         public override void ResetEffects()
         {
@@ -118,8 +102,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             {
                 parrySlowTimer--;
 
-                // The server owns the result of a parry window. It tells the
-                // owning client when to play the failure feedback.
                 if (parrySlowTimer <= 0 && !parrySucceededThisWindow)
                     TriggerVisualEffect(ParryVisualEffect.Failed);
             }
@@ -219,12 +201,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             if (!IsParrying)
                 return base.FreeDodge(info);
 
-            // The local client may predict the dodge to avoid a visibly delayed
-            // hit. It never changes boss state, health, buffs, or world state;
-            // the server executes and validates all of those below.
-            if (Main.netMode == NetmodeID.MultiplayerClient)
-                return true;
-
             if (info.DamageSource.SourceNPCIndex < 0 ||
                 info.DamageSource.SourceNPCIndex >= Main.maxNPCs)
                 return base.FreeDodge(info);
@@ -240,6 +216,13 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
             if (boss is null || !boss.IsParryable)
                 return base.FreeDodge(info);
+
+            if (Main.netMode == NetmodeID.MultiplayerClient)
+            {
+                parrySlowTimer = 0;
+                parrySucceededThisWindow = true;
+                return true;
+            }
 
             boss.OnParried(Player);
             Player.SetImmuneTimeForAllTypes(60);
@@ -377,13 +360,16 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             if (Main.netMode != NetmodeID.Server)
                 return;
 
+            if (!Main.dedServ)
+                PlayVisualEffect(effect, attackerIndex, scale);
+
             ModPacket packet = ModContent.GetInstance<ShatteredIllusion>().GetPacket();
             packet.Write((byte)MessageType.ParryVisualEffect);
             packet.Write((byte)effect);
             packet.Write((byte)Player.whoAmI);
             packet.Write((short)attackerIndex);
             packet.Write(scale);
-            packet.Send(Player.whoAmI);
+            packet.Send();
         }
 
         internal static void ReceiveVisualEffect(BinaryReader reader)
@@ -393,10 +379,10 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             int attackerIndex = reader.ReadInt16();
             float scale = reader.ReadSingle();
 
-            if (playerIndex != Main.myPlayer || playerIndex >= Main.maxPlayers)
+            if (playerIndex < 0 || playerIndex >= Main.maxPlayers || !Main.player[playerIndex].active)
                 return;
 
-            Main.LocalPlayer.GetModPlayer<ParryPlayer>().PlayVisualEffect(effect, attackerIndex, scale);
+            Main.player[playerIndex].GetModPlayer<ParryPlayer>().PlayVisualEffect(effect, attackerIndex, scale);
         }
 
         private void PlayVisualEffect(ParryVisualEffect effect, int attackerIndex, float scale)
@@ -440,7 +426,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             SpawnRing(Player.Center, DustID.Gold, 20f, 18, 9f, alpha: 40, scale: 1.7f);
             SpawnRing(Player.Center, DustID.GoldFlame, 45f, 22, 5f, alpha: 70, scale: 1.4f);
 
-            // Bright gold sparks bursting off the player 
             SpawnParrySparks(Player.Center, count: 16, speedMin: 3f, speedMax: 7f, color: new Color(255, 210, 110, 0), sparkScale: 10f, duration: 26);
 
             if (attackerIndex < 0 || attackerIndex >= Main.maxNPCs || !Main.npc[attackerIndex].active)
@@ -458,7 +443,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
                 clash.noGravity = true;
             }
 
-            // Sharper white-hot sparks right at the clash point 
+            // you know im bout to eat some hamburgers and these reminded me of it
             SpawnParrySparks(attacker.Center, count: 18, speedMin: 4f, speedMax: 9f, color: new Color(255, 250, 225, 0), sparkScale: 9f, duration: 20);
         }
 
@@ -605,7 +590,6 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
 
         private static void AddLineSegment(List<Vector2> points, Vector2 start, Vector2 end, int count)
         {
-            // Skip the final t=1 point so segments don't double up their shared corner.
             for (int i = 0; i < count; i++)
             {
                 float t = i / (float)count;

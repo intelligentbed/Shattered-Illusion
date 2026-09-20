@@ -4,7 +4,7 @@ using MonoMod.Cil;
 using Terraria;
 using Terraria.ModLoader;
 using Terraria.WorldBuilding;
-using ShatteredIllusion.Content.World;
+using ShatteredIllusion.Content.World.WorldGeneration;
 
 namespace ShatteredIllusion.Core.ILEditing
 {
@@ -12,7 +12,7 @@ namespace ShatteredIllusion.Core.ILEditing
     {
         private static Mod modInstance;
 
-        public const int DungeonShorePadding = 250;
+        public const int DungeonShorePadding = 150;
 
         // Safety cap so a wide shore on a Small world can't shove the dungeon toward the middle of the map.
         private const float MaxLeftLimitFraction = 0.3f;

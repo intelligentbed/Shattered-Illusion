@@ -125,7 +125,7 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
             float backdropBottom = subCenterY + (subTextSize.Y / 2f) + BACKDROP_PADDING;
             DrawFeatheredBackdrop(spriteBatch, backdropTop, backdropBottom, alpha);
 
-            // expanding gold rule between the title and the subtitle, grows in with the intro
+            // expanding gold rule between the title and the subtitle
             float ruleWidth = MathHelper.Lerp(0f, 220f, introProgress);
             Texture2D pixel = TextureAssets.MagicPixel.Value;
             float ruleY = titleCenterY + (titleTextSize.Y * scale / 2f) + (TITLE_LINE_GAP / 2f);
@@ -137,12 +137,12 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
             DrawSubtitleOrnaments(spriteBatch, pixel, centerX, subCenterY, subTextSize.X, alpha);
 
-            // main title, drawn bigger with a soft multi-directional outline instead of one flat shadow
+            // main title
             DrawOutlinedString(
                 spriteBatch, titleFont, titleLine,
                 new Vector2(centerX, titleCenterY), Color.White * alpha, Color.Black * alpha * 0.75f, scale);
 
-            // subtitle line, smaller and in the gold accent color so it reads as a "label" under the title
+            // subtitle line
             DrawOutlinedString(
                 spriteBatch, subFont, cleanedSub,
                 new Vector2(centerX, subCenterY), AccentColor * alpha, Color.Black * alpha * 0.75f, 1f);
@@ -180,7 +180,7 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
             }
         }
 
-        // short gold line + little rotated-square "diamond" on each side of the subtitle text, idk how i feel about it so might scrap
+        //idk how i feel about it so might scrap
         private static void DrawSubtitleOrnaments(
             SpriteBatch spriteBatch, Texture2D pixel, float centerX, float centerY, float subTextWidth, float alpha)
         {
@@ -310,7 +310,6 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
         public override void PlayerDisconnect()
         {
             if (Main.dedServ) return;
-            // Reset cutscene when this player disconnects.
             ResetCutscene();
         }
 
@@ -489,9 +488,6 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
                    npcType == NPCID.KingSlime;
         }
 
-        // Whether the boss's velocity/AI should be frozen while its cutscene
-        // plays. Read from each boss's own cutscene class so the flag lives
-        // right next to the rest of that boss's cutscene tuning.
         public static bool ShouldFreezeMovement(int npcType)
         {
             if (npcType == ModContent.NPCType<GreatAntlionCharger>())
@@ -532,7 +528,7 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
         public static void Apply(CutscenePlayer player)
         {
             player.SetDefinition(
-                Language.GetTextValue("The Isolated Beast      \nGreat Antlion Charger"),
+                Language.GetTextValue("Mods.ShatteredIllusion.Cutscenes.GreatAntlionCharger.Title"),
                 40, 20, 140, 20,
                 0, 200, 4,
                 new SoundStyle("ShatteredIllusion/Sounds/Silence"), 0, 120);
@@ -546,7 +542,7 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
         public static void Apply(CutscenePlayer player)
         {
             player.SetDefinition(
-                Language.GetTextValue("The Viscious Monarch      \n           --King Slime--"),
+                Language.GetTextValue("Mods.ShatteredIllusion.Cutscenes.KingSlime.Title"),
                 60, 20, 150, 20,
                 120, 60, 4,
                 new SoundStyle("ShatteredIllusion/Sounds/BarkFart"), 60, 120);
@@ -612,6 +608,8 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
         {
             cutsceneTimer = 200;
 
+            npc.netUpdate = true;
+
             if (Main.netMode == NetmodeID.Server)
             {
                 const float maxDistance = 3000f;
@@ -627,13 +625,17 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
                     if (Vector2.DistanceSquared(player.Center, npc.Center) > maxDistanceSquared)
                         continue;
 
-                    // Tell this specific client to start the cutscene.
+                    if (i == Main.myPlayer && !Main.dedServ)
+                    {
+                        player.GetModPlayer<CutscenePlayer>().StartCutscene(npc);
+                        continue;
+                    }
+
                     SIPackets.SendBossCutscene(npc, i);
                 }
             }
             else
             {
-                // Singleplayer starts the cutscene directly.
                 if (Main.myPlayer >= 0 &&
                     Main.myPlayer < Main.maxPlayers)
                 {
