@@ -17,6 +17,8 @@ using ShatteredIllusion.Content.Items.Placeables.Relics;
 using ShatteredIllusion.Content.Particles;
 using ParticleLibrary.Core.V3.Particles;
 using ParticleLibrary.Utilities;
+using ShatteredIllusion.Core.Packets;
+using System.IO;
 using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
@@ -57,9 +59,26 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private float Phase2DiveLaunchX;
         private float Phase2DiveLaunchY;
 
+        private const int Phase2Flag = 1;
+        private const int Phase2TransitioningFlag = 2;
 
-        private bool Phase2;
-        private bool Phase2Transitioning;
+        public bool Phase2
+        {
+            get => ((int)NPC.ai[2] & Phase2Flag) != 0;
+            set => SetPhase2Flags(Phase2Flag, value);
+        }
+
+        public bool Phase2Transitioning
+        {
+            get => ((int)NPC.ai[2] & Phase2TransitioningFlag) != 0;
+            set => SetPhase2Flags(Phase2TransitioningFlag, value);
+        }
+
+        private void SetPhase2Flags(int bit, bool on)
+        {
+            int flags = (int)NPC.ai[2];
+            NPC.ai[2] = on ? (flags | bit) : (flags & ~bit);
+        }
 
         private int DashStuckTimer;
 
@@ -111,11 +130,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private bool IsHidden =>
             CurrentState == AttackPhase.WaitingForCutscene ||
             (CurrentState == AttackPhase.Burrow && Timer > 30f && Timer < BurrowPursuitEnd) ||
-            // Phase2BurrowDive goes fully invisible (alpha 255) for the dig-down,
-            // reposition, and launch-telegraph sub-phases (Timer 30-90), then becomes
-            // visible again for the pop animation and the jump arc (Timer 91+).
-            // This was previously missing here, which let the boss be hit (and hit
-            // the player) while buried and teleporting off-screen.
             (CurrentState == AttackPhase.Phase2BurrowDive && Timer > 30f && Timer <= 90f);
 
         private Asset<Texture2D>? burrowTexture;
@@ -234,9 +248,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void OnKill()
         {
-            // The underground-pursuit rumble is a looped sound that only stops itself
-            // when the burrow state naturally finishes. If the boss dies mid-pursuit
-            // (e.g. from an on-death effect) the loop was previously left playing forever.
             if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound))
                 sound?.Stop();
 
@@ -272,19 +283,21 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             float hitboxHalfHeight = NPC.height / 2f;
             return hitboxHalfHeight - visualHalfHeight;
         }
-
-        // Timer only ever advances in whole-frame steps, but it's stored as a float
-        // (it's backed by NPC.ai), so we compare with a small tolerance instead of
-        // exact equality.
         private const float TimerEqualityTolerance = 0.01f;
 
         private bool TimerAt(float target) => Math.Abs(Timer - target) < TimerEqualityTolerance;
 
-        private static bool IsZero(float value) => Math.Abs(value) < 0.0001f;
 
-        // Picks a value based on the current difficulty tier, replacing the
-        // "masterMode ? a : (expertMode ? b : c)" nested-ternary pattern used
-        // all over the attack code.
+        private Vector2 SafeNormalize(Vector2 vector)
+        {
+            if (vector == Vector2.Zero)
+                return new Vector2(NPC.spriteDirection, 0f);
+
+            vector.Normalize();
+            return vector;
+        }
+
+        private static bool IsZero(float value) => Math.Abs(value) < 0.0001f;
         private static int DifficultyValue(int normal, int expert, int master)
         {
             if (Main.masterMode) return master;
@@ -622,7 +635,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             return checkPosition.Y;
         }
 
-        // Returns true if there's at least one player who is active, alive, and within DespawnRange of the boss.
+        // Returns true if there's at least one player who is active, alive, and within DespawnRange of the boss 
+        //coming back to this there is a much better waty to handle this
         private bool AnyPlayerPresentNearby()
         {
             for (int i = 0; i < Main.maxPlayers; i++)
@@ -648,8 +662,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (DespawnTimer >= DespawnTime)
                 {
-                    // Same looping-sound leak as OnKill: despawning while the burrow
-                    // rumble is active would otherwise leave it playing indefinitely.
                     if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? despawnSound))
                         despawnSound?.Stop();
 
@@ -842,19 +854,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     d.noGravity = true;
                 }
 
-                for (int i = 0; i < 2; i++)
+                if (!Main.dedServ)
                 {
-                    Vector2 spawnOffset = Main.rand.NextVector2Circular(NPC.width * 0.9f, NPC.height * 0.9f);
-                    Vector2 inwardVelocity = -spawnOffset * Main.rand.NextFloat(0.05f, 0.09f);
+                    for (int i = 0; i < 2; i++)
+                    {
+                        Vector2 spawnOffset = Main.rand.NextVector2Circular(NPC.width * 0.9f, NPC.height * 0.9f);
+                        Vector2 inwardVelocity = -spawnOffset * Main.rand.NextFloat(0.05f, 0.09f);
 
-                    BossParticleSystem.SandStreaks.Create(new ParticleInfo(
-                        position: (NPC.Center + spawnOffset).ToNumerics(),
-                        velocity: inwardVelocity.ToNumerics(),
-                        rotation: 0f,
-                        scale: new SystemVector2(26f, 5f),
-                        color: new Color(255, 210, 140, 0),
-                        duration: 20
-                    ));
+                        BossParticleSystem.SandStreaks.Create(new ParticleInfo(
+                            position: (NPC.Center + spawnOffset).ToNumerics(),
+                            velocity: inwardVelocity.ToNumerics(),
+                            rotation: 0f,
+                            scale: new SystemVector2(26f, 5f),
+                            color: new Color(255, 210, 140, 0),
+                            duration: 20
+                        ));
+                    }
                 }
 
                 if (TimerAt(18f))
@@ -1120,14 +1135,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     ScreenShake(5f, 8);
                     float actualGroundY = GetGroundY(NPC.Center);
 
-                    BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                        position: new Vector2(NPC.Center.X, actualGroundY).ToNumerics(),
-                        velocity: SystemVector2.Zero,
-                        rotation: 0f,
-                        scale: new SystemVector2(220f, 90f),
-                        color: new Color(235, 200, 140, 0),
-                        duration: 24
-                    ));
+                    if (!Main.dedServ)
+                    {
+                        BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                            position: new Vector2(NPC.Center.X, actualGroundY).ToNumerics(),
+                            velocity: SystemVector2.Zero,
+                            rotation: 0f,
+                            scale: new SystemVector2(220f, 90f),
+                            color: new Color(235, 200, 140, 0),
+                            duration: 24
+                        ));
+                    }
 
                     NPC.Center = new Vector2(
                         NPC.Center.X,
@@ -1248,8 +1266,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             // telegraph for the spit
             if (Timer <= 90f)
             {
-                Vector2 baseDir = target.Center - mouthPosition;
-                baseDir.Normalize();
+                Vector2 baseDir = SafeNormalize(target.Center - mouthPosition);
 
                 int shotCount = DifficultyValue(1, 3, 5);
                 float spread = DifficultyValue(0f, 0.18f, 0.22f);
@@ -1299,8 +1316,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             if (TimerAt(90f))
             {
                 Vector2 predictedPosition = target.Center + target.velocity * 4f;
-                Vector2 direction = predictedPosition - mouthPosition;
-                direction.Normalize();
+                Vector2 direction = SafeNormalize(predictedPosition - mouthPosition);
 
                 float aimInaccuracy = Main.rand.NextFloat(-0.05f, 0.05f);
                 direction = direction.RotatedBy(aimInaccuracy);
@@ -1407,47 +1423,52 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (TimerAt(56f))
                 {
-                    float direction = target.Center.X >= NPC.Center.X
-                        ? 1f
-                        : -1f;
+                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    {
+                        float direction = target.Center.X >= NPC.Center.X
+                            ? 1f
+                            : -1f;
 
-                    float launchX = target.Center.X - direction * 800f;
-                    launchX = MathHelper.Clamp(
-                        launchX,
-                        200f,
-                        Main.maxTilesX * 16f - 200f
-                    );
+                        float launchX = target.Center.X - direction * 800f;
+                        launchX = MathHelper.Clamp(
+                            launchX,
+                            200f,
+                            Main.maxTilesX * 16f - 200f
+                        );
 
-                    // Land BEHIND the player (hopefully)
-                    Phase2DiveLandingX =
-                        target.Center.X - direction * 180f;
+                        // Land BEHIND the player (hopefully)
+                        Phase2DiveLandingX =
+                            target.Center.X - direction * 180f;
 
-                    Phase2DiveLandingX = MathHelper.Clamp(
-                        Phase2DiveLandingX,
-                        200f,
-                        Main.maxTilesX * 16f - 200f
-                    );
-
-                    float launchGroundY = GetGroundY(
-                        new Vector2(launchX, target.Center.Y)
-                    );
-
-                    Phase2DiveGroundY = GetGroundY(
-                        new Vector2(
+                        Phase2DiveLandingX = MathHelper.Clamp(
                             Phase2DiveLandingX,
-                            target.Center.Y
-                        )
-                    );
+                            200f,
+                            Main.maxTilesX * 16f - 200f
+                        );
 
-                    NPC.Center = new Vector2(
-                        launchX,
-                        launchGroundY - NPC.height / 2f
-                    );
+                        float launchGroundY = GetGroundY(
+                            new Vector2(launchX, target.Center.Y)
+                        );
 
-                    NPC.direction = (int)direction;
-                    NPC.spriteDirection = NPC.direction;
+                        Phase2DiveGroundY = GetGroundY(
+                            new Vector2(
+                                Phase2DiveLandingX,
+                                target.Center.Y
+                            )
+                        );
 
-                    NPC.netUpdate = true;
+                        NPC.Center = new Vector2(
+                            launchX,
+                            launchGroundY - NPC.height / 2f
+                        );
+
+                        NPC.direction = (int)direction;
+                        NPC.spriteDirection = NPC.direction;
+
+                        NPC.netUpdate = true;
+
+                        SIPackets.SendAntlionDiveState(NPC, Phase2DiveLandingX, Phase2DiveGroundY);
+                    }
                 }
 
                 // telegraph for the jump
@@ -1753,28 +1774,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
 
             // One big expanding ring to sell the "power up" moment.
-            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                position: NPC.Center.ToNumerics(),
-                velocity: SystemVector2.Zero,
-                rotation: 0f,
-                scale: new SystemVector2(340f, 340f),
-                color: new Color(255, 130, 110, 0),
-                duration: 30
-            ));
-
-            // Embers thrown outward in every direction alongside the sand.
-            for (int i = 0; i < 24; i++)
+            if (!Main.dedServ)
             {
-                Vector2 emberVelocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(3f, 9f);
-
-                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                BossParticleSystem.Shockwaves.Create(new ParticleInfo(
                     position: NPC.Center.ToNumerics(),
-                    velocity: emberVelocity.ToNumerics(),
+                    velocity: SystemVector2.Zero,
                     rotation: 0f,
-                    scale: new SystemVector2(14f, 14f),
-                    color: new Color(255, 160, 90, 0),
-                    duration: Main.rand.Next(24, 36)
+                    scale: new SystemVector2(340f, 340f),
+                    color: new Color(255, 130, 110, 0),
+                    duration: 30
                 ));
+
+                // Embers thrown outward in every direction alongside the sand.
+                for (int i = 0; i < 24; i++)
+                {
+                    Vector2 emberVelocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(3f, 9f);
+
+                    BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                        position: NPC.Center.ToNumerics(),
+                        velocity: emberVelocity.ToNumerics(),
+                        rotation: 0f,
+                        scale: new SystemVector2(14f, 14f),
+                        color: new Color(255, 160, 90, 0),
+                        duration: Main.rand.Next(24, 36)
+                    ));
+                }
             }
         }
 
@@ -1881,14 +1905,34 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             {
                 Vector2 sparkVelocity = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(4f, 8f);
 
-                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                    position: NPC.Center.ToNumerics(),
-                    velocity: sparkVelocity.ToNumerics(),
-                    rotation: 0f,
-                    scale: new SystemVector2(10f, 10f),
-                    color: new Color(255, 225, 120, 0),
-                    duration: Main.rand.Next(18, 28)
-                ));
+                if (!Main.dedServ)
+                {
+                    BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                        position: NPC.Center.ToNumerics(),
+                        velocity: sparkVelocity.ToNumerics(),
+                        rotation: 0f,
+                        scale: new SystemVector2(10f, 10f),
+                        color: new Color(255, 225, 120, 0),
+                        duration: Main.rand.Next(18, 28)
+                    ));
+                }
+            }
+        }
+        public static void ReceiveDiveState(BinaryReader reader)
+        {
+            int npcIndex = reader.ReadInt32();
+            float landingX = reader.ReadSingle();
+            float groundY = reader.ReadSingle();
+
+            if (npcIndex < 0 || npcIndex >= Main.maxNPCs)
+                return;
+
+            NPC npc = Main.npc[npcIndex];
+
+            if (npc.active && npc.ModNPC is GreatAntlionCharger antlion)
+            {
+                antlion.Phase2DiveLandingX = landingX;
+                antlion.Phase2DiveGroundY = groundY;
             }
         }
 
