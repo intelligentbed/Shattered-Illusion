@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
+using ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
 using ShatteredIllusionKeybinds;
@@ -183,6 +184,9 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             if (NPCBehaviorOverrideLoader.TryGet(npc.type, out var container) &&
                 container.BehaviorOverride is IParryable overrideBoss)
             {
+                if (overrideBoss is KingSlimeOverride)
+                    return KingSlimeOverride.IsInStabParryWindow(npc);
+
                 return overrideBoss.IsParryable;
             }
 

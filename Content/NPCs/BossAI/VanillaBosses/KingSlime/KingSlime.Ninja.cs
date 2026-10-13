@@ -4,6 +4,7 @@ using ShatteredIllusion.Common.Players.ParrySystem;
 using ShatteredIllusion.Content.Particles;
 using ParticleLibrary.Core.V3.Particles;
 using ParticleLibrary.Utilities;
+using ReLogic.Content;
 using System;
 using Terraria;
 using Terraria.Audio;
@@ -16,6 +17,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 {
     public partial class KingSlimeOverride
     {
+        private static Asset<Texture2D>? ninjaWalkAsset;
+        private static Asset<Texture2D>? ninjaStabAsset;
+        private static Asset<Texture2D>? ninjaStunAsset;
+        private static Asset<Texture2D>? ninjaPopupAsset;
+
         private const int NinjaWalkFrameCount = 4;
         private const int NinjaWalkFrameDuration = 6;
 
@@ -110,7 +116,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             return closest;
         }
 
-        private static bool IsInStabParryWindow(NPC npc) =>
+        public static bool IsInStabParryWindow(NPC npc) =>
             CurrentPhase(npc) == AttackPhase.NinjaStab && CurrentStep(npc) == NinjaStabStrikeStep;
 
         private void DoNinjaWalk(NPC npc, Player target)
@@ -362,9 +368,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     return;
             }
 
-            Texture2D ninjaTexture = ModContent.Request<Texture2D>(
+            Texture2D ninjaTexture = (ninjaWalkAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaWalk"
-            ).Value;
+            )).Value;
 
             int frameCount = Math.Max(1, NinjaWalkFrameCount);
             int frameHeight = Math.Max(1, ninjaTexture.Height / frameCount);
@@ -398,9 +404,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private void DrawNinjaStab(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-            Texture2D stabTexture = ModContent.Request<Texture2D>(
+            Texture2D stabTexture = (ninjaStabAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaStab"
-            ).Value;
+            )).Value;
 
             int step = CurrentStep(npc);
             float timer = npc.ai[Slot_Timer];
@@ -440,9 +446,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private void DrawNinjaStunned(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-            Texture2D parryTexture = ModContent.Request<Texture2D>(
+            Texture2D parryTexture = (ninjaStunAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaStun"
-            ).Value;
+            )).Value;
 
             float timer = npc.ai[Slot_Timer];
 
@@ -478,9 +484,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private void DrawNinjaPopup(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-            Texture2D popupTexture = ModContent.Request<Texture2D>(
+            Texture2D popupTexture = (ninjaPopupAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaPopup"
-            ).Value;
+            )).Value;
 
             float timer = npc.ai[Slot_Timer];
             int stageIndex = (int)MathHelper.Clamp(timer / NinjaPopupFrameDuration, 0f, NinjaPopupFrameCount - 1);

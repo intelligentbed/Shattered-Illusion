@@ -13,14 +13,18 @@ namespace ShatteredIllusion.Assets.MainMenu
     {
         public override string DisplayName => "Shattered Illusion";
 
+        private static Asset<Texture2D>? logoAsset;
+        private static Asset<Texture2D>? blankPixelAsset;
+        private static Asset<Texture2D>? backgroundAsset;
+
         public override Asset<Texture2D> Logo =>
-        ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Logo");
+            logoAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Logo");
 
         public override Asset<Texture2D> SunTexture =>
-            ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/BlankPixel");
+            blankPixelAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/BlankPixel");
 
         public override Asset<Texture2D> MoonTexture =>
-            ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/BlankPixel");
+            blankPixelAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/BlankPixel");
 
         public override int Music => MusicID.Title;
 
@@ -103,7 +107,7 @@ namespace ShatteredIllusion.Assets.MainMenu
 
         private static void DrawBackdrop(SpriteBatch spriteBatch)
         {
-            Texture2D background = ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Background").Value;
+            Texture2D background = (backgroundAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Background")).Value;
 
             float widthRatio = (float)Main.screenWidth / background.Width;
             float heightRatio = (float)Main.screenHeight / background.Height;
