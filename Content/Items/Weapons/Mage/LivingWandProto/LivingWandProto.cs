@@ -20,7 +20,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage.LivingWandProto
             Item.value = 10466;
             Item.rare = ItemRarityID.White;
             Item.UseSound = SoundID.Item5;
-            Item.shoot = ModContent.ProjectileType<LivingWandProjectile>();
+            Item.shoot = ModContent.ProjectileType<LivingWandProtoProjectile>();
             Item.shootSpeed = 15f;
             Item.mana = 2;
             Item.damage = 4;
@@ -36,7 +36,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage.LivingWandProto
         }
     }
 
-    public class LivingWandProjectile : ModProjectile
+    public class LivingWandProtoProjectile : ModProjectile
     {
         public override void SetDefaults()
         {
