@@ -1,0 +1,59 @@
+name: Build
+
+# Compiles the mod against the latest stable tModLoader on every push to main
+# and every pull request. It only checks that the C# compiles; it does not
+# package the .tmod or run the game.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile mod
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # The .csproj imports ..\tModLoader.targets, so the mod has to sit one
+      # folder below the place that file is written to.
+      - name: Check out mod
+        uses: actions/checkout@v4
+        with:
+          path: ModSources/ShatteredIllusion
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download latest stable tModLoader
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo tModLoader/tModLoader --pattern tModLoader.zip --dir "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP/tModLoader.zip" -d "$GITHUB_WORKSPACE/tModLoader"
+
+      # Same file tModLoader creates in ModSources on a dev machine. The empty
+      # BuildMod target skips the step that launches tModLoader to package the
+      # .tmod, which needs the game's native libraries.
+      - name: Point the mod at tModLoader
+        run: |
+          cat > ModSources/tModLoader.targets <<EOF
+          <Project>
+            <Import Project="$GITHUB_WORKSPACE/tModLoader/tMLMod.targets" />
+            <Target Name="BuildMod" />
+          </Project>
+          EOF
+
+      - name: Compile
+        run: dotnet build ModSources/ShatteredIllusion/ShatteredIllusion.csproj
