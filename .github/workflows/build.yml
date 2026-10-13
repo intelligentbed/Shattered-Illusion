@@ -31,6 +31,12 @@ jobs:
         with:
           path: ModSources/ShatteredIllusion
 
+      # build.txt, the .csproj and the Lib folder have to agree on which mods
+      # this one depends on. Nothing else checks that.
+      - name: Check dependency declarations
+        working-directory: ModSources/ShatteredIllusion
+        run: python3 .github/scripts/check-dependencies.py
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
