@@ -16,7 +16,6 @@ namespace ShatteredIllusion.World.WorldGeneration
         private const string CustomPassName = "Shattered Illusion: Populate Desert Chests";
 
         private const float DuneCarapaceChestChance = 0.30f;
-        private const int ChestFrameWidth = 36;
         private const int BiomeCheckRadius = 40; 
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)
@@ -37,34 +36,22 @@ namespace ShatteredIllusion.World.WorldGeneration
         {
             progress.Message = "Burying secrets in the sand...";
 
-            int chestsScanned = 0;
-            int undergroundChests = 0;
-            int desertChests = 0;
-            int itemsPlaced = 0;
-
             for (int i = 0; i < Main.maxChests; i++)
             {
                 Chest chest = Main.chest[i];
                 if (chest == null)
                     continue;
 
-                chestsScanned++;
-
                 if (!IsUnderground(chest.y))
                     continue;
-
-                undergroundChests++;
 
                 if (!IsInDesertBiome(chest.x, chest.y))
                     continue;
 
-                desertChests++;
-
                 if (!WorldGen.genRand.NextBool((int)Math.Round(1f / DuneCarapaceChestChance)))
                     continue;
 
-                if (TryAddItemToChestFirstSlot(chest, ModContent.ItemType<DuneCarapace>(), stack: 1))
-                    itemsPlaced++;
+                TryAddItemToChestFirstSlot(chest, ModContent.ItemType<DuneCarapace>(), stack: 1);
             }
         }
 

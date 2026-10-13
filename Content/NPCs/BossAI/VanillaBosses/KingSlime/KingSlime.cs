@@ -6,6 +6,7 @@ using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Content.Particles;
 using ParticleLibrary.Core.V3.Particles;
 using ParticleLibrary.Utilities;
+using ReLogic.Content;
 using System;
 using System.IO;
 using Terraria;
@@ -86,6 +87,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const int MinionReturnDelayMin = 360;
         private const int MinionReturnDelayMax = 420;
 
+        private static readonly float[] SplitTelegraphSigns = { -1f, 1f };
+
+        private static Asset<Texture2D>? kingSlimeAsset;
+        private static Asset<Texture2D>? crownAsset;
+
         private static bool IsAuthority =>
             Main.netMode != NetmodeID.MultiplayerClient;
 
@@ -131,6 +137,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private static int CountActiveMinions(NPC npc)
         {
+            KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
+            if (data.ActiveMinionCountTick == Main.GameUpdateCount)
+                return data.ActiveMinionCount;
+
             int minionType = ModContent.NPCType<KingSlimeMinion>();
             int count = 0;
 
@@ -146,6 +157,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
             }
 
+            data.ActiveMinionCount = count;
+            data.ActiveMinionCountTick = Main.GameUpdateCount;
             return count;
         }
 
@@ -162,6 +175,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private static void RecallAllMinions(NPC npc)
         {
+            npc.GetGlobalNPC<KingSlimeInstanceData>().ActiveMinionCountTick = uint.MaxValue;
+
             int minionType = ModContent.NPCType<KingSlimeMinion>();
 
             for (int i = 0; i < Main.maxNPCs; i++)
@@ -173,6 +188,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     (int)other.ai[KingSlimeMinion.Slot_Owner] == npc.whoAmI)
                 {
                     other.active = false;
+
+                    if (Main.netMode == NetmodeID.Server)
+                        NetMessage.SendData(MessageID.SyncNPC, number: other.whoAmI);
                 }
             }
         }
@@ -231,6 +249,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             Player target = Main.player[npc.target];
 
             KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
+            if (CurrentPhase(npc) != AttackPhase.SplitAttack)
+                data.SplitRoarPlayed = false;
 
             // Cache the vanilla King Slime hitbox once so it can be restored if he
             // reverts from ninja form back to slime form (e.g. despawning mid-fight).
@@ -912,7 +933,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
 
                 // roar right as the windup starts 
+                KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
+                if (!data.SplitRoarPlayed)
                 {
+                    data.SplitRoarPlayed = true;
+
                     SoundEngine.PlaySound(
                         SoundID.Roar with { Pitch = -0.3f, Volume = 1.1f },
                         npc.Center
@@ -964,7 +990,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
                     if (timer % 3f == 0f)
                     {
-                        foreach (float sign in new float[] { -1f, 1f })
+                        foreach (float sign in SplitTelegraphSigns)
                         {
                             for (int i = 0; i < segmentsPerArm; i++)
                             {
@@ -1158,6 +1184,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private void SpawnMassMinions(NPC npc)
         {
+            npc.GetGlobalNPC<KingSlimeInstanceData>().ActiveMinionCountTick = uint.MaxValue;
+
             int minionCount = Main.masterMode ? 3 : (Main.expertMode ? 2 : 1);
 
             for (int i = 0; i < minionCount; i++)
@@ -1217,9 +1245,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     Vector2 screenPos,
                     Color drawColor)
         {
-            Texture2D kingSlimeTexture = ModContent.Request<Texture2D>(
+            Texture2D kingSlimeTexture = (kingSlimeAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Assets/ExtraTextures/Resprites/NPC_50"
-            ).Value;
+            )).Value;
 
             var frameCount = Main.npcFrameCount[npc.type];
             var frameVertical = npc.frame.Y / npc.frame.Height;
@@ -1278,9 +1306,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             bodyDraw.Draw(spriteBatch);
 
-            Texture2D crownTexture = ModContent.Request<Texture2D>(
+            Texture2D crownTexture = (crownAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Assets/ExtraTextures/Resprites/Extra_39"
-            ).Value;
+            )).Value;
 
             var center = npc.Bottom;
             center.Y -= frame.Height * jellyScale.Y;

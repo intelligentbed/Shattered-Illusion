@@ -64,6 +64,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             {
                 bullet.Start = position;
                 bullet.Target = target;
+                proj.netUpdate = true;
             }
         }
     }

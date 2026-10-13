@@ -52,8 +52,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
             }
         }
 
-        [System.Obsolete]
-        public override void Kill(int timeLeft)
+        public override void OnKill(int timeLeft)
         {
             SoundEngine.PlaySound(SoundID.NPCHit1, Projectile.Center);
 

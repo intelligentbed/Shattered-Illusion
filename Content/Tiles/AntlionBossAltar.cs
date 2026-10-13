@@ -116,12 +116,15 @@ namespace ShatteredIllusion.Content.Tiles
 
     public class AntlionAltar : ModItem
     {
-        public override void SetDefaults()
+        public override void SetStaticDefaults()
         {
             Main.RegisterItemAnimation(Item.type, new DrawAnimationVertical(6, 4));
 
             ItemID.Sets.AnimatesAsSoul[Item.type] = true;
+        }
 
+        public override void SetDefaults()
+        {
             Item.width = 32;
             Item.height = 32;
             Item.maxStack = 1;

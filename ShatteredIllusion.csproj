@@ -11,11 +11,11 @@
 		  <HintPath>Lib\ParticleLibrary.dll</HintPath>
 		</Reference>
 		<Reference Include="ShatteredMusiMod">
-			<HintPath>lib\ShatteredMusiMod.dll</HintPath>
+			<HintPath>Lib\ShatteredMusiMod.dll</HintPath>
 		</Reference>
 
 		<Reference Include="StructureHelper">
-			<HintPath>lib\StructureHelper.dll</HintPath>
+			<HintPath>Lib\StructureHelper.dll</HintPath>
 		</Reference>
 	</ItemGroup>
 

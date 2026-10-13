@@ -151,6 +151,11 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
         private int _leftPageIndex = CoverPageIndex;
         private bool _isTurningForward;
 
+        private static readonly Dictionary<string, string[]> WrappedPageCache = new Dictionary<string, string[]>();
+        private static string[]? _tocLabels;
+        private int _cachedPageNumbersIndex = -1;
+        private string _cachedPageNumbers = string.Empty;
+
         private readonly List<Rectangle> _tocEntryBounds = new List<Rectangle>();
 
         public JournalPanel()
@@ -315,7 +320,13 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
                 DrawPage(spriteBatch, Pages[_leftPageIndex], dimensions.X + 28f * Scale, dimensions.Y + 52f * Scale);
                 DrawPage(spriteBatch, Pages[_leftPageIndex + 1], dimensions.X + 253f * Scale, dimensions.Y + 52f * Scale);
 
-                string pageNumbers = $"{_leftPageIndex + 1} - {_leftPageIndex + 2} / {Pages.Length}";
+                if (_cachedPageNumbersIndex != _leftPageIndex)
+                {
+                    _cachedPageNumbers = $"{_leftPageIndex + 1} - {_leftPageIndex + 2} / {Pages.Length}";
+                    _cachedPageNumbersIndex = _leftPageIndex;
+                }
+
+                string pageNumbers = _cachedPageNumbers;
                 Utils.DrawBorderString(
                     spriteBatch,
                     pageNumbers,
@@ -365,9 +376,16 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             _tocEntryBounds.Clear();
             float entryY = topY + 40f * Scale;
 
+            if (_tocLabels == null)
+            {
+                _tocLabels = new string[TableOfContents.Length];
+                for (int i = 0; i < TableOfContents.Length; i++)
+                    _tocLabels[i] = $"- {TableOfContents[i].Label}";
+            }
+
             for (int i = 0; i < TableOfContents.Length; i++)
             {
-                string label = $"- {TableOfContents[i].Label}";
+                string label = _tocLabels[i];
                 Utils.DrawBorderString(spriteBatch, label, new Vector2(rightX, entryY), PageTextColor, PageTextScale);
 
                 var bounds = new Rectangle((int)rightX, (int)entryY, (int)(180f * Scale), (int)PageLineHeight);
@@ -379,7 +397,12 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
         private static void DrawPage(SpriteBatch spriteBatch, string pageText, float x, float y)
         {
-            string[] lines = WrapText(pageText).ToArray();
+            if (!WrappedPageCache.TryGetValue(pageText, out string[]? lines))
+            {
+                lines = WrapText(pageText).ToArray();
+                WrappedPageCache[pageText] = lines;
+            }
+
             for (int i = 0; i < lines.Length; i++)
             {
                 Utils.DrawBorderString(

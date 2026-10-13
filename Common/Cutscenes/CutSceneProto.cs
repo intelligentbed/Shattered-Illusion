@@ -442,7 +442,8 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
             AudioDuration = 0;
             AudioTriggered = false;
 
-            SetGlobalGameZoomTarget(savedPlayerZoom);
+            if (Player.whoAmI == Main.myPlayer)
+                SetGlobalGameZoomTarget(savedPlayerZoom);
         }
 
         public void ResetCutscene()
@@ -553,6 +554,11 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
     {
         public override bool InstancePerEntity => true;
 
+        public override bool AppliesToEntity(NPC entity, bool lateInstantiation)
+        {
+            return IsRegisteredBoss(entity.type);
+        }
+
         private int cutsceneTimer;
         private bool cutsceneWasActive;
 
@@ -612,6 +618,9 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
             if (Main.netMode == NetmodeID.Server)
             {
+                // Clients drop the cutscene packet if they haven't been told about the NPC yet.
+                NetMessage.SendData(MessageID.SyncNPC, number: npc.whoAmI);
+
                 const float maxDistance = 3000f;
                 float maxDistanceSquared = maxDistance * maxDistance;
 

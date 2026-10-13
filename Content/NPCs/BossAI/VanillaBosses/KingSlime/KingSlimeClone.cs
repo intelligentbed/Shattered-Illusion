@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ReLogic.Content;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -9,6 +10,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 {
     public class KingSlimeClone : ModNPC
     {
+        private static Asset<Texture2D>? cloneAsset;
+
         public override void SetStaticDefaults()
         {
             Main.npcFrameCount[NPC.type] = Main.npcFrameCount[NPCID.KingSlime];
@@ -37,6 +40,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             if (parentIndex < 0 || parentIndex >= Main.maxNPCs || !Main.npc[parentIndex].active || Main.npc[parentIndex].type != NPCID.KingSlime)
             {
                 NPC.active = false;
+
                 return;
             }
 
@@ -83,6 +87,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             else
             {
                 NPC.active = false;
+
                 return;
             }
 
@@ -100,7 +105,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
 
-            Texture2D texture = ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/KingSlimeClone").Value;
+            Texture2D texture = (cloneAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/KingSlimeClone")).Value;
 
             Rectangle sourceRectangle = new Rectangle(0, 0, texture.Width, texture.Height);
             Vector2 drawOrigin = new Vector2(texture.Width / 2f, texture.Height / 2f);

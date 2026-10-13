@@ -33,11 +33,6 @@ Items: {
 		DisplayName: Moss
 	}
 
-	MossTileItem: {
-		Tooltip: ""
-		DisplayName: Moss
-	}
-
 	FrostLeggings: {
 		DisplayName: Tundra Leggings
 		Tooltip: Increases Ranged damage by 1%
@@ -107,11 +102,6 @@ Items: {
 		DisplayName: Antlion Trophy Item
 	}
 
-	AntlionRelicItem: {
-		Tooltip: ""
-		DisplayName: Antlion Relic Item
-	}
-
 	AntlionRelic: {
 		Tooltip: ""
 		DisplayName: Antlion Relic
@@ -157,16 +147,6 @@ Items: {
 		DisplayName: Special Iron Bricks
 	}
 
-	RustyKeys: {
-		DisplayName: Rusty Keys
-		Tooltip: ""
-	}
-
-	Rustylocker: {
-		DisplayName: Rusty Locker
-		Tooltip: "[DEBUG] YOU AREN'T SUPPOSED TO SEE THIS"
-	}
-
 	MossChestplate: {
 		DisplayName: Moss Chestplate
 		Tooltip: ""
@@ -193,11 +173,6 @@ Items: {
 	MandibleShooter: {
 		Tooltip: Fires two shots that arc together and converge on your cursor
 		DisplayName: Mandible Shooter
-	}
-
-	DeleteThisLater: {
-		Tooltip: ""
-		DisplayName: Delete This Later
 	}
 
 	StarryNight: {
@@ -245,7 +220,6 @@ Buffs: {
 
 Tiles: {
 	MossBlock.MapEntry: Moss Block
-	MossTile.MapEntry: Moss Tile
 	AntlionBossAltar.MapEntry: Antlion Boss Altar
 	SpecialIronBricks.MapEntry: Special Iron Bricks
 	AshenSand.MapEntry: Ashen Sand
@@ -256,33 +230,25 @@ Tiles: {
 Projectiles: {
 	JadeSprout.DisplayName: Jade Sprout
 	LivingWandProjectile.DisplayName: Living Wand Projectile
-	ParryVisual.DisplayName: Parry Visual
 	FallingRubble.DisplayName: Falling Rubble
 	SandBall.DisplayName: Sand Ball
-	SlimyShockwave.DisplayName: Slimy Shockwave
 	LivingWoodGreatClubProjectile.DisplayName: Living Wood Great Club Projectile
 	LivingWoodRubble.DisplayName: Living Wood Rubble
 	LivingWoodGreatClubHoldout.DisplayName: Living Wood Great Club Holdout
 	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 	StarryProjectile.DisplayName: Starry Projectile
-	JournalMeteor.DisplayName: Journal Meteor
 }
 
 Keybinds: {
 	Parry.DisplayName: Parry
-	"Use Resolve Meter.DisplayName": Use Resolve Meter
-	"Resolve Meter.DisplayName": Resolve Meter
 	"Sturdiness Meter.DisplayName": Sturdiness Meter
 	"Toggle Journal.DisplayName": Toggle  Journal
 }
 
 NPCs: {
 	GreatAntlionCharger.DisplayName: Great Antlion Charger
-	KingSlimeNinja.DisplayName: King Slime Ninja
-	Ninja.DisplayName: Ninja
 	KingSlimeClone.DisplayName: King Slime Clone
-	KingSlimeChunk.DisplayName: King Slime Chunk
 	KingSlimeMinion.DisplayName: King Slime Minion
 }
 
@@ -291,25 +257,8 @@ Configs: {
 		DisplayName: Shattered Illusion Config
 
 		Headers: {
-			ParryBar: Parry Bar Header
-			ResolveBar: Resolve Bar Header
 			SturdinessBar: Sturdiness Bar Header
 			Client: Client
-		}
-
-		ParryBarLocked: {
-			Label: Lock Parry Bar Position
-			Tooltip: When enabled, the parry bar stays fixed in place. Disable to drag it anywhere on screen.
-		}
-
-		ParryBarPosX: {
-			Label: Parry Bar Pos X
-			Tooltip: ""
-		}
-
-		ParryBarPosY: {
-			Label: Parry Bar Pos Y
-			Tooltip: ""
 		}
 
 		SturdinessBarLocked: {
@@ -330,11 +279,6 @@ Configs: {
 		MenuButtonPosition: {
 			Tooltip: Which side of the screen the main menu buttons (Single Player, Multiplayer, etc.) are drawn on.
 			Label: Menu Button Side
-		}
-
-		EnableMenuParticles: {
-			Label: Menu Ember Particles
-			Tooltip: Ambient floating embers on the main menu. Disable for a small performance saving on very low-end systems.
 		}
 	}
 
