@@ -124,13 +124,15 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             player.itemTime = 2;
             player.itemAnimation = 2;
 
-            if (Projectile.ai[1] == 0)
+            if (Projectile.ai[1] == 0 && Projectile.owner == Main.myPlayer)
             {
                 int initialDir = Main.MouseWorld.X >= player.Center.X ? 1 : -1;
                 Projectile.ai[1] = initialDir;
+                Projectile.netUpdate = true;
             }
 
-            int direction = (int)Projectile.ai[1];
+            // Non-owners wait for the synced direction and use the player's facing until it arrives
+            int direction = Projectile.ai[1] != 0 ? (int)Projectile.ai[1] : player.direction;
             player.ChangeDir(direction);
 
             var phase = (Phase)Projectile.localAI[0];

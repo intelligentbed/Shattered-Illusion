@@ -143,16 +143,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                     // A brighter spark to go with the dust flare - flies up and out
                     // instead of just sitting there, sells "danger" more than dust alone.
-                    Vector2 sparkVelocity = new Vector2(Main.rand.NextFloat(-1.5f, 1.5f), Main.rand.NextFloat(-3f, -1f));
+                    if (!Main.dedServ)
+                    {
+                        Vector2 sparkVelocity = new Vector2(Main.rand.NextFloat(-1.5f, 1.5f), Main.rand.NextFloat(-3f, -1f));
 
-                    BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                        position: pos.ToNumerics(),
-                        velocity: sparkVelocity.ToNumerics(),
-                        rotation: 0f,
-                        scale: new SystemVector2(8f, 8f),
-                        color: new Color(255, 110, 70, 0),
-                        duration: Main.rand.Next(14, 22)
-                    ));
+                        BossParticleSystem.EmberBursts.Create(new ParticleInfo(
+                            position: pos.ToNumerics(),
+                            velocity: sparkVelocity.ToNumerics(),
+                            rotation: 0f,
+                            scale: new SystemVector2(8f, 8f),
+                            color: new Color(255, 110, 70, 0),
+                            duration: Main.rand.Next(14, 22)
+                        ));
+                    }
                 }
             }
 
@@ -161,7 +164,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             // and brighter as impact gets closer.
             int segmentCount = (int)MathHelper.Lerp(1f, 3f, progress);
 
-            for (int i = 0; i < segmentCount; i++)
+            for (int i = 0; i < segmentCount && !Main.dedServ; i++)
             {
                 float t = Main.rand.NextFloat();
                 Vector2 segmentPos = new Vector2(Projectile.Center.X, startY + t * totalLength);
@@ -181,7 +184,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             int elapsedTicks = 600 - (int)Projectile.timeLeft;
             int pulseInterval = (int)MathHelper.Lerp(14f, 5f, progress);
 
-            if (elapsedTicks % Math.Max(1, pulseInterval) == 0)
+            if (!Main.dedServ && elapsedTicks % Math.Max(1, pulseInterval) == 0)
             {
                 BossParticleSystem.Shockwaves.Create(new ParticleInfo(
                     position: new Vector2(Projectile.Center.X, CachedEndY).ToNumerics(),

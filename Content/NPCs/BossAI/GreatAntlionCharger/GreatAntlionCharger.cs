@@ -54,6 +54,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private const float SpriteVisualScale = 0.8f;
 
         private SlotId rumbleSoundSlot;
+        private bool launchRoarPlayed;
         private float Phase2DiveLandingX;
         private float Phase2DiveGroundY;
         private float Phase2DiveLaunchX;
@@ -160,6 +161,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         };
 
 
+        public override void SetStaticDefaults()
+        {
+            Main.npcFrameCount[Type] = MainFrameCount;
+            NPCID.Sets.MPAllowedEnemies[Type] = true;
+        }
+
         public override void SetDefaults()
         {
             NPC.width = 160;
@@ -177,7 +184,6 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             NPC.aiStyle = -1;
             NPC.noGravity = false;
             NPC.noTileCollide = false;
-            Main.npcFrameCount[NPC.type] = MainFrameCount;
 
             if (ModLoader.TryGetMod("ShatteredMusiMod", out Mod musicMod))
             {
@@ -622,7 +628,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             int startTileX = (int)(checkPosition.X / 16f);
             int startTileY = (int)(checkPosition.Y / 16f);
 
-            for (int y = startTileY; y < startTileY + 120; y++)
+            if (startTileX < 0 || startTileX >= Main.maxTilesX)
+                return checkPosition.Y;
+
+            int endTileY = Math.Min(startTileY + 120, Main.maxTilesY);
+
+            for (int y = Math.Max(startTileY, 0); y < endTileY; y++)
             {
                 Tile tile = Main.tile[startTileX, y];
 
@@ -654,6 +665,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override void AI()
         {
+            if (CurrentState != AttackPhase.Launch)
+                launchRoarPlayed = false;
 
             // Despawn check
             if (!AnyPlayerPresentNearby())
@@ -809,9 +822,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            if (Timer <= 8f)
+            if (!launchRoarPlayed && Timer <= 8f)
             {
                 SoundEngine.PlaySound(Roar1);
+                launchRoarPlayed = true;
             }
 
             // Don't let this idiot launch himself into the depths of Terraria

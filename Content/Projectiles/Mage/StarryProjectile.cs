@@ -122,6 +122,9 @@ namespace ShatteredIllusion.Content.Projectiles.Mage
         {
             SoundEngine.PlaySound(SoundID.Item29, Projectile.position);
 
+            if (Projectile.owner != Main.myPlayer)
+                return;
+
             for (int i = 0; i < MiniStarCount; i++)
             {
                 float angle = MathHelper.ToRadians(-90) + MathHelper.ToRadians(Main.rand.NextFloat(-60f, 60f));

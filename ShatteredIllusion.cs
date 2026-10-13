@@ -96,6 +96,11 @@ namespace ShatteredIllusion
                     }
                     break;
 
+                case MessageType.SyncAntlionDiveState:
+                    if (Main.netMode == NetmodeID.MultiplayerClient)
+                        Content.NPCs.BossAI.GreatAntlionCharger.GreatAntlionCharger.ReceiveDiveState(reader);
+                    break;
+
                 default:
                     Logger.Warn($"Ignoring unknown packet type {(byte)messageType} from player {whoAmI}.");
                     break;

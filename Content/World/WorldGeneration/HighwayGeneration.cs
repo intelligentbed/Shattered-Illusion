@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.GameContent.Generation;
@@ -258,6 +259,24 @@ namespace ShatteredIllusion.World.WorldGeneration
         public override void ClearWorld()
         {
             HighwayArea = Rectangle.Empty;
+        }
+
+        public override void NetSend(BinaryWriter writer)
+        {
+            writer.Write(HighwayArea.X);
+            writer.Write(HighwayArea.Y);
+            writer.Write(HighwayArea.Width);
+            writer.Write(HighwayArea.Height);
+        }
+
+        public override void NetReceive(BinaryReader reader)
+        {
+            int x = reader.ReadInt32();
+            int y = reader.ReadInt32();
+            int width = reader.ReadInt32();
+            int height = reader.ReadInt32();
+
+            HighwayArea = new Rectangle(x, y, width, height);
         }
     }
 
