@@ -10,10 +10,6 @@
 		<Reference Include="ParticleLibrary">
 		  <HintPath>Lib\ParticleLibrary.dll</HintPath>
 		</Reference>
-		<Reference Include="ShatteredMusiMod">
-			<HintPath>Lib\ShatteredMusiMod.dll</HintPath>
-		</Reference>
-
 		<Reference Include="StructureHelper">
 			<HintPath>Lib\StructureHelper.dll</HintPath>
 		</Reference>
