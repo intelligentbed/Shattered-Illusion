@@ -28,17 +28,14 @@ namespace ShatteredIllusion.Content.Biomes
         /// </summary>
         protected abstract int[] GetBiomeTiles();
 
-        /// <summary>
-        /// How many of this biome's blocks must be near the player for HasEnoughTiles to be true.
-        /// "Near" is the area the game scans around the player's screen each scene update.
-        /// For scale, vanilla needs about 300 blocks for Corruption and 1500 sand for the Desert.
-        /// </summary>
+        // Defines how many of this biome's blocks must be near the player for HasEnoughTiles to be true.
+        // "Near" is the area the game scans around the player's screen each scene update.
         public virtual int MinimumTileCount => 300;
 
-        /// <summary>How many of this biome's blocks were found near the local player in the last scan.</summary>
+        // How many of this biome's blocks were found near the local player in the last scan
         public int TileCount => BiomeRegistry.GetTileCount(this);
 
-        /// <summary>True when TileCount has reached MinimumTileCount.</summary>
+        // True when TileCount has reached MinimumTileCount
         public bool HasEnoughTiles => TileCount >= MinimumTileCount;
 
         // Lets BiomeRegistry call the protected GetBiomeTiles.
