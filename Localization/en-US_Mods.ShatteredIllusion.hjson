@@ -304,6 +304,11 @@ Biomes: {
 		TownNPCDialogueName: the Ashen Shore Biome
 		DisplayName: Ashen Shore Biome
 	}
+
+	AshenCoreBiome: {
+		TownNPCDialogueName: the Ashen Core
+		DisplayName: Ashen Core
+	}
 }
 
 Cutscenes: {
