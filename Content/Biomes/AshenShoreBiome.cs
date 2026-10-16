@@ -17,8 +17,9 @@ namespace ShatteredIllusion.Content.Biomes
     ///   x = 0 (world edge)                        x = AreaWidth (~700)
     ///   |  sea, beach, geothermal plants          |   y = 0 .. AreaBottom    -> Ashen Shore
     ///   |-----------------------------------------|   y = AreaBottom
-    ///   |  caves, ruins, volcano arena            |   AreaBottom .. Underworld -> Ashen Core
-    ///   |-----------------------------------------|   y = Main.UnderworldLayer
+    ///   |  caves, ruins, volcano arena            |   AreaBottom .. bottom     -> Ashen Core
+    ///   |  (replaces hell in these columns too)   |
+    ///   |-----------------------------------------|   y = Main.maxTilesY (bottom of the world)
     /// </summary>
     public class AshenShoreBiome : ShatteredBiome
     {
