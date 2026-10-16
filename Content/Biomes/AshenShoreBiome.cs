@@ -13,22 +13,13 @@ namespace ShatteredIllusion.Content.Biomes
     ///
     /// The shore is only the surface sea. The deep part underneath is a separate biome, the Ashen Core
     /// (see AshenCoreBiome). Rough layout, in tile coordinates (x grows to the right, y grows DOWN):
-    ///
-    ///   x = 0 (world edge)                        x = AreaWidth (~700)
-    ///   |  sea, beach, geothermal plants          |   y = 0 .. AreaBottom    -> Ashen Shore
-    ///   |-----------------------------------------|   y = AreaBottom
-    ///   |  caves, ruins, volcano arena            |   AreaBottom .. bottom     -> Ashen Core
-    ///   |  (replaces hell in these columns too)   |
-    ///   |-----------------------------------------|   y = Main.maxTilesY (bottom of the world)
     /// </summary>
     public class AshenShoreBiome : ShatteredBiome
     {
-        // BiomeHigh so the shore's music and visuals beat vanilla's Ocean, which also covers this area.
+        //the shore's music and visuals beat vanilla's Ocean as one does
         public override SceneEffectPriority Priority => SceneEffectPriority.BiomeHigh;
 
         // Blocks that count toward the shore: Ashen Sand (beach) and Ashen Dirt (seafloor).
-        // Volcanic Stone is left out on purpose. The generator uses it for the deep fill under the
-        // seafloor, which is Ashen Core territory, so counting it would make the shore turn on down there.
         protected override int[] GetBiomeTiles()
         {
             return
@@ -38,10 +29,7 @@ namespace ShatteredIllusion.Content.Biomes
             ];
         }
 
-        // Two ways to be in the shore, same as Calamity's Sulphurous Sea:
-        //  - 300+ Ashen Sand/Dirt nearby (MinimumTileCount). This also covers player-placed blocks elsewhere.
-        //  - Standing anywhere in the shore's area, even with no blocks in view (e.g. swimming in open
-        //    water far above the seafloor).
+        // to be in the shore you eithr have to be in the shore's area or place 300+ ashen dirt/sand
         // Either way, the shore is never active inside the Ashen Core, so the two never overlap.
         public override bool IsBiomeActive(Player player)
         {
@@ -59,8 +47,7 @@ namespace ShatteredIllusion.Content.Biomes
         /// <summary>
         /// Depth (tile y) where the shore ends and the Ashen Core begins.
         /// Main.rockLayer is where the cavern layer starts; maxTilesY / 13 moves the line up a bit so
-        /// the shore stops a little above the caverns. This is the same line Calamity uses for the
-        /// bottom of the Sulphurous Sea, and scales with world size.
+        /// the shore stops a little above the caverns (scales with world size)
         /// </summary>
         public static int AreaBottom => (int)(Main.rockLayer - Main.maxTilesY / 13);
 
