@@ -5,21 +5,15 @@ using Terraria.ModLoader;
 namespace ShatteredIllusion.Content.Biomes
 {
     /// <summary>
-    /// The Ashen Core: the abyss under the Ashen Shore (like Calamity's Abyss under the Sulphurous Sea).
-    /// Planned layout: caves with ruins of the geothermal plants, then a big volcano arena at the bottom.
-    /// It runs all the way to the bottom of the world, replacing the underworld (hell) in its columns.
-    ///
-    /// Detection only for now. Nothing generates the Core yet and it has no blocks of its own, so it is
-    /// detected purely by position. See AshenShoreBiome for a diagram of how the two areas stack.
+    /// lwk just a pplanning right nowe sicne we havne tstarted on the biome yet sooo yeah 
     /// </summary>
     public class AshenCoreBiome : ShatteredBiome
     {
-        // BiomeHigh, same as the shore, so it beats vanilla underground, cavern and underworld biomes here.
+        //the biome takes over the the vanillia biomes so there isnt over lap
         public override SceneEffectPriority Priority => SceneEffectPriority.BiomeHigh;
 
-        // No Core blocks yet. When the Core gets its own tiles, list them here and add HasEnoughTiles
-        // to IsBiomeActive. Volcanic Stone isn't used because the generator also places it near the
-        // shore's surface (the lava fringe), which would make the Core turn on up there.
+        //ADD BLOCKS HERE (when we get some) AND ADD HasEnoughTiles to the
+        // IsBiomeActive. 
         protected override int[] GetBiomeTiles() => [];
 
         public override bool IsBiomeActive(Player player) => IsInCoreArea(player.Center.ToTileCoordinates());
