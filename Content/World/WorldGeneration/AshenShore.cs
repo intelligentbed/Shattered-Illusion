@@ -1,10 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 using Terraria.IO;
 using Terraria.ModLoader;
+<<<<<<< Updated upstream
+=======
+using Terraria.ModLoader.IO;
+using Terraria.ObjectData;
+>>>>>>> Stashed changes
 using Terraria.WorldBuilding;
 using ShatteredIllusion.Content.Tiles.BoilingOcean;
 
@@ -135,6 +141,18 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
         #endregion
 
+        #region Saved result of generation
+
+        /// <summary>
+        /// Depth (tile y) where the generated shore actually ends, i.e. the deepest seafloor plus the dirt
+        /// layer under it (where the terrain turns to Volcanic Stone). 0 means "unknown" (world made before
+        /// this existed, or generation was skipped). Saved with the world by AshenShoreWorldGen, and used by
+        /// AshenShoreBiome.AreaBottom so the biome area matches the terrain that was really generated.
+        /// </summary>
+        public static int GeneratedShoreBottomY;
+
+        #endregion
+
         #region Per-generation state (reset every time Setup() runs)
 
         private static int _worldSeed;
@@ -221,6 +239,15 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             _shoreWidth = WorldGen.genRand.Next(ShoreWidthMin, ShoreWidthMax + 1);
             _width = Math.Min(BiomeWidth, Main.maxTilesX - 5);
 
+<<<<<<< Updated upstream
+=======
+            _tilesDug = 0;
+            _tilesFilled = 0;
+            _tilesConverted = 0;
+            _tilesPlaced = 0;
+            GeneratedShoreBottomY = 0;
+
+>>>>>>> Stashed changes
             if (!TryFindNeighborSurface(out int neighborSurfaceY, out _neighborCapTileType, out _neighborCapWallType))
                 return false;
 
@@ -238,12 +265,39 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             _seafloorTopByX = new int[_width];
             _isDryBeachByX = new bool[_width];
 
+<<<<<<< Updated upstream
+=======
+            // 1. what is already there (must happen before anything is modified)
+            for (int x = 0; x < _width; x++)
+                _existingTopByX[x] = FindExistingSurface(x);
+
+            // 2. the designed profile, still with the hammered drop into the ocean
+            var design = new int[_width];
+            for (int x = 0; x < _width; x++)
+                design[x] = ComputeDesignTop(x, ComputeWaterTop(x));
+
+            SmoothHeightProfile(design, MaxHeightStepPerColumn);
+
+            // 3. blend the design into the existing terrain. weight is 0 at the seam (=> existing height) and 1 inside the biome
+            int deepest = 0;
+            int deepestFloor = 0;
+>>>>>>> Stashed changes
             for (int x = 0; x < _width; x++)
             {
                 int waterTop = ComputeWaterTop(x);
                 int groundTop = ComputeGroundTop(x, waterTop, out bool isDryBeach);
                 _seafloorTopByX[x] = groundTop;
+<<<<<<< Updated upstream
                 _isDryBeachByX[x] = isDryBeach;
+=======
+                _isDryBeachByX[x] = groundTop <= waterTop || mirroredX <= SeamWaterGuard;
+                _sandCapByX[x] = groundTop <= _surfaceY + ShoreSandScanBelowSurface;
+                _dirtEndDepthByX[x] = ComputeDirtEndDepth(x);
+                _convertBottomByX[x] = Math.Min(Main.maxTilesY - 5, groundTop + ConvertDepth + ConvertFadeWidth);
+
+                deepest = Math.Max(deepest, _convertBottomByX[x]);
+                deepestFloor = Math.Max(deepestFloor, groundTop);
+>>>>>>> Stashed changes
             }
 
             // the fall of into the ocean its hammered rn cause i like it like that but might change based off others
@@ -262,7 +316,13 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 _clearBottomByX[x] = Math.Min(_clearedBottomY, Math.Max(guaranteedBottomY, cappedBottomY));
             }
 
-            Log($"surfaceY = {_surfaceY}, cap tile = {_neighborCapTileType}, cap wall = {_neighborCapWallType}, shoreWidth = {_shoreWidth}, width = {_width}");
+            // The shore ends where the dirt layer under the deepest seafloor hands over to Volcanic Stone.
+            // Stay out of the underworld (it starts ~200 tiles above the bottom of the world).
+            GeneratedShoreBottomY = Math.Min(
+                Main.maxTilesY - 200,
+                deepestFloor + SeafloorSolidBuffer + BackfillDepth);
+
+            Log($"surfaceY = {_surfaceY}, cap tile = {_neighborCapTileType}, cap wall = {_neighborCapWallType}, shoreWidth = {_shoreWidth}, width = {_width}, deepestFloor = {deepestFloor}, shoreBottomY = {GeneratedShoreBottomY}");
             return true;
         }
 
@@ -1036,6 +1096,32 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         public override void PostSetupContent()
         {
             AshenShore.Init();
+        }
+
+        // Remember where the generated shore ends, so the biome area matches the real terrain
+        public override void SaveWorldData(TagCompound tag)
+        {
+            tag["ShoreBottomY"] = AshenShore.GeneratedShoreBottomY;
+        }
+
+        public override void LoadWorldData(TagCompound tag)
+        {
+            AshenShore.GeneratedShoreBottomY = tag.GetInt("ShoreBottomY");
+        }
+
+        public override void ClearWorld()
+        {
+            AshenShore.GeneratedShoreBottomY = 0;
+        }
+
+        public override void NetSend(BinaryWriter writer)
+        {
+            writer.Write(AshenShore.GeneratedShoreBottomY);
+        }
+
+        public override void NetReceive(BinaryReader reader)
+        {
+            AshenShore.GeneratedShoreBottomY = reader.ReadInt32();
         }
 
         public override void ModifyWorldGenTasks(List<GenPass> tasks, ref double totalWeight)

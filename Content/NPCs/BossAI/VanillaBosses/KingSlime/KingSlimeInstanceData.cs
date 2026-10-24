@@ -1,3 +1,4 @@
+using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -27,6 +28,18 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         // reverts from ninja form back to slime form (e.g. despawning mid-fight).
         public int OriginalWidth;
         public int OriginalHeight;
+
+        public int CinePhase = -1;
+        public int CineStep = -1;
+        public int HitStopFrames;
+        public bool HitStopActive;
+        public Vector2 HitStopVelocity;
+
+        public int IntroBeats;
+        public int DeathBeats;
+        public bool AllowDeath;
+
+        public override bool CheckDead(NPC npc) => !KingSlimeOverride.InterceptDeath(npc, this);
 
         public override bool AppliesToEntity(NPC npc, bool lateInstantiation) => npc.type == NPCID.KingSlime;
     }

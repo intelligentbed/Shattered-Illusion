@@ -259,6 +259,7 @@ Configs: {
 		Headers: {
 			SturdinessBar: Sturdiness Bar Header
 			Client: Client
+			Cinematics: Cinematics
 		}
 
 		SturdinessBarLocked: {
@@ -279,6 +280,71 @@ Configs: {
 		MenuButtonPosition: {
 			Tooltip: Which side of the screen the main menu buttons (Single Player, Multiplayer, etc.) are drawn on.
 			Label: Menu Button Side
+		}
+
+		Cinematics: {
+			Label: Enable Cinematics
+			Tooltip: Off = boss fights play without any of the added cinematic effects.
+		}
+
+		Letterbox: {
+			Label: Black Bars
+			Tooltip: Black bars during the transformation and the parry.
+		}
+
+		CameraZoom: {
+			Label: Camera Zoom & Focus
+			Tooltip: Slow push-ins and camera focus pulls.
+		}
+
+		Vignette: {
+			Label: Vignette
+			Tooltip: Darkened screen edges during build ups.
+		}
+
+		TitleCard: {
+			Label: Title Card
+			Tooltip: Shows the boss title card during cutscenes and transformations.
+		}
+
+		HitStop: {
+			Label: Hit-Stop (Singleplayer)
+			Tooltip: Brief freeze-frames on big slams, the transformation and the parry. Singleplayer only.
+		}
+
+		ImpactParticles: {
+			Label: Extra Impact Particles
+			Tooltip: Shockwave rings, dash trails and speed lines.
+		}
+
+		SlamTelegraph: {
+			Label: Slam Landing Telegraph
+			Tooltip: Ground ring showing where the huge jump will land. Stays on even if cinematics are disabled.
+		}
+
+		IntroEntrance: {
+			Label: Intro Entrance
+			Tooltip: Bosses make a dramatic entrance during their spawn cutscene.
+		}
+
+		DeathSequence: {
+			Label: Death Sequence Effects
+			Tooltip: Camera, black bars, flashes and freeze frames during boss death scenes. The short death delay itself always happens.
+		}
+
+		ZoomIntensity: {
+			Label: Zoom Intensity
+			Tooltip: Scales all zoom effects. 0 disables zoom, 2 doubles it.
+		}
+
+		FlashIntensity: {
+			Label: Flash Intensity
+			Tooltip: Scales screen flashes. Lower this if you are sensitive to bright flashes.
+		}
+
+		ShakeIntensity: {
+			Label: Added Screen Shake Intensity
+			Tooltip: Scales the extra camera shake from the cinematic layer. The fight's original shake is unaffected.
 		}
 	}
 

@@ -29,6 +29,9 @@ namespace ShatteredIllusion.Content.Particles
         /// <summary>Stationary pulsing rings - "this exact spot is about to get hit" markers.</summary>
         public static ParticleBuffer<GroundWarningRingParticle> GroundWarnings { get; private set; }
 
+        /// <summary>Steady rings with no pulse - respawn every tick for a smooth landing-zone marker.</summary>
+        public static ParticleBuffer<GroundMarkerParticle> GroundMarkers { get; private set; }
+
         /// <summary>Single growing focal point for long charge-up windups (e.g. King Slime's split).</summary>
         public static ParticleBuffer<ChargeCoreParticle> ChargeCores { get; private set; }
 
@@ -40,17 +43,18 @@ namespace ShatteredIllusion.Content.Particles
             // Buffer size = how many of that particle type can exist AT ONCE
             // before new ones stop spawning. 
 
-            SandStreaks = new ParticleBuffer<SandStreakParticle>(200);
+            SandStreaks = new ParticleBuffer<SandStreakParticle>(200)
+                .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(SandStreaks);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, SandStreaks);
 
             EmberBursts = new ParticleBuffer<EmberBurstParticle>(150)
-                .SetBlendState(BlendState.Additive); // glowy sparks
+                .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(EmberBursts);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, EmberBursts);
 
             Shockwaves = new ParticleBuffer<ShockwaveRingParticle>(16)
-                .SetBlendState(BlendState.Additive); // glowy ring
+                .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(Shockwaves);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, Shockwaves);
 
@@ -61,9 +65,14 @@ namespace ShatteredIllusion.Content.Particles
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, TelegraphSegments);
 
             GroundWarnings = new ParticleBuffer<GroundWarningRingParticle>(16)
-                .SetBlendState(BlendState.Additive); // glowy ring
+                .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(GroundWarnings);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, GroundWarnings);
+
+            GroundMarkers = new ParticleBuffer<GroundMarkerParticle>(16)
+                .SetBlendState(BlendState.Additive);
+            ParticleManagerV3.RegisterUpdatable(GroundMarkers);
+            ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, GroundMarkers);
 
             ChargeCores = new ParticleBuffer<ChargeCoreParticle>(8)
                 .SetBlendState(BlendState.Additive);

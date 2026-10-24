@@ -10,7 +10,7 @@ namespace ShatteredIllusion.Content.Particles
     /// </summary>
     public class SandStreakParticle : Behavior<ParticleInfo>
     {
-        public override string Texture => "ShatteredIllusion/Content/Particles/SoftGlow";
+        public override string Texture => "ShatteredIllusion/Content/Particles/Streak";
 
         public override void Initialize(ref ParticleInfo info)
         {

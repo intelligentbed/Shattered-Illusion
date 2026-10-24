@@ -8,7 +8,7 @@ namespace ShatteredIllusion.Content.Particles
     /// </summary>
     public class EmberBurstParticle : Behavior<ParticleInfo>
     {
-        public override string Texture => "ShatteredIllusion/Content/Particles/SoftGlow";
+        public override string Texture => "ShatteredIllusion/Content/Particles/Spark";
 
         public override void Update(ref ParticleInfo info)
         {

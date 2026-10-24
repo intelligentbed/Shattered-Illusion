@@ -9,7 +9,7 @@ namespace ShatteredIllusion.Content.Particles
     /// </summary>
     public class TelegraphSegmentParticle : Behavior<ParticleInfo>
     {
-        public override string Texture => "ShatteredIllusion/Content/Particles/SoftGlow";
+        public override string Texture => "ShatteredIllusion/Content/Particles/Dash";
 
         public override void Update(ref ParticleInfo info)
         {

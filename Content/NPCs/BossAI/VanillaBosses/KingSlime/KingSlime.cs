@@ -37,7 +37,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             NinjaStab,
             NinjaStunned,
 
-            Despawn
+            Despawn,
+
+            Death
         }
 
         //Attack order as you know
@@ -236,9 +238,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             CutscenePlayer cutscenePlayer =
                 Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
 
-            if (cutscenePlayer.IsCutsceneActive)
+            if (cutscenePlayer.Active &&
+                cutscenePlayer.TryGetNpc(out NPC trackedNpc) &&
+                trackedNpc.whoAmI == npc.whoAmI)
             {
                 npc.velocity = Vector2.Zero;
+                CinematicIntro(npc);
                 return false;
             }
 
@@ -259,6 +264,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             {
                 data.OriginalWidth = npc.width;
                 data.OriginalHeight = npc.height;
+            }
+
+            if (CurrentPhase(npc) == AttackPhase.Death)
+            {
+                DoDeathScene(npc, data);
+                return false;
             }
 
             npc.dontTakeDamage = false;
@@ -296,6 +307,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 npc.velocity.X *= 0.9f;
                 return false;
             }
+
+            if (CinematicHitStop(npc, data))
+                return false;
 
             npc.ai[Slot_Timer]++;
             UpdateJellyWobble(npc, data);
@@ -348,6 +362,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     DoNinjaStunned(npc);
                     break;
             }
+
+            CinematicTick(npc, data);
 
             return false;
         }
@@ -986,38 +1002,38 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     Vector2 axis = splitVerticalTelegraph ? Vector2.UnitY : Vector2.UnitX;
                     float maxReach = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
                     float reach = MathHelper.Lerp(40f, maxReach, windupT);
-                    int segmentsPerArm = (int)MathHelper.Lerp(2f, 6f, windupT);
+                    const float segmentSpacing = 26f;
 
-                    if (timer % 3f == 0f)
+                    // Evenly spaced dashes that extend outward as the windup builds. Respawned every tick
+                    // (duration 2) so the line is steady instead of flickering at random spots.
+                    foreach (float sign in SplitTelegraphSigns)
                     {
-                        foreach (float sign in SplitTelegraphSigns)
+                        for (float d = segmentSpacing; d <= reach; d += segmentSpacing)
                         {
-                            for (int i = 0; i < segmentsPerArm; i++)
-                            {
-                                float t = (i + Main.rand.NextFloat()) / segmentsPerArm;
-                                Vector2 segmentPos = npc.Center + axis * (sign * reach * t);
+                            float fade = MathHelper.Clamp(1.2f - d / maxReach, 0.35f, 1f);
 
-                                BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
-                                    position: segmentPos.ToNumerics(),
-                                    velocity: SystemVector2.Zero,
-                                    rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
-                                    scale: new SystemVector2(20f, 9f),
-                                    color: new Color(0, 180, 255, 255),
-                                    duration: 16
-                                ));
-                            }
+                            BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
+                                position: (npc.Center + axis * (sign * d)).ToNumerics(),
+                                velocity: SystemVector2.Zero,
+                                rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
+                                scale: new SystemVector2(24f, 8f),
+                                color: new Color(0, 180, 255, 255) * (fade * (0.4f + 0.5f * windupT)),
+                                duration: 2
+                            ));
                         }
                     }
 
-                    if (timer >= 45f && timer % 5f == 0f)
+                    if (timer >= 45f)
                     {
-                        BossParticleSystem.GroundWarnings.Create(new ParticleInfo(
+                        float ringSize = MathHelper.Lerp(50f, 90f, (timer - 45f) / 15f);
+
+                        BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
                             position: npc.Center.ToNumerics(),
                             velocity: SystemVector2.Zero,
                             rotation: 0f,
-                            scale: new SystemVector2(70f, 70f),
-                            color: new Color(0, 200, 255, 255),
-                            duration: 10
+                            scale: new SystemVector2(ringSize, ringSize),
+                            color: new Color(0, 200, 255, 255) * 0.6f,
+                            duration: 2
                         ));
                     }
                 }
@@ -1271,10 +1287,21 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             bool isRising = currentPhase == AttackPhase.TransformToNinja && currentStep == TransformRiseStep;
             bool isShrinking = currentPhase == AttackPhase.TransformToNinja && currentStep == TransformShrinkStep;
 
+            if (currentPhase == AttackPhase.Death && DeathIsNinja(npc))
+            {
+                DrawNinjaDeath(npc, spriteBatch, screenPos, drawColor);
+                return false;
+            }
+
+            IntroVisual intro = GetIntroVisual(npc);
+
+            if (intro.Active && !intro.BodyVisible)
+                return false;
+
             if (isNinjaForm || isRising)
             {
                 DrawNinja(npc, spriteBatch, screenPos, drawColor);
-                return false; 
+                return false;
             }
 
             float idleWobble = (float)Math.Sin(data.WobbleClock * 0.1f) * 0.02f;
@@ -1294,7 +1321,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             var bodyDraw = new DrawData(
                 kingSlimeTexture,
-                npc.Bottom - screenPos + new Vector2(0f, 2f),
+                npc.Bottom - screenPos + new Vector2(0f, 2f + intro.BodyOffsetY),
                 frame,
                 npc.GetAlpha(drawColor),
                 npc.rotation + wobbleRotation,
@@ -1332,7 +1359,24 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 center.Y -= CrownDropHeight * (1f - EaseOutBounce(dropT));
             }
 
-            spriteBatch.Draw(crownTexture, center - screenPos, null, Color.White, 0f, crownTexture.Size() / 2f, npc.scale, spriteEffects, 0f);
+            float crownRotation = 0f;
+
+            if (currentPhase == AttackPhase.Death)
+            {
+                DrawDeathCrown(npc, spriteBatch, screenPos, center, spriteEffects);
+                return false;
+            }
+
+            if (intro.Active)
+            {
+                if (!intro.CrownVisible)
+                    return false;
+
+                center.Y += intro.CrownOffsetY;
+                crownRotation = intro.CrownRotation;
+            }
+
+            spriteBatch.Draw(crownTexture, center - screenPos, null, Color.White, crownRotation, crownTexture.Size() / 2f, npc.scale, spriteEffects, 0f);
 
             return false;
         }

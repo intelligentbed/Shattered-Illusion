@@ -17,26 +17,66 @@ namespace ShatteredIllusion.World.WorldGeneration
     {
         public static Rectangle HighwayArea { get; private set; }
 
-        private const int StructureWidth = 329;
-        private const int StructureHeight = 46;
+        // Fallback size, used only if the real size can't be read from the structure file.
+        private const int FallbackWidth = 329;
+        private const int FallbackHeight = 46;
 
         private const int MarkerHalfWidth = 6;
 
+        // Extra tiles around the highway that vanilla structures must also stay out of.
+        private const int ReservePadding = 12;
+
+        // Distance between columns sampled when working out how deep the desert is.
+        private const int DepthSampleStep = 8;
+
         private const string StructurePath =
             "Content/World/Structures/AntlionBossArena.shstruct";
+
+        // Area chosen during the "reserve" pass. Used by the "place" pass at the end of worldgen.
+        private static Rectangle reservedArea = Rectangle.Empty;
 
         public override void ModifyWorldGenTasks(
             List<GenPass> tasks,
             ref double totalWeight)
         {
-            int passIndex = tasks.FindIndex(
-                genpass => genpass.Name.Equals("Settle Liquids"));
+            // PASS 1: reserve the area as early as the desert exists, so vanilla
+            // structures (underground houses, cabins, chests, micro biomes...) avoid it.
+            int reserveIndex = tasks.FindIndex(
+                genpass => genpass.Name.Equals("Full Desert"));
 
-            if (passIndex == -1)
+            if (reserveIndex != -1)
+            {
+                reserveIndex++; // after the desert is generated
+            }
+            else
             {
                 ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
-                    "[HighwayGeneration] Could not find 'Settle Liquids' gen pass. " +
-                    "Attempting to insert the highway generation pass at the end of world generation.");
+                    "[HighwayGeneration] Could not find 'Full Desert' gen pass. " +
+                    "Reserving the highway area before 'Settle Liquids' instead.");
+
+                reserveIndex = tasks.FindIndex(
+                    genpass => genpass.Name.Equals("Settle Liquids"));
+
+                if (reserveIndex == -1)
+                    reserveIndex = tasks.Count;
+            }
+
+            tasks.Insert(
+                reserveIndex,
+                new PassLegacy(
+                    "ShatteredIllusion Highway Reserve",
+                    ReserveHighwayArea));
+
+            // PASS 2: place the structure at the very end, so nothing generated afterwards
+            // can end up inside it, and anything that slipped in gets cleared out.
+            int placeIndex = tasks.FindIndex(
+                genpass => genpass.Name.Equals("Final Cleanup"));
+
+            if (placeIndex == -1)
+            {
+                ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
+                    "[HighwayGeneration] Could not find 'Final Cleanup' gen pass. " +
+                    "Placing the highway at the end of world generation.");
 
                 for (int i = 0; i < tasks.Count; i++)
                 {
@@ -44,35 +84,65 @@ namespace ShatteredIllusion.World.WorldGeneration
                         $"[GenPass {i}] {tasks[i].Name}");
                 }
 
-                passIndex = tasks.Count;
+                placeIndex = tasks.Count;
             }
 
             tasks.Insert(
-                passIndex,
+                placeIndex,
                 new PassLegacy(
                     "ShatteredIllusion Highway Structure",
                     GenerateHighwayStructure));
         }
 
-        private static void GenerateHighwayStructure(
-            GenerationProgress progress,
-            GameConfiguration config)
+        /// <summary>
+        /// Reads the real size of the structure file, falling back to the old constants.
+        /// </summary>
+        private static Point16 GetStructureSize()
         {
-            progress.Message = "Generating Highway Structure...";
+            try
+            {
+                Point16 size = StructureHelper.API.Generator.GetStructureDimensions(
+                    StructurePath,
+                    ModContent.GetInstance<ShatteredIllusion>());
 
-            HighwayArea = Rectangle.Empty;
+                if (size.X > 0 && size.Y > 0)
+                    return size;
+            }
+            catch (Exception ex)
+            {
+                ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
+                    "[HighwayGeneration] Could not read structure dimensions, " +
+                    $"using fallback {FallbackWidth}x{FallbackHeight}.\n{ex.Message}");
+            }
 
-            int targetX = Main.maxTilesX / 2 - StructureWidth / 2;
+            return new Point16(FallbackWidth, FallbackHeight);
+        }
+
+        /// <summary>
+        /// Works out where the highway goes.
+        /// </summary>
+        private static Point16 ComputePlacement(int width, int height)
+        {
+            int targetX = Main.maxTilesX / 2 - width / 2;
             int targetY = Main.maxTilesY / 3;
 
             Rectangle desertBounds = GenVars.UndergroundDesertLocation;
 
             if (desertBounds.Width > 0 && desertBounds.Height > 0)
             {
-                int desertCenterX = Utils.Clamp(
-                    desertBounds.X + desertBounds.Width / 2,
+                int desertCenterX = desertBounds.X + desertBounds.Width / 2;
+
+                targetX = Utils.Clamp(
+                    desertCenterX - width / 2,
                     50,
-                    Main.maxTilesX - StructureWidth - 50);
+                    Main.maxTilesX - width - 50);
+
+                if (desertBounds.Width < width)
+                {
+                    ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
+                        $"[HighwayGeneration] Underground desert ({desertBounds.Width} wide) is " +
+                        $"narrower than the highway ({width}). The highway will extend into neighbouring biomes.");
+                }
 
                 int startY = Utils.Clamp(
                     desertBounds.Y,
@@ -84,55 +154,116 @@ namespace ShatteredIllusion.World.WorldGeneration
                     50,
                     Main.maxTilesY - 50);
 
-                int deepestSolidY = -1;
+                // Sample several columns across the highway and use the median depth,
+                // so one cave or hole in a single column can't throw the result off.
+                int sampleStartX = Math.Max(desertBounds.Left, targetX);
+                int sampleEndX = Math.Min(desertBounds.Right, targetX + width);
 
-                for (int y = startY; y <= endY; y++)
+                List<int> depths = new List<int>();
+
+                for (int x = sampleStartX; x < sampleEndX; x += DepthSampleStep)
                 {
-                    Tile tile = Framing.GetTileSafely(desertCenterX, y);
+                    int deepestSolidY = -1;
 
-                    if (tile.HasTile &&
-                        (tile.TileType == TileID.Sandstone ||
-                         tile.TileType == TileID.HardenedSand))
+                    for (int y = startY; y <= endY; y++)
                     {
-                        deepestSolidY = y;
+                        Tile tile = Framing.GetTileSafely(x, y);
+
+                        if (tile.HasTile &&
+                            (tile.TileType == TileID.Sandstone ||
+                             tile.TileType == TileID.HardenedSand))
+                        {
+                            deepestSolidY = y;
+                        }
                     }
+
+                    if (deepestSolidY != -1)
+                        depths.Add(deepestSolidY);
                 }
 
-                if (deepestSolidY != -1)
+                if (depths.Count > 0)
                 {
-                    targetX = desertCenterX - StructureWidth / 2;
+                    depths.Sort();
+                    int medianDepth = depths[depths.Count / 2];
 
                     targetY = Utils.Clamp(
-                        deepestSolidY - StructureHeight - 5,
+                        medianDepth - height - 5,
                         50,
-                        Main.maxTilesY - StructureHeight - 50);
+                        Main.maxTilesY - height - 50);
                 }
                 else
                 {
                     targetY = Utils.Clamp(
                         desertBounds.Y +
                         desertBounds.Height / 2 -
-                        StructureHeight / 2,
+                        height / 2,
                         50,
-                        Main.maxTilesY - StructureHeight - 50);
+                        Main.maxTilesY - height - 50);
                 }
             }
 
             targetX = Utils.Clamp(
                 targetX,
                 50,
-                Main.maxTilesX - StructureWidth - 50);
+                Main.maxTilesX - width - 50);
 
             targetY = Utils.Clamp(
                 targetY,
                 50,
-                Main.maxTilesY - StructureHeight - 50);
+                Main.maxTilesY - height - 50);
 
-            Point16 position = new Point16(targetX, targetY);
+            return new Point16(targetX, targetY);
+        }
 
+        private static void ReserveHighwayArea(
+            GenerationProgress progress,
+            GameConfiguration config)
+        {
+            progress.Message = "Reserving space for the highway...";
+
+            Point16 size = GetStructureSize();
+            Point16 position = ComputePlacement(size.X, size.Y);
+
+            reservedArea = new Rectangle(
+                position.X,
+                position.Y,
+                size.X,
+                size.Y);
+
+            // Vanilla structure generators check this map before placing anything.
+            GenVars.structures.AddProtectedStructure(reservedArea, ReservePadding);
+        }
+
+        private static void GenerateHighwayStructure(
+            GenerationProgress progress,
+            GameConfiguration config)
+        {
+            progress.Message = "Generating Highway Structure...";
+
+            HighwayArea = Rectangle.Empty;
+
+            // If the reserve pass didn't run or came out empty, compute it now.
+            if (reservedArea.IsEmpty)
+            {
+                Point16 size = GetStructureSize();
+                Point16 fallback = ComputePlacement(size.X, size.Y);
+
+                reservedArea = new Rectangle(
+                    fallback.X,
+                    fallback.Y,
+                    size.X,
+                    size.Y);
+            }
+
+            Rectangle area = reservedArea;
+            Point16 position = new Point16(area.X, area.Y);
 
             try
             {
+                // Remove anything that generated here anyway (mod structures, chests, caves,
+                // liquids, tile entities, etc.) so the highway is always clean.
+                ClearArea(area);
+
                 StructureHelper.API.Generator.GenerateStructure(
                     StructurePath,
                     position,
@@ -142,8 +273,8 @@ namespace ShatteredIllusion.World.WorldGeneration
             {
                 ModContent.GetInstance<ShatteredIllusion>().Logger.Error(
                     $"[HighwayGeneration] CRITICAL: Highway structure placement FAILED " +
-                    $"at ({targetX}, {targetY}) with size " +
-                    $"{StructureWidth}x{StructureHeight}.\n{ex}");
+                    $"at ({area.X}, {area.Y}) with size " +
+                    $"{area.Width}x{area.Height}.\n{ex}");
 
                 HighwayArea = Rectangle.Empty;
 
@@ -151,16 +282,21 @@ namespace ShatteredIllusion.World.WorldGeneration
                 return;
             }
 
+            HighwayArea = area;
 
-            HighwayArea = new Rectangle(
-                targetX,
-                targetY,
-                StructureWidth,
-                StructureHeight);
+            try
+            {
+                ReframeBorder(area);
+            }
+            catch (Exception ex)
+            {
+                ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
+                    $"[HighwayGeneration] Border reframe failed.\n{ex.Message}");
+            }
 
             progress.Message = "Marking the surface above the highway...";
 
-            int highwayCenterX = targetX + StructureWidth / 2;
+            int highwayCenterX = area.X + area.Width / 2;
 
             try
             {
@@ -174,6 +310,76 @@ namespace ShatteredIllusion.World.WorldGeneration
             }
         }
 
+        /// <summary>
+        /// Wipes tiles, walls, liquids, wires, chests, signs and tile entities inside the area.
+        /// </summary>
+        private static void ClearArea(Rectangle area)
+        {
+            for (int i = 0; i < Main.maxChests; i++)
+            {
+                Chest chest = Main.chest[i];
+
+                if (chest != null && area.Contains(chest.x, chest.y))
+                    Main.chest[i] = null;
+            }
+
+            for (int i = 0; i < Main.sign.Length; i++)
+            {
+                Sign sign = Main.sign[i];
+
+                if (sign != null && area.Contains(sign.x, sign.y))
+                    Main.sign[i] = null;
+            }
+
+            // Item frames, mannequins, weapon racks, etc.
+            List<Point16> entityPositions = new List<Point16>();
+
+            foreach (KeyValuePair<Point16, TileEntity> pair in TileEntity.ByPosition)
+            {
+                if (area.Contains(pair.Key.X, pair.Key.Y))
+                    entityPositions.Add(pair.Key);
+            }
+
+            foreach (Point16 entityPosition in entityPositions)
+            {
+                if (TileEntity.ByPosition.TryGetValue(entityPosition, out TileEntity entity))
+                {
+                    TileEntity.ByID.Remove(entity.ID);
+                    TileEntity.ByPosition.Remove(entityPosition);
+                }
+            }
+
+            for (int x = area.Left; x < area.Right; x++)
+            {
+                for (int y = area.Top; y < area.Bottom; y++)
+                {
+                    if (!WorldGen.InWorld(x, y, 5))
+                        continue;
+
+                    Tile tile = Main.tile[x, y];
+                    tile.ClearEverything();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Re-frames the tiles just outside the highway so grass, vines and sand
+        /// next to the cleared edge don't keep stale frames.
+        /// </summary>
+        private static void ReframeBorder(Rectangle area)
+        {
+            for (int x = area.Left - 1; x <= area.Right; x++)
+            {
+                WorldGen.SquareTileFrame(x, area.Top - 1, true);
+                WorldGen.SquareTileFrame(x, area.Bottom, true);
+            }
+
+            for (int y = area.Top; y < area.Bottom; y++)
+            {
+                WorldGen.SquareTileFrame(area.Left - 1, y, true);
+                WorldGen.SquareTileFrame(area.Right, y, true);
+            }
+        }
 
         private static void GenerateSurfaceMarker(int centerX)
         {
@@ -212,22 +418,38 @@ namespace ShatteredIllusion.World.WorldGeneration
             }
         }
 
+        private static bool IsSkyTile(int type)
+        {
+            return type == TileID.Cloud ||
+                   type == TileID.RainCloud ||
+                   type == TileID.SnowCloud ||
+                   type == TileID.Sunplate ||
+                   type == TileID.Platforms;
+        }
 
         private static int FindSurfaceY(int x)
         {
+            // Start at the highest point the surface reaches anywhere in the world, so the
+            // scan always begins above the ground instead of inside hills.
             int startY = Math.Max(
-                (int)Main.worldSurface - 60,
+                (int)GenVars.worldSurfaceLow - 5,
                 10);
 
             for (int y = startY; y < Main.maxTilesY - 50; y++)
             {
                 Tile tile = Framing.GetTileSafely(x, y);
 
-                if (tile.HasTile &&
-                    Main.tileSolid[tile.TileType])
+                if (!tile.HasTile ||
+                    !Main.tileSolid[tile.TileType])
                 {
-                    return y;
+                    continue;
                 }
+
+                // Skip floating island / sky structures.
+                if (IsSkyTile(tile.TileType))
+                    continue;
+
+                return y;
             }
 
             return -1;
@@ -235,7 +457,6 @@ namespace ShatteredIllusion.World.WorldGeneration
 
         public override void SaveWorldData(TagCompound tag)
         {
-
             tag["HighwayAreaX"] = HighwayArea.X;
             tag["HighwayAreaY"] = HighwayArea.Y;
             tag["HighwayAreaWidth"] = HighwayArea.Width;
@@ -259,6 +480,7 @@ namespace ShatteredIllusion.World.WorldGeneration
         public override void ClearWorld()
         {
             HighwayArea = Rectangle.Empty;
+            reservedArea = Rectangle.Empty;
         }
 
         public override void NetSend(BinaryWriter writer)
@@ -281,7 +503,6 @@ namespace ShatteredIllusion.World.WorldGeneration
     }
 
     #region Highway Protection System
-
 
     public class HighwayProtectionTile : GlobalTile
     {

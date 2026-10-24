@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using ReLogic.Graphics;
 using ReLogic.Utilities;
 using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 using ShatteredIllusion.Core.Packets;
@@ -13,139 +12,146 @@ using Terraria.ID;
 using Terraria.Localization;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG 
+namespace ShatteredIllusion.Common.Cutscenes
 {
+    public class CutsceneData
+    {
+        public string TitleKey = "Mods.ShatteredIllusion.Cutscenes.Unknown.Title";
+        public int TotalTicks = 220;
+        public int IntroTicks = 45;
+        public int OutroTicks = 40;
+        public float Zoom = 1.8f;
+        public bool FreezeNpc = true;
+
+        public int ShakeStart = -1;
+        public int ShakeDuration;
+        public int ShakeMagnitude;
+
+        public SoundStyle? Sound;
+        public int SoundStart = -1;
+        public int SoundDuration;
+    }
+
+    internal static class CutsceneDefinition
+    {
+        public static CutsceneData Get(int npcType)
+        {
+            if (npcType == ModContent.NPCType<GreatAntlionCharger>())
+            {
+                return new CutsceneData
+                {
+                    TitleKey = "Mods.ShatteredIllusion.Cutscenes.GreatAntlionCharger.Title",
+                    Zoom = 1.9f,
+                    ShakeStart = 0,
+                    ShakeDuration = 200,
+                    ShakeMagnitude = 4,
+                    Sound = new SoundStyle("ShatteredIllusion/Sounds/Silence"),
+                    SoundStart = 0,
+                    SoundDuration = 120
+                };
+            }
+
+            if (npcType == NPCID.KingSlime)
+            {
+                return new CutsceneData
+                {
+                    TitleKey = "Mods.ShatteredIllusion.Cutscenes.KingSlime.Title",
+                    FreezeNpc = false,
+                    ShakeStart = 120,
+                    ShakeDuration = 60,
+                    ShakeMagnitude = 4,
+                    Sound = new SoundStyle("ShatteredIllusion/Sounds/BarkFart"),
+                    SoundStart = 60,
+                    SoundDuration = 120
+                };
+            }
+
+            return null;
+        }
+    }
+
     public class BossCutsceneSystem : ModSystem
     {
-        private const int CUTSCENE_DURATION = 200; //duration of cutscene in ticks (60 = 1 sec). Yes bro i know how ticks work im not DUMB
-
-        // title card layout all tuned from the BOTTOM of the screen now instead of the top
-        private const float TITLE_BOTTOM_MARGIN = 130f; // how far up from the bottom edge the subtitle line sits
-        private const float TITLE_LINE_GAP = 26f;       // vertical gap between the big title and the small subtitle
-        private const float BACKDROP_PADDING = 22f;      // extra room the dark backing bar gives around the text
-        private const float ORNAMENT_GAP = 16f;          // gap between subtitle text and the little accent lines/diamonds
-        private const float ORNAMENT_LENGTH = 46f;       // how long the flanking accent lines are
-        private static readonly Color AccentColor = new Color(255, 205, 120); // used for the subtitle + ornaments
+        private const float BAR_FRACTION = 0.12f;
+        private const float TITLE_MAX_SCALE = 1.1f;
+        private const float TITLE_MAX_WIDTH_FRACTION = 0.6f;
+        private const float SUBTITLE_SCALE = 1.1f;
+        private const float SUBTITLE_TRACKING = 5f;
+        private const int LETTER_STAGGER = 2;
+        private static readonly Color Accent = new Color(255, 205, 120);
 
         public override void PostUpdateEverything()
         {
             if (Main.dedServ) return;
 
-            CutscenePlayer cutscenePlayer = Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
-            if (!cutscenePlayer.IsCutsceneActive) return;
+            CutscenePlayer cp = Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
+            if (!cp.Active) return;
 
-            if (!cutscenePlayer.TryGetTrackedNPC(out NPC tracked))
+            if (!cp.TryGetNpc(out _))
             {
-                cutscenePlayer.EndCutscene();
+                cp.EndCutscene();
                 return;
             }
 
-            cutscenePlayer.TargetPosition = tracked.Center;
-            cutscenePlayer.CutsceneTimer++;
+            cp.Timer++;
+            CutsceneData data = cp.Data;
 
-            if (!cutscenePlayer.ScreenshakeTriggered &&
-                cutscenePlayer.ScreenshakeStartTick >= 0 &&
-                cutscenePlayer.CutsceneTimer >= cutscenePlayer.ScreenshakeStartTick)
+            if (!cp.ShakeFired && data.ShakeStart >= 0 && cp.Timer >= data.ShakeStart)
             {
-                ScreenshakePlayer shakePlayer = Main.LocalPlayer.GetModPlayer<ScreenshakePlayer>();
-                shakePlayer.StartShake(cutscenePlayer.ScreenshakeDuration, cutscenePlayer.ScreenshakeMagnitude);
-                cutscenePlayer.ScreenshakeTriggered = true;
+                Main.LocalPlayer.GetModPlayer<ScreenshakePlayer>().StartShake(data.ShakeDuration, data.ShakeMagnitude);
+                cp.ShakeFired = true;
             }
 
-            if (!cutscenePlayer.AudioTriggered &&
-                cutscenePlayer.AudioStartTick >= 0 &&
-                cutscenePlayer.CutsceneTimer >= cutscenePlayer.AudioStartTick)
-            {
-                cutscenePlayer.PlayAudio();
-            }
+            if (!cp.SoundFired && data.Sound.HasValue && data.SoundStart >= 0 && cp.Timer >= data.SoundStart)
+                cp.PlayAudio();
 
-            if (cutscenePlayer.AudioTriggered &&
-                cutscenePlayer.AudioDuration > 0 &&
-                cutscenePlayer.CutsceneTimer >= cutscenePlayer.AudioStartTick + cutscenePlayer.AudioDuration)
-            {
-                cutscenePlayer.StopAudio();
-            }
+            if (cp.SoundFired && data.SoundDuration > 0 && cp.Timer >= data.SoundStart + data.SoundDuration)
+                cp.StopAudio();
 
-            if (cutscenePlayer.CutsceneTimer >= CUTSCENE_DURATION)
-            {
-                cutscenePlayer.EndCutscene();
-            }
+            if (cp.Timer >= data.TotalTicks)
+                cp.EndCutscene();
         }
 
         public override void PostDrawInterface(SpriteBatch spriteBatch)
         {
             if (Main.dedServ) return;
 
-            CutscenePlayer cutscenePlayer = Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
-            if (!cutscenePlayer.IsCutsceneActive) return;
+            CutscenePlayer cp = Main.LocalPlayer.GetModPlayer<CutscenePlayer>();
+            if (!cp.Active) return;
 
-            if (cutscenePlayer.CutsceneTimer < cutscenePlayer.TitleFadeInStart ||
-                cutscenePlayer.CutsceneTimer > cutscenePlayer.TitleFadeOutStart + cutscenePlayer.TitleFadeOutTicks)
-            {
-                return;
-            }
-
-            float alpha = 1f;
-            if (cutscenePlayer.CutsceneTimer < cutscenePlayer.TitleFadeInStart + cutscenePlayer.TitleFadeInTicks)
-            {
-                alpha = (cutscenePlayer.CutsceneTimer - cutscenePlayer.TitleFadeInStart) /
-                        (float)cutscenePlayer.TitleFadeInTicks;
-            }
-            else if (cutscenePlayer.CutsceneTimer > cutscenePlayer.TitleFadeOutStart)
-            {
-                alpha = 1f - (cutscenePlayer.CutsceneTimer - cutscenePlayer.TitleFadeOutStart) /
-                        (float)cutscenePlayer.TitleFadeOutTicks;
-            }
-            alpha = MathHelper.Clamp(alpha, 0f, 1f);
-
-            float introProgress = MathHelper.Clamp(
-                (cutscenePlayer.CutsceneTimer - cutscenePlayer.TitleFadeInStart) / (float)cutscenePlayer.TitleFadeInTicks,
-                0f, 1f);
-            float scale = MathHelper.Lerp(0.85f, 1f, introProgress);
-            float yDrift = MathHelper.Lerp(14f, 0f, introProgress);
-
-            string[] lines = cutscenePlayer.TitleText.Split('\n');
-            string titleLine = lines.Length > 0 ? lines[0].Trim() : "";
-            string subLine = lines.Length > 1 ? lines[1].Trim() : "";
-            string cleanedSub = subLine.Trim('-', ' ');
-
-            var titleFont = FontAssets.DeathText.Value;
-            var subFont = FontAssets.MouseText.Value;
-
-            Vector2 titleTextSize = titleFont.MeasureString(titleLine);
-            Vector2 subTextSize = subFont.MeasureString(cleanedSub);
-
-            // anchor everything off the BOTTOM of the screen
-            float centerX = Main.screenWidth / 2f;
-            float subCenterY = Main.screenHeight - TITLE_BOTTOM_MARGIN + yDrift;
-            float titleCenterY = subCenterY - (subTextSize.Y / 2f) - TITLE_LINE_GAP - (titleTextSize.Y * scale / 2f);
-
-            // dark backdrop
-            float backdropTop = titleCenterY - (titleTextSize.Y * scale / 2f) - BACKDROP_PADDING;
-            float backdropBottom = subCenterY + (subTextSize.Y / 2f) + BACKDROP_PADDING;
-            DrawFeatheredBackdrop(spriteBatch, backdropTop, backdropBottom, alpha);
-
-            // expanding gold rule between the title and the subtitle
-            float ruleWidth = MathHelper.Lerp(0f, 220f, introProgress);
+            float blend = cp.Blend;
+            int w = Main.screenWidth;
+            int h = Main.screenHeight;
             Texture2D pixel = TextureAssets.MagicPixel.Value;
-            float ruleY = titleCenterY + (titleTextSize.Y * scale / 2f) + (TITLE_LINE_GAP / 2f);
 
-            spriteBatch.Draw(
+            spriteBatch.Draw(pixel, new Rectangle(0, 0, w, h), Color.Black * (0.25f * blend));
+
+            int bar = (int)(h * BAR_FRACTION * blend);
+            spriteBatch.Draw(pixel, new Rectangle(0, 0, w, bar), Color.Black);
+            spriteBatch.Draw(pixel, new Rectangle(0, h - bar, w, bar), Color.Black);
+
+            DrawTitle(spriteBatch, pixel, cp);
+        }
+
+        private static void DrawTitle(SpriteBatch sb, Texture2D pixel, CutscenePlayer cp)
+        {
+            CutsceneData data = cp.Data;
+            string[] lines = Language.GetTextValue(data.TitleKey).Split('\n');
+            string title = lines.Length > 0 ? lines[0].Trim() : "";
+            string subtitle = lines.Length > 1 ? lines[1].Trim('-', ' ').ToUpperInvariant() : "";
+
+            CutsceneTitleRenderer.Draw(
+                sb,
                 pixel,
-                new Rectangle((int)(centerX - ruleWidth / 2f), (int)ruleY, (int)ruleWidth, 2),
-                AccentColor * alpha * 0.9f);
-
-            DrawSubtitleOrnaments(spriteBatch, pixel, centerX, subCenterY, subTextSize.X, alpha);
-
-            // main title
-            DrawOutlinedString(
-                spriteBatch, titleFont, titleLine,
-                new Vector2(centerX, titleCenterY), Color.White * alpha, Color.Black * alpha * 0.75f, scale);
-
-            // subtitle line
-            DrawOutlinedString(
-                spriteBatch, subFont, cleanedSub,
-                new Vector2(centerX, subCenterY), AccentColor * alpha, Color.Black * alpha * 0.75f, 1f);
+                title,
+                subtitle,
+                cp.Timer,
+                data.IntroTicks + 10,
+                data.TotalTicks - data.OutroTicks - 20,
+                20f,
+                Main.screenWidth,
+                Main.screenHeight,
+                Accent);
         }
 
         internal static void ReceiveStart(int npcIndex, int npcType)
@@ -158,173 +164,67 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
             Main.LocalPlayer.GetModPlayer<CutscenePlayer>().StartCutscene(npc);
         }
-
-        private static void DrawFeatheredBackdrop(SpriteBatch spriteBatch, float top, float bottom, float alpha)
-        {
-            Texture2D pixel = TextureAssets.MagicPixel.Value;
-            const int featherBands = 8;
-            float totalHeight = bottom - top;
-            float bandHeight = totalHeight / featherBands;
-
-            for (int i = 0; i < featherBands; i++)
-            {
-                float bandCenter = (i + 0.5f) / featherBands;
-                float edgeDistance = MathHelper.Min(bandCenter, 1f - bandCenter) * 2f;
-                float bandAlpha = MathHelper.Clamp(edgeDistance, 0f, 1f) * 0.5f * alpha;
-                float y = top + bandHeight * i;
-
-                spriteBatch.Draw(
-                    pixel,
-                    new Rectangle(0, (int)y, Main.screenWidth, (int)bandHeight + 1),
-                    Color.Black * bandAlpha);
-            }
-        }
-
-        //idk how i feel about it so might scrap
-        private static void DrawSubtitleOrnaments(
-            SpriteBatch spriteBatch, Texture2D pixel, float centerX, float centerY, float subTextWidth, float alpha)
-        {
-            float lineStart = subTextWidth / 2f + ORNAMENT_GAP;
-            float lineEnd = lineStart + ORNAMENT_LENGTH;
-
-            spriteBatch.Draw(
-                pixel,
-                new Rectangle((int)(centerX + lineStart), (int)centerY, (int)ORNAMENT_LENGTH, 1),
-                AccentColor * alpha);
-
-            DrawDiamond(spriteBatch, pixel, new Vector2(centerX + lineEnd + 8f, centerY), alpha);
-
-            spriteBatch.Draw(
-                pixel,
-                new Rectangle((int)(centerX - lineEnd), (int)centerY, (int)ORNAMENT_LENGTH, 1),
-                AccentColor * alpha);
-
-            DrawDiamond(spriteBatch, pixel, new Vector2(centerX - lineEnd - 8f, centerY), alpha);
-        }
-
-        private static void DrawDiamond(SpriteBatch spriteBatch, Texture2D pixel, Vector2 center, float alpha)
-        {
-            const float diamondSize = 6f;
-            Vector2 origin = new Vector2(0.5f, 0.5f);
-
-            spriteBatch.Draw(
-                pixel,
-                center,
-                null,
-                AccentColor * alpha,
-                MathHelper.PiOver4,
-                origin,
-                diamondSize,
-                SpriteEffects.None,
-                0f);
-        }
-
-        private static void DrawOutlinedString(
-            SpriteBatch spriteBatch,
-            DynamicSpriteFont font,
-            string text,
-            Vector2 center,
-            Color color,
-            Color outlineColor,
-            float scale)
-        {
-            if (string.IsNullOrEmpty(text)) return;
-
-            Vector2 size = font.MeasureString(text);
-            Vector2 origin = size / 2f;
-
-            for (int dx = -1; dx <= 1; dx++)
-            {
-                for (int dy = -1; dy <= 1; dy++)
-                {
-                    if (dx == 0 && dy == 0) continue;
-
-                    Vector2 offset = new Vector2(dx, dy);
-
-                    spriteBatch.DrawString(
-                        font,
-                        text,
-                        center + offset,
-                        outlineColor,
-                        0f,
-                        origin,
-                        scale,
-                        SpriteEffects.None,
-                        0f);
-                }
-            }
-
-            spriteBatch.DrawString(
-                font,
-                text,
-                center,
-                color,
-                0f,
-                origin,
-                scale,
-                SpriteEffects.None,
-                0f);
-        }
     }
 
     public class CutscenePlayer : ModPlayer
     {
-        public bool IsCutsceneActive { get; private set; }
-        public int TrackedNpcIndex { get; private set; } = -1;
-        public int TrackedNpcType { get; private set; } = -1;
-        public int CutsceneTimer { get; set; }
-        public Vector2 TargetPosition { get; set; }
-        public Vector2 SmoothedCameraPos { get; private set; }
+        public bool Active { get; private set; }
+        public CutsceneData Data { get; private set; }
+        public int Timer { get; set; }
+        public bool ShakeFired { get; set; }
+        public bool SoundFired { get; private set; }
 
-        public string TitleText { get; private set; } = "";
-        public int TitleFadeInStart { get; private set; } = 40;
-        public int TitleFadeInTicks { get; private set; } = 20;
-        public int TitleFadeOutStart { get; private set; } = 140;
-        public int TitleFadeOutTicks { get; private set; } = 20;
-
-        public int ScreenshakeStartTick { get; private set; } = -1;
-        public int ScreenshakeDuration { get; private set; }
-        public int ScreenshakeMagnitude { get; private set; }
-        public bool ScreenshakeTriggered { get; set; }
-
-        public SoundStyle AudioSound { get; private set; }
-        public int AudioStartTick { get; private set; } = -1;
-        public int AudioDuration { get; private set; }
-        public bool AudioTriggered { get; private set; }
-
+        private int npcIndex = -1;
+        private int npcType = -1;
+        private float savedZoom = 1f;
         private SlotId activeAudio;
-        private float savedPlayerZoom = 1f;
 
-        private static void SetGlobalGameZoomTarget(float value)
+        public static float Ease(float t)
         {
-            Main.GameZoomTarget = value;
+            t = MathHelper.Clamp(t, 0f, 1f);
+            return t * t * t * (t * (t * 6f - 15f) + 10f);
+        }
+
+        public float Blend
+        {
+            get
+            {
+                if (!Active) return 0f;
+                if (Timer < Data.IntroTicks)
+                    return Ease(Timer / (float)Data.IntroTicks);
+
+                int outroStart = Data.TotalTicks - Data.OutroTicks;
+                if (Timer > outroStart)
+                    return 1f - Ease((Timer - outroStart) / (float)Data.OutroTicks);
+
+                return 1f;
+            }
+        }
+
+        private float HoldProgress
+        {
+            get
+            {
+                float length = Math.Max(1f, Data.TotalTicks - Data.OutroTicks - Data.IntroTicks);
+                return MathHelper.Clamp((Timer - Data.IntroTicks) / length, 0f, 1f);
+            }
         }
 
         public override void OnEnterWorld()
         {
-            if (Main.dedServ) return;
             if (Player.whoAmI == Main.myPlayer)
-                ResetCutscene();
-        }
-
-        public override void PlayerDisconnect()
-        {
-            if (Main.dedServ) return;
-            ResetCutscene();
+                EndCutscene();
         }
 
         public override void OnRespawn()
         {
-            if (Main.dedServ) return;
             if (Player.whoAmI == Main.myPlayer)
-                ResetCutscene();
+                EndCutscene();
         }
 
         public override void PreUpdateMovement()
         {
-            if (Main.dedServ) return;
-            if (Player.whoAmI != Main.myPlayer) return;
-            if (!IsCutsceneActive) return;
+            if (Player.whoAmI != Main.myPlayer || !Active) return;
 
             Player.velocity = Vector2.Zero;
             Player.controlLeft = false;
@@ -337,61 +237,46 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
         public override void ModifyScreenPosition()
         {
-            if (Main.dedServ) return;
-            if (Player.whoAmI != Main.myPlayer) return;
-            if (!IsCutsceneActive) return;
+            if (Player.whoAmI != Main.myPlayer || !Active) return;
+            if (!TryGetNpc(out NPC npc)) return;
 
-            SetGlobalGameZoomTarget(2.0f);
+            float blend = Blend;
+            Vector2 focus = Vector2.Lerp(Player.Center, npc.Center, blend);
 
-            Vector2 viewportCenter = new Vector2(
-                Main.screenWidth / 2f,
-                Main.screenHeight / 2f);
+            float zoom = MathHelper.Lerp(savedZoom, Data.Zoom * (1f + 0.06f * HoldProgress), blend);
+            Main.GameZoomTarget = zoom;
 
-            Vector2 desiredScreenPos = TargetPosition - viewportCenter;
-
-            SmoothedCameraPos = Vector2.Lerp(
-                SmoothedCameraPos,
-                desiredScreenPos,
-                0.05f);
-
-            Main.screenPosition = SmoothedCameraPos;
+            Main.screenPosition = focus - new Vector2(Main.screenWidth / 2f, Main.screenHeight / 2f);
         }
 
         public void StartCutscene(NPC npc)
         {
             if (Main.dedServ) return;
-            if (IsCutsceneActive)
+
+            CutsceneData data = CutsceneDefinition.Get(npc.type);
+            if (data == null) return;
+
+            if (Active)
                 EndCutscene();
 
-            IsCutsceneActive = true;
-            TrackedNpcIndex = npc.whoAmI;
-            TrackedNpcType = npc.type;
-            TargetPosition = npc.Center;
-            SmoothedCameraPos = Main.screenPosition;
-            savedPlayerZoom = Main.GameZoomTarget;
-
-            CutsceneDefinition.Apply(npc.type, this);
-
-            CutsceneTimer = 0;
-            ScreenshakeTriggered = false;
-            AudioTriggered = false;
+            Data = data;
+            Active = true;
+            npcIndex = npc.whoAmI;
+            npcType = npc.type;
+            savedZoom = Main.GameZoomTarget;
+            Timer = 0;
+            ShakeFired = false;
+            SoundFired = false;
             activeAudio = default;
         }
 
-        public bool TryGetTrackedNPC(out NPC npc)
+        public bool TryGetNpc(out NPC npc)
         {
             npc = null;
+            if (npcIndex < 0 || npcIndex >= Main.maxNPCs) return false;
 
-            if (TrackedNpcIndex < 0 || TrackedNpcIndex >= Main.maxNPCs)
-                return false;
-
-            NPC tracked = Main.npc[TrackedNpcIndex];
-
-            if (!tracked.active)
-                return false;
-
-            if (tracked.type != TrackedNpcType)
-                return false;
+            NPC tracked = Main.npc[npcIndex];
+            if (!tracked.active || tracked.type != npcType) return false;
 
             npc = tracked;
             return true;
@@ -399,154 +284,34 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
         public void PlayAudio()
         {
-            if (Main.dedServ) return;
-            if (AudioTriggered) return;
-            if (AudioStartTick < 0) return;
+            if (SoundFired || !Data.Sound.HasValue) return;
 
-            activeAudio = SoundEngine.PlaySound(AudioSound);
-            AudioTriggered = true;
+            activeAudio = SoundEngine.PlaySound(Data.Sound.Value);
+            SoundFired = true;
         }
 
         public void StopAudio()
         {
-            if (Main.dedServ) return;
-
             if (SoundEngine.TryGetActiveSound(activeAudio, out var sound))
-            {
                 sound.Stop();
-            }
-
-            AudioDuration = 0;
         }
 
         public void EndCutscene()
         {
-            if (Main.dedServ) return;
+            if (!Active) return;
 
             StopAudio();
 
-            IsCutsceneActive = false;
-            TrackedNpcIndex = -1;
-            TrackedNpcType = -1;
-            CutsceneTimer = 0;
-            TargetPosition = Vector2.Zero;
-            SmoothedCameraPos = Vector2.Zero;
-
-            ScreenshakeStartTick = -1;
-            ScreenshakeDuration = 0;
-            ScreenshakeMagnitude = 0;
-            ScreenshakeTriggered = false;
-
-            AudioSound = default;
-            AudioStartTick = -1;
-            AudioDuration = 0;
-            AudioTriggered = false;
+            Active = false;
+            Data = null;
+            npcIndex = -1;
+            npcType = -1;
+            Timer = 0;
+            ShakeFired = false;
+            SoundFired = false;
 
             if (Player.whoAmI == Main.myPlayer)
-                SetGlobalGameZoomTarget(savedPlayerZoom);
-        }
-
-        public void ResetCutscene()
-        {
-            if (Main.dedServ) return;
-            EndCutscene();
-        }
-
-        internal void SetDefinition(
-            string titleText,
-            int titleFadeInStart,
-            int titleFadeInTicks,
-            int titleFadeOutStart,
-            int titleFadeOutTicks,
-            int screenshakeStartTick,
-            int screenshakeDuration,
-            int screenshakeMagnitude,
-            SoundStyle audioSound,
-            int audioStartTick,
-            int audioDuration)
-        {
-            TitleText = titleText;
-            TitleFadeInStart = titleFadeInStart;
-            TitleFadeInTicks = titleFadeInTicks;
-            TitleFadeOutStart = titleFadeOutStart;
-            TitleFadeOutTicks = titleFadeOutTicks;
-
-            ScreenshakeStartTick = screenshakeStartTick;
-            ScreenshakeDuration = screenshakeDuration;
-            ScreenshakeMagnitude = screenshakeMagnitude;
-
-            AudioSound = audioSound;
-            AudioStartTick = audioStartTick;
-            AudioDuration = audioDuration;
-        }
-    }
-
-    internal static class CutsceneDefinition
-    {
-        public static bool IsRegistered(int npcType)
-        {
-            return npcType == ModContent.NPCType<GreatAntlionCharger>() ||
-                   npcType == NPCID.KingSlime;
-        }
-
-        public static bool ShouldFreezeMovement(int npcType)
-        {
-            if (npcType == ModContent.NPCType<GreatAntlionCharger>())
-                return GreatAntlionChargerCutscene.FreezeMovement;
-
-            if (npcType == NPCID.KingSlime)
-                return KingSlimeCutscene.FreezeMovement;
-
-            return true;
-        }
-
-        public static void Apply(int npcType, CutscenePlayer player)
-        {
-            if (npcType == ModContent.NPCType<GreatAntlionCharger>())
-            {
-                GreatAntlionChargerCutscene.Apply(player);
-                return;
-            }
-
-            if (npcType == NPCID.KingSlime)
-            {
-                KingSlimeCutscene.Apply(player);
-                return;
-            }
-
-            player.SetDefinition(
-                Language.GetTextValue("Mods.ShatteredIllusion.Cutscenes.Unknown.Title"),
-                40, 20, 140, 20,
-                -1, 0, 0,
-                default, -1, 0);
-        }
-    }
-
-    internal static class GreatAntlionChargerCutscene
-    {
-        public const bool FreezeMovement = true;
-
-        public static void Apply(CutscenePlayer player)
-        {
-            player.SetDefinition(
-                Language.GetTextValue("Mods.ShatteredIllusion.Cutscenes.GreatAntlionCharger.Title"),
-                40, 20, 140, 20,
-                0, 200, 4,
-                new SoundStyle("ShatteredIllusion/Sounds/Silence"), 0, 120);
-        }
-    }
-
-    internal static class KingSlimeCutscene
-    {
-        public const bool FreezeMovement = false;
-
-        public static void Apply(CutscenePlayer player)
-        {
-            player.SetDefinition(
-                Language.GetTextValue("Mods.ShatteredIllusion.Cutscenes.KingSlime.Title"),
-                60, 20, 150, 20,
-                120, 60, 4,
-                new SoundStyle("ShatteredIllusion/Sounds/BarkFart"), 60, 120);
+                Main.GameZoomTarget = savedZoom;
         }
     }
 
@@ -554,110 +319,71 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
     {
         public override bool InstancePerEntity => true;
 
+        private int holdTimer;
+        private bool wasActive;
+        private CutsceneData data;
+
         public override bool AppliesToEntity(NPC entity, bool lateInstantiation)
         {
-            return IsRegisteredBoss(entity.type);
+            return CutsceneDefinition.Get(entity.type) != null;
         }
-
-        private int cutsceneTimer;
-        private bool cutsceneWasActive;
 
         public override void OnSpawn(NPC npc, IEntitySource source)
         {
-            if (Main.netMode == NetmodeID.MultiplayerClient)
-                return;
+            data = CutsceneDefinition.Get(npc.type);
+            if (data == null) return;
 
-            if (!IsRegisteredBoss(npc.type))
-                return;
+            if (Main.netMode == NetmodeID.MultiplayerClient) return;
 
-            StartServerCutscene(npc);
+            holdTimer = data.TotalTicks;
+            npc.netUpdate = true;
+
+            if (Main.netMode == NetmodeID.SinglePlayer)
+            {
+                Main.LocalPlayer.GetModPlayer<CutscenePlayer>().StartCutscene(npc);
+                return;
+            }
+
+            // clients drop the cutscene packet if they haven't been told about the NPC yet
+            NetMessage.SendData(MessageID.SyncNPC, number: npc.whoAmI);
+
+            const float maxDistance = 3000f;
+            float maxDistanceSquared = maxDistance * maxDistance;
+
+            for (int i = 0; i < Main.maxPlayers; i++)
+            {
+                Player player = Main.player[i];
+                if (!player.active) continue;
+                if (Vector2.DistanceSquared(player.Center, npc.Center) > maxDistanceSquared) continue;
+
+                SIPackets.SendBossCutscene(npc, i);
+            }
         }
 
         public override bool PreAI(NPC npc)
         {
-            if (!IsRegisteredBoss(npc.type))
-                return true;
-
-            if (cutsceneTimer > 0)
+            if (holdTimer > 0)
             {
-                bool freezeMovement = CutsceneDefinition.ShouldFreezeMovement(npc.type);
-
-                if (freezeMovement)
-                {
+                if (data.FreezeNpc)
                     npc.velocity = Vector2.Zero;
-                }
 
                 npc.dontTakeDamage = true;
+                wasActive = true;
+                holdTimer--;
 
-                cutsceneWasActive = true;
-                cutsceneTimer--;
-
-                return !freezeMovement;
+                return !data.FreezeNpc;
             }
 
-            if (cutsceneWasActive)
+            if (wasActive)
             {
-                cutsceneWasActive = false;
+                wasActive = false;
                 npc.dontTakeDamage = false;
 
-                if (Main.netMode != NetmodeID.MultiplayerClient &&
-                    npc.ModNPC is GreatAntlionCharger antlion)
-                {
+                if (npc.ModNPC is GreatAntlionCharger antlion)
                     antlion.FinishIntro();
-                }
             }
 
             return true;
-        }
-
-        private void StartServerCutscene(NPC npc)
-        {
-            cutsceneTimer = 200;
-
-            npc.netUpdate = true;
-
-            if (Main.netMode == NetmodeID.Server)
-            {
-                // Clients drop the cutscene packet if they haven't been told about the NPC yet.
-                NetMessage.SendData(MessageID.SyncNPC, number: npc.whoAmI);
-
-                const float maxDistance = 3000f;
-                float maxDistanceSquared = maxDistance * maxDistance;
-
-                for (int i = 0; i < Main.maxPlayers; i++)
-                {
-                    Player player = Main.player[i];
-
-                    if (!player.active)
-                        continue;
-
-                    if (Vector2.DistanceSquared(player.Center, npc.Center) > maxDistanceSquared)
-                        continue;
-
-                    if (i == Main.myPlayer && !Main.dedServ)
-                    {
-                        player.GetModPlayer<CutscenePlayer>().StartCutscene(npc);
-                        continue;
-                    }
-
-                    SIPackets.SendBossCutscene(npc, i);
-                }
-            }
-            else
-            {
-                if (Main.myPlayer >= 0 &&
-                    Main.myPlayer < Main.maxPlayers)
-                {
-                    Main.LocalPlayer
-                        .GetModPlayer<CutscenePlayer>()
-                        .StartCutscene(npc);
-                }
-            }
-        }
-
-        private static bool IsRegisteredBoss(int type)
-        {
-            return CutsceneDefinition.IsRegistered(type);
         }
     }
 
@@ -676,7 +402,6 @@ namespace ShatteredIllusion.Common.Cutscenes //REFACTORED THE WHOLE SHIBANG
 
         public override void ModifyScreenPosition()
         {
-            if (Main.dedServ) return;
             if (Player.whoAmI != Main.myPlayer) return;
             if (screenshakeTimer <= 0) return;
 
