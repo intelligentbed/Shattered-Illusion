@@ -6,16 +6,28 @@ using Terraria;
 using Terraria.ID;
 using Terraria.IO;
 using Terraria.ModLoader;
-<<<<<<< Updated upstream
-=======
 using Terraria.ModLoader.IO;
 using Terraria.ObjectData;
->>>>>>> Stashed changes
 using Terraria.WorldBuilding;
 using ShatteredIllusion.Content.Tiles.BoilingOcean;
 
 namespace ShatteredIllusion.Content.World.WorldGeneration
 {
+    // HOW THIS WORKS NOW (in-place conversion instead of clear-and-rebuild)
+    //
+    //  1. Setup() records the surface height of the terrain that is ALREADY there (vanilla ocean / forest) for every column.
+    //  2. The designed shore + seafloor profile is blended into that real surface over SeamBlendWidth columns,
+    //     so at the seam the new ground height == the existing ground height. No cliff, no box.
+    //  3. ReshapeColumn() then only touches what has to change:
+    //       - ground above the new surface gets dug out (and water added/removed)
+    //       - gaps between the new surface and the old one get filled
+    //       - everything below the surface is CONVERTED tile-by-tile (dirt -> AshenDirt, stone -> VolcanicStone, etc).
+    //         Ores, gems, caves and structures that are already there are left alone.
+    //  4. The amount of conversion fades in with a noise dither toward the seam and toward the bottom, so the
+    //     biome "grows" out of the old terrain instead of being stamped on top of it.
+    //  5. Deeper into the biome (past SeamBlendWidth) the designed shore/ocean is PLACED over whatever was there,
+    //     like the original generator did, so the interior is clean strata instead of vanilla leftovers.
+    //     The handoff from "convert" to "place" is dithered over PlaceBlendWidth columns so there is no visible line.
     public static class AshenShore
     {
         #region Tile / wall types
@@ -42,6 +54,44 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
             _initialized = true;
         }
+
+        // Vanilla tiles that get swapped to our soil layer (AshenSand cap / AshenDirt / deeper VolcanicStone).
+        // Anything solid that is NOT in one of these two sets (ores, gems, wood, bricks, ...) is left exactly as it is.
+        private static readonly HashSet<ushort> SoilTiles = new HashSet<ushort>
+        {
+            TileID.Dirt, TileID.Grass, TileID.CorruptGrass, TileID.CrimsonGrass, TileID.HallowedGrass,
+            TileID.JungleGrass, TileID.MushroomGrass, TileID.Mud, TileID.ClayBlock,
+            TileID.Sand, TileID.Ebonsand, TileID.Crimsand, TileID.Pearlsand,
+            TileID.HardenedSand, TileID.CorruptHardenedSand, TileID.CrimsonHardenedSand, TileID.HallowHardenedSand,
+            TileID.Sandstone, TileID.CorruptSandstone, TileID.CrimsonSandstone, TileID.HallowSandstone,
+            TileID.Silt, TileID.Slush, TileID.SnowBlock,
+            TileID.IceBlock, TileID.CorruptIce, TileID.HallowedIce, TileID.FleshIce,
+        };
+
+        private static readonly HashSet<ushort> StoneTiles = new HashSet<ushort>
+        {
+            TileID.Stone, TileID.Ebonstone, TileID.Crimstone, TileID.Pearlstone,
+            TileID.GreenMoss, TileID.BrownMoss, TileID.RedMoss, TileID.BlueMoss, TileID.PurpleMoss,
+        };
+
+        // Corruption / Crimson tiles and what they turn into when they are purged BELOW the biome (where the surrounding rock is still vanilla).
+        // Inside the biome they become our own tiles instead.
+        private static readonly Dictionary<ushort, ushort> EvilToVanilla = new Dictionary<ushort, ushort>
+        {
+            { TileID.Ebonstone, TileID.Stone }, { TileID.Crimstone, TileID.Stone },
+            { TileID.CorruptGrass, TileID.Dirt }, { TileID.CrimsonGrass, TileID.Dirt },
+            { TileID.Ebonsand, TileID.Sand }, { TileID.Crimsand, TileID.Sand },
+            { TileID.CorruptHardenedSand, TileID.HardenedSand }, { TileID.CrimsonHardenedSand, TileID.HardenedSand },
+            { TileID.CorruptSandstone, TileID.Sandstone }, { TileID.CrimsonSandstone, TileID.Sandstone },
+            { TileID.CorruptIce, TileID.IceBlock }, { TileID.FleshIce, TileID.IceBlock },
+        };
+
+        private static readonly HashSet<ushort> EvilWalls = new HashSet<ushort>
+        {
+            WallID.EbonstoneUnsafe, WallID.CrimstoneUnsafe, WallID.CorruptGrassUnsafe, WallID.CrimsonGrassUnsafe,
+            WallID.CorruptionUnsafe1, WallID.CorruptionUnsafe2, WallID.CorruptionUnsafe3, WallID.CorruptionUnsafe4,
+            WallID.CrimsonUnsafe1, WallID.CrimsonUnsafe2, WallID.CrimsonUnsafe3, WallID.CrimsonUnsafe4,
+        };
 
         #endregion
 
@@ -70,9 +120,10 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         public const int ShoreWidthMin = 170;
         public const int ShoreWidthMax = 230;
 
+        // The designed beach peaks at (waterline - this). Lower it for a flatter beach. With the seam blend
+        // the peak no longer shows up as a cliff, but it still sets how tall the dune/beach ridge gets.
         public const int BeachMaxHeightMin = 40;
 
- 
         public const float BeachDescentSmoothness = 0.5f;
 
         public const float BeachNoiseMagnification = 0.03f;
@@ -80,7 +131,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
         public const int ShelfRampWidth = 120;
 
-        // the low taper fade with the other biomes but its lwk kinda buns might scrap or rework it
+        // The seafloor depth tapers to zero toward the seam over this many columns (design profile only)
         public const int RightEdgeTransitionWidth = 150;
 
         // How far below the seafloor the dirt layer runs before it transitions into Volcanic Stone
@@ -93,9 +144,11 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
         public const int ShoreSandCapDepth = 12;
         public const int ShoreSandTransitionDepth = 6;
-        public const int ShoreSandScanAboveSurface = 130;
+        // Ground shallower than (surfaceY + this) gets the sand cap
         public const int ShoreSandScanBelowSurface = 60;
 
+        // How many columns it takes the biome to fully take over from the existing terrain, counted from the seam.
+        // Controls BOTH the height blend and the tile conversion dither.
         public const int SeamBlendWidth = 180;
 
         public const int TransitionDepth = 40;
@@ -137,7 +190,54 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         public const int LavaFringeBandTop = 60;
         public const int LavaFringeBandBottom = 150;
 
+        // Max column-to-column step of the DESIGNED profile (the existing terrain keeps its own shape)
         public const int MaxHeightStepPerColumn = 1;
+
+        // ---- in-place conversion ----
+
+        // Where to start looking for the existing ground, relative to the neighbor surface.
+        // If this lands inside solid ground we walk upward to find the true top of the hill.
+        public const int ExistingSurfaceScanAbove = 100;
+
+        // How far below the surface tile conversion goes before it fades back out to untouched vanilla terrain
+        public const int ConvertMargin = 60;
+        public const int ConvertDepth = SeafloorSolidBuffer + BackfillDepth + TransitionDepth + ConvertMargin;
+        public const int ConvertFadeWidth = 80;
+
+        // Under open water, every vanilla cave / tunnel / water pocket this deep below the seafloor is sealed solid so
+        // nothing vanilla can open into the ocean. Our own pockets and worms are carved AFTER this, so they are unaffected.
+        // Keep it >= CaveNetworkMaxDepthBelowFloor + WormFloorSafetyMargin + CaveWormMaxRadius (~177) so our caves sit inside the sealed band.
+        public const int OceanSealDepth = 200;
+
+        // Past the seam blend zone, tiles switch from "convert what is there" to "place the designed terrain".
+        // This is how many columns that handoff is dithered over.
+        public const int PlaceBlendWidth = 120;
+
+        // Trees, plants, pots, chests, vines etc. get wiped this deep below the surface
+        public const int DecorClearDepth = 40;
+
+        // The new surface always gets at least this much solid ground under it (cave openings get filled to this depth)
+        public const int MinSurfaceCrust = 6;
+
+        // In the blend zone vanilla decoration is thinned out in chunks this wide instead of cut off in a straight line
+        public const int DecorCellWidth = 12;
+
+        // ---- cleanup of things vanilla puts where we don't want them ----
+
+        // Corruption/Crimson tiles and walls inside the biome are always converted (not dithered) once the conversion
+        // weight passes EvilForceMinWeight, so an evil biome crossing the seam still fades out instead of being cut off.
+        public const bool PurgeEvilBiome = true;
+        public const float EvilForceMinWeight = 0.25f;
+
+        // evil tiles are also swapped for their plain vanilla versions this far below the biome, so chasms don't poke up into it
+        public const int EvilPurgeExtraDepth = 200;
+
+        // Chests (wooden, ocean, cabin...) inside the biome are removed if they sit in water or within this many tiles
+        // of the ground surface. Deeper dry chests are left alone.
+        public const int ShoreChestClearDepth = 30;
+
+        // No open water this close to the seam, so a valley right at the border can't flood the neighbor
+        public const int SeamWaterGuard = 20;
 
         #endregion
 
@@ -157,29 +257,39 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
         private static int _worldSeed;
 
-        // Number of columns actually generated 
+        // Number of columns actually generated
         private static int _width;
 
         // Surface height of the neighboring biome at the seam
         private static int _surfaceY;
 
-        // Neighboring biome material at the seam
+        // Neighboring biome material at the seam (used for tiles we have to place newly near the seam)
         private static ushort _neighborCapTileType;
         private static ushort _neighborCapWallType;
 
         // Randomized once per world
         private static int _shoreWidth;
 
-        // Vertical extent of the cleared region
+        // Vertical extent of everything we may touch
         private static int _clearTopY;
-        private static int _clearedBottomY;
+        private static int _affectedBottomY;
 
-        private static int[] _clearBottomByX;
+        // Height of the terrain that was there BEFORE we touched anything
+        private static int[] _existingTopByX;
 
-        // Seafloor (or beach) height for each column.
+        // Final ground height for each column (beach or seafloor), blended with the existing terrain near the seam
         private static int[] _seafloorTopByX;
 
         private static bool[] _isDryBeachByX;
+        private static bool[] _sandCapByX;
+        private static int[] _dirtEndDepthByX;
+        private static int[] _convertBottomByX;
+
+        // debug counters
+        private static int _tilesDug;
+        private static int _tilesFilled;
+        private static int _tilesConverted;
+        private static int _tilesPlaced;
 
         #endregion
 
@@ -199,10 +309,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 RemoveLeftoverDebris();
 
                 progress?.Set(0.10);
-                ReplaceVanillaOcean();
-
-                progress?.Set(0.25);
-                GenerateShoreAndSeafloor();
+                ReshapeTerrain();
 
                 progress?.Set(0.50);
                 CarveSeafloorPockets();
@@ -211,7 +318,6 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 CarveCaveNetwork();
 
                 progress?.Set(0.65);
-                PaintShoreline();
                 ScatterWaterClutter();
 
                 progress?.Set(0.75);
@@ -219,15 +325,21 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
                 progress?.Set(0.80);
                 SuppressLavaFringe();
+                PurgeOrphanedChestsAndSigns();
                 FrameAffectedArea();
+
+                Log($"dug {_tilesDug}, filled {_tilesFilled}, converted {_tilesConverted}, placed {_tilesPlaced} tiles");
 
                 progress?.Set(1.00);
             }
             finally
             {
-                _seafloorTopByX = null;
-                _clearBottomByX = null;
+                _existingTopByX = null;
+                // _seafloorTopByX stays alive: the late cleanup pass still needs it (it nulls it when done)
                 _isDryBeachByX = null;
+                _sandCapByX = null;
+                _dirtEndDepthByX = null;
+                _convertBottomByX = null;
             }
         }
 
@@ -239,34 +351,25 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             _shoreWidth = WorldGen.genRand.Next(ShoreWidthMin, ShoreWidthMax + 1);
             _width = Math.Min(BiomeWidth, Main.maxTilesX - 5);
 
-<<<<<<< Updated upstream
-=======
             _tilesDug = 0;
             _tilesFilled = 0;
             _tilesConverted = 0;
             _tilesPlaced = 0;
             GeneratedShoreBottomY = 0;
 
->>>>>>> Stashed changes
             if (!TryFindNeighborSurface(out int neighborSurfaceY, out _neighborCapTileType, out _neighborCapWallType))
                 return false;
 
             _surfaceY = Math.Max(50, neighborSurfaceY + ShoreSurfaceOffset);
             _clearTopY = Math.Max(5, _surfaceY - 80);
-            _clearedBottomY = Math.Min(Main.maxTilesY - 5, _surfaceY + SeafloorDepth + SeafloorSolidBuffer + 100);
 
-            // always clear at least the near-surface band; deeper clearing fades out toward the seam
-            int guaranteedBottomY = Math.Min(_clearedBottomY, _surfaceY + WaterlineOffset + ShallowSeafloorDepth + 40);
-
-            const int localFillMargin = 60;
-            int localFillDepth = SeafloorSolidBuffer + BackfillDepth + TransitionDepth + localFillMargin;
-
-            _clearBottomByX = new int[_width];
+            _existingTopByX = new int[_width];
             _seafloorTopByX = new int[_width];
             _isDryBeachByX = new bool[_width];
+            _sandCapByX = new bool[_width];
+            _dirtEndDepthByX = new int[_width];
+            _convertBottomByX = new int[_width];
 
-<<<<<<< Updated upstream
-=======
             // 1. what is already there (must happen before anything is modified)
             for (int x = 0; x < _width; x++)
                 _existingTopByX[x] = FindExistingSurface(x);
@@ -281,15 +384,16 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             // 3. blend the design into the existing terrain. weight is 0 at the seam (=> existing height) and 1 inside the biome
             int deepest = 0;
             int deepestFloor = 0;
->>>>>>> Stashed changes
             for (int x = 0; x < _width; x++)
             {
+                float weight = ConversionWeight(x);
+                int mirroredX = _width - 1 - x;
                 int waterTop = ComputeWaterTop(x);
-                int groundTop = ComputeGroundTop(x, waterTop, out bool isDryBeach);
+
+                int groundTop = (int)Math.Round(MathHelper.Lerp(_existingTopByX[x], design[x], weight));
+                groundTop = (int)MathHelper.Clamp(groundTop, 10, Main.maxTilesY - 10);
+
                 _seafloorTopByX[x] = groundTop;
-<<<<<<< Updated upstream
-                _isDryBeachByX[x] = isDryBeach;
-=======
                 _isDryBeachByX[x] = groundTop <= waterTop || mirroredX <= SeamWaterGuard;
                 _sandCapByX[x] = groundTop <= _surfaceY + ShoreSandScanBelowSurface;
                 _dirtEndDepthByX[x] = ComputeDirtEndDepth(x);
@@ -297,24 +401,9 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
 
                 deepest = Math.Max(deepest, _convertBottomByX[x]);
                 deepestFloor = Math.Max(deepestFloor, groundTop);
->>>>>>> Stashed changes
             }
 
-            // the fall of into the ocean its hammered rn cause i like it like that but might change based off others
-            SmoothHeightProfile(_seafloorTopByX, MaxHeightStepPerColumn);
-
-            for (int x = 0; x < _width; x++)
-            {
-                int groundTop = _seafloorTopByX[x];
-
-                int localBottomY = groundTop + localFillDepth;
-
-                float fade = Math.Max(0.05f, RightEdgeFade(x));
-                int fadedBottomY = _clearTopY + (int)((_clearedBottomY - _clearTopY) * fade);
-
-                int cappedBottomY = Math.Min(fadedBottomY, localBottomY);
-                _clearBottomByX[x] = Math.Min(_clearedBottomY, Math.Max(guaranteedBottomY, cappedBottomY));
-            }
+            _affectedBottomY = Math.Min(Main.maxTilesY - 5, deepest + 1);
 
             // The shore ends where the dirt layer under the deepest seafloor hands over to Volcanic Stone.
             // Stay out of the underworld (it starts ~200 tiles above the bottom of the world).
@@ -397,6 +486,30 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             return 0;
         }
 
+        // Top of the terrain that currently exists in this column (ocean floor, beach, hill...)
+        private static int FindExistingSurface(int x)
+        {
+            int limit = Math.Min(Main.maxTilesY - 10, _surfaceY + SeafloorDepth + SeafloorSolidBuffer);
+            int y = Math.Max(10, _surfaceY - ExistingSurfaceScanAbove);
+
+            // started inside a hill that is taller than the scan window, walk up to its real top
+            if (IsNaturalGround(Main.tile[x, y]))
+            {
+                while (y > 10 && IsNaturalGround(Main.tile[x, y - 1]))
+                    y--;
+
+                return y;
+            }
+
+            for (; y < limit; y++)
+            {
+                if (IsNaturalGround(Main.tile[x, y]))
+                    return y;
+            }
+
+            return _surfaceY + WaterlineOffset + ShallowSeafloorDepth;
+        }
+
         #endregion
 
         #region Steps
@@ -404,7 +517,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         // rails/platforms/rope left behind by vanilla structures
         private static void RemoveLeftoverDebris()
         {
-            int maxY = Math.Min(Main.maxTilesY - 5, _clearedBottomY + 200);
+            int maxY = Math.Min(Main.maxTilesY - 5, _affectedBottomY + 200);
 
             for (int x = 0; x < _width; x++)
             {
@@ -426,35 +539,271 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             }
         }
 
-        //FUCK THE OCEAN WE GOT A worse one :(
-        private static void ReplaceVanillaOcean()
+        private static void ReshapeTerrain()
         {
-            PurgeChestsAndSigns(0, _width, _clearTopY, _clearedBottomY);
-
             for (int x = 0; x < _width; x++)
-            {
-                int bottomY = _clearBottomByX[x];
+                ReshapeColumn(x);
+        }
 
-                for (int y = _clearTopY; y < bottomY; y++)
-                    ResetTile(x, y);
+        // The whole "replace instead of rebuild" idea lives here.
+        private static void ReshapeColumn(int x)
+        {
+            int existingTop = _existingTopByX[x];
+            int groundTop = _seafloorTopByX[x];
+            int waterTop = ComputeWaterTop(x);
+            bool hasWater = !_isDryBeachByX[x];
+            float weight = ConversionWeight(x);
+            float placeWeight = PlaceWeight(x);
+
+            // only keep vanilla trees/plants if the ground under them is still where it was
+            bool keepDecor = Math.Abs(groundTop - existingTop) <= 1 && KeepDecorInColumn(x, weight);
+
+            int startY = Math.Max(5, Math.Min(_clearTopY, existingTop));
+            int endY = _convertBottomByX[x];
+            int decorBottomY = Math.Min(endY, Math.Max(groundTop, existingTop) + DecorClearDepth);
+            int fillBelowY = Math.Max(existingTop, groundTop + MinSurfaceCrust);
+
+            // ---- above the new surface: dig out whatever is there, then set water / no water ----
+            for (int y = startY; y < groundTop; y++)
+            {
+                if (!InBounds(x, y))
+                    continue;
+
+                Tile tile = Main.tile[x, y];
+
+                if (tile.HasTile && (!keepDecor || !IsDecoration(tile.TileType)))
+                {
+                    tile.ClearTile();
+                    _tilesDug++;
+                }
+
+                if (tile.WallType != 0 && !Main.wallDungeon[tile.WallType])
+                    tile.WallType = 0;
+
+                if (hasWater && y >= waterTop)
+                {
+                    tile.LiquidType = LiquidID.Water;
+                    tile.LiquidAmount = 255;
+                }
+                else
+                {
+                    tile.LiquidAmount = 0;
+                }
+            }
+
+            // ---- from the new surface down: fill gaps, strip decoration, convert existing tiles in place ----
+            for (int y = groundTop; y < endY; y++)
+            {
+                if (!InBounds(x, y))
+                    continue;
+
+                Tile tile = Main.tile[x, y];
+                int depth = y - groundTop;
+
+                // ocean: seal vanilla caves under the seafloor, regardless of how far the convert -> place handoff has got
+                if (hasWater && depth < OceanSealDepth && (!tile.HasTile || IsDecoration(tile.TileType)))
+                {
+                    FillTile(x, y, depth);
+                    _tilesPlaced++;
+                    continue;
+                }
+
+                // interior: place the designed terrain over whatever was there (caves, ores, water and all).
+                // placeWeight ramps 0 -> 1 so vanilla caves/ores fade out gradually instead of stopping at a line
+                if (placeWeight > 0f
+                    && ShouldConvert(x, y, depth, weight)
+                    && (placeWeight >= 0.999f || DitherPastThreshold(x, y, placeWeight, 1400)))
+                {
+                    FillTile(x, y, depth);
+                    _tilesPlaced++;
+                    continue;
+                }
+
+                // new ground is higher than the old one (or a cave opening right under the surface): this is the only place we add tiles
+                if (y < fillBelowY && (!tile.HasTile || IsDecoration(tile.TileType)))
+                {
+                    FillTile(x, y, depth);
+                    _tilesFilled++;
+                    continue;
+                }
+
+                if (tile.HasTile && IsDecoration(tile.TileType))
+                {
+                    if (!keepDecor && y < decorBottomY)
+                        tile.ClearTile();
+                }
+                else if (tile.HasTile)
+                {
+                    ConvertSolidInPlace(x, y, depth, weight);
+                }
+
+                ConvertWallInPlace(x, y, depth, weight);
+            }
+
+            if (PurgeEvilBiome && weight >= EvilForceMinWeight)
+                PurgeEvilBelow(x, endY);
+        }
+
+        // Below the biome the terrain is still vanilla, so evil tiles become their plain equivalents and evil walls are removed
+        private static void PurgeEvilBelow(int x, int startY)
+        {
+            int endY = Math.Min(Main.maxTilesY - 5, startY + EvilPurgeExtraDepth);
+
+            for (int y = startY; y < endY; y++)
+            {
+                if (!InBounds(x, y))
+                    continue;
+
+                Tile tile = Main.tile[x, y];
+
+                if (tile.WallType != 0 && EvilWalls.Contains(tile.WallType))
+                    tile.WallType = 0;
+
+                if (tile.HasTile && EvilToVanilla.TryGetValue(tile.TileType, out ushort replacement))
+                {
+                    tile.TileType = replacement;
+                    tile.TileFrameX = 0;
+                    tile.TileFrameY = 0;
+                }
             }
         }
 
-        private static void GenerateShoreAndSeafloor()
+        // 0 at the seam (leave the existing terrain alone), 1 once we are SeamBlendWidth columns into the biome
+        private static float ConversionWeight(int x)
         {
-            for (int x = 0; x < _width; x++)
+            int mirroredX = _width - 1 - x;
+            return SmoothStep(MathHelper.Clamp(mirroredX / (float)Math.Max(1, SeamBlendWidth), 0f, 1f));
+        }
+
+        // 0 inside the seam blend zone (convert only), 1 once we are PlaceBlendWidth columns past it (place only)
+        private static float PlaceWeight(int x)
+        {
+            int mirroredX = _width - 1 - x;
+            return SmoothStep(MathHelper.Clamp((mirroredX - SeamBlendWidth) / (float)Math.Max(1, PlaceBlendWidth), 0f, 1f));
+        }
+
+        // fades the conversion out toward the bottom so there is no flat edge where the biome stops
+        private static float ConversionDepthFade(int depth)
+        {
+            int fadeStart = ConvertDepth;
+            if (depth <= fadeStart)
+                return 1f;
+
+            float t = (depth - fadeStart) / (float)Math.Max(1, ConvertFadeWidth);
+            return 1f - SmoothStep(MathHelper.Clamp(t, 0f, 1f));
+        }
+
+        private static bool ShouldConvert(int x, int y, int depth, float weight)
+        {
+            float chance = weight * ConversionDepthFade(depth);
+
+            if (chance >= 0.999f)
+                return true;
+            if (chance <= 0f)
+                return false;
+
+            return DitherPastThreshold(x, y, chance, 1300);
+        }
+
+        private static void ConvertSolidInPlace(int x, int y, int depth, float weight)
+        {
+            Tile tile = Main.tile[x, y];
+            ushort type = tile.TileType;
+
+            bool soil = SoilTiles.Contains(type);
+            bool stone = !soil && StoneTiles.Contains(type);
+
+            // ores, gems, wood, bricks, our own tiles... are not touched
+            if (!soil && !stone)
+                return;
+
+            bool forcedEvil = PurgeEvilBiome && weight >= EvilForceMinWeight && EvilToVanilla.ContainsKey(type);
+            if (!forcedEvil && !ShouldConvert(x, y, depth, weight))
+                return;
+
+            // only the type changes, so slopes / half blocks / the cave shape that is already there stay as they are
+            tile.TileType = PickMaterial(x, y, depth, stone);
+            tile.TileFrameX = 0;
+            tile.TileFrameY = 0;
+            tile.TileColor = 0;
+
+            _tilesConverted++;
+        }
+
+        private static void ConvertWallInPlace(int x, int y, int depth, float weight)
+        {
+            Tile tile = Main.tile[x, y];
+            ushort wall = tile.WallType;
+
+            if (wall == 0 || Main.wallDungeon[wall])
+                return;
+
+            bool forcedEvil = PurgeEvilBiome && weight >= EvilForceMinWeight && EvilWalls.Contains(wall);
+            if (!forcedEvil && !ShouldConvert(x, y, depth, weight))
+                return;
+
+            // while the biome walls are still WallID.None this just removes the old wall
+            tile.WallType = WallForTile(PickMaterial(x, y, depth, false));
+        }
+
+        // decides what a tile becomes based on how deep it is: sand cap -> dirt -> dithers into volcanic stone
+        private static ushort PickMaterial(int x, int y, int depth, bool stoneLike)
+        {
+            // natural rock stays rock, it just turns volcanic
+            if (stoneLike)
+                return VolcanicStoneTile;
+
+            if (_sandCapByX[x] && depth < ShoreSandCapDepth)
             {
-                int groundTop = _seafloorTopByX[x];
+                int transitionStart = ShoreSandCapDepth - ShoreSandTransitionDepth;
+                if (depth < transitionStart)
+                    return ShoreSandTile;
 
-                if (!_isDryBeachByX[x])
-                {
-                    int waterTop = ComputeWaterTop(x);
-                    for (int y = waterTop; y < groundTop; y++)
-                        SetLiquid(x, y);
-                }
-
-                FillColumnBelow(x, groundTop);
+                float p = (depth - transitionStart) / (float)Math.Max(1, ShoreSandTransitionDepth);
+                return DitherPastThreshold(x, y, p, 900) ? SeafloorTile : ShoreSandTile;
             }
+
+            int dirtEnd = _dirtEndDepthByX[x];
+            if (depth >= dirtEnd)
+            {
+                float progress = Math.Min(1f, (depth - dirtEnd) / (float)Math.Max(1, TransitionDepth));
+                if (DitherPastThreshold(x, y, progress, 700))
+                    return VolcanicStoneTile;
+            }
+
+            return SeafloorTile;
+        }
+
+        private static ushort WallForTile(ushort tileType)
+        {
+            if (tileType == ShoreSandTile)
+                return ShoreSandWall;
+            if (tileType == SeafloorTile)
+                return SeafloorWall;
+
+            return VolcanicStoneWall;
+        }
+
+        // Brand new tile (only used where the new ground is higher than what was there). Near the seam it
+        // uses the neighbor's material so the patch doesn't stand out.
+        private static void FillTile(int x, int y, int depth)
+        {
+            ushort tileType = PickMaterial(x, y, depth, false);
+            ushort wallType = WallForTile(tileType);
+
+            ApplySeamBlend(x, y, ref tileType, ref wallType);
+            SetSolid(x, y, tileType, wallType);
+        }
+
+        private static bool IsDecoration(ushort type) => !Main.tileSolid[type] || Main.tileSolidTop[type];
+
+        // thins the vanilla trees/plants out in chunks across the blend zone instead of a hard cutoff
+        private static bool KeepDecorInColumn(int x, float weight)
+        {
+            if (weight >= 1f)
+                return false;
+
+            return Hash(x / DecorCellWidth, 17, _worldSeed + 1500) >= weight;
         }
 
         private static int ComputeWaterTop(int x)
@@ -463,7 +812,8 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             return _surfaceY + WaterlineOffset + (int)waterNoise;
         }
 
-        private static int ComputeGroundTop(int x, int waterTop, out bool isDryBeach)
+        // The DESIGNED ground height. This is not used directly anymore, Setup() blends it into the existing terrain.
+        private static int ComputeDesignTop(int x, int waterTop)
         {
             int mirroredX = _width - 1 - x;
             float rightFade = RightEdgeFade(x);
@@ -483,8 +833,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 )
             );
 
-            isDryBeach = mirroredX < _shoreWidth && beachTop < waterTop;
-            if (isDryBeach)
+            if (mirroredX < _shoreWidth && beachTop < waterTop)
                 return beachTop;
 
             float rampX = Math.Max(0, mirroredX - _shoreWidth);
@@ -510,6 +859,12 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             return waterTop + seafloorDepth;
         }
 
+        private static int ComputeDirtEndDepth(int x)
+        {
+            float depthWobble = FBM(x * DirtDepthWobbleMagnification, 900f, _worldSeed, 3) * DirtDepthWobbleAmplitude;
+            return Math.Max(0, SeafloorSolidBuffer + BackfillDepth - TransitionDepth + (int)depthWobble);
+        }
+
         // clamps the diff between adjacent columns. runs both directions so a run of jumps gets spread out
         // instead of just clipping the first one and leaving the rest
         private static void SmoothHeightProfile(int[] heights, int maxStep)
@@ -521,46 +876,13 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 heights[x] = (int)MathHelper.Clamp(heights[x], heights[x + 1] - maxStep, heights[x + 1] + maxStep);
         }
 
-        private static void FillColumnBelow(int x, int groundTop)
-        {
-            int bottomY = _clearBottomByX[x];
-
-            float depthWobble = FBM(x * DirtDepthWobbleMagnification, 900f, _worldSeed, 3) * DirtDepthWobbleAmplitude;
-
-            int dirtEnd = Math.Min(
-                bottomY - TransitionDepth,
-                groundTop + SeafloorSolidBuffer + BackfillDepth - TransitionDepth + (int)depthWobble
-            );
-            dirtEnd = Math.Max(groundTop, dirtEnd);
-
-            for (int y = groundTop; y < bottomY; y++)
-            {
-                ushort tileHere = SeafloorTile;
-                ushort wallHere = SeafloorWall;
-
-                if (y >= dirtEnd)
-                {
-                    float progress = Math.Min(1f, (y - dirtEnd) / (float)Math.Max(1, TransitionDepth));
-
-                    if (DitherPastThreshold(x, y, progress, 700))
-                    {
-                        tileHere = VolcanicStoneTile;
-                        wallHere = VolcanicStoneWall;
-                    }
-                }
-
-                ApplySeamBlend(x, y, ref tileHere, ref wallHere);
-
-                SetSolid(x, y, tileHere, wallHere);
-            }
-        }
-
         private static bool DitherPastThreshold(int x, int y, float progress, int seedOffset)
         {
             float dither = FBM(x * TransitionNoiseMagnification, y * TransitionNoiseMagnification, _worldSeed + seedOffset, 2) * 0.5f + 0.5f;
             return dither < progress;
         }
 
+        // Only used for tiles we place newly. Near the seam they take the neighbor's material.
         private static void ApplySeamBlend(int x, int y, ref ushort tileHere, ref ushort wallHere)
         {
             if (x < _width - SeamBlendWidth)
@@ -583,70 +905,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             return SmoothStep(t);
         }
 
-        // Finds the first exposed solid tile in a column, near the neighboring surface height
-        private static int FindSurfaceY(int x)
-        {
-            int scanTop = Math.Max(5, _surfaceY - ShoreSandScanAboveSurface);
-            int scanBottom = Math.Min(Main.maxTilesY - 5, _surfaceY + ShoreSandScanBelowSurface);
-
-            for (int y = scanTop; y < scanBottom; y++)
-            {
-                if (!Main.tile[x, y].HasTile)
-                    continue;
-
-                // only exposed tiles count
-                if (y > 5 && Main.tile[x, y - 1].HasTile)
-                    continue;
-
-                return y;
-            }
-
-            return -1;
-        }
-
-        // Caps the actual coastline with sand also blending into the neighboring biome's material near the edge
-        private static void PaintShoreline()
-        {
-            for (int x = 0; x < _width; x++)
-            {
-                int groundY = FindSurfaceY(x);
-                if (groundY < 0)
-                    continue;
-
-                int capBottom = groundY + ShoreSandCapDepth;
-                int transitionStart = capBottom - ShoreSandTransitionDepth;
-
-                for (int y = groundY; y < capBottom; y++)
-                {
-                    if (!InBounds(x, y))
-                        continue;
-
-                    if (!Main.tile[x, y].HasTile)
-                        break; 
-
-                    ushort tileHere = ShoreSandTile;
-                    ushort wallHere = ShoreSandWall;
-
-                    if (y >= transitionStart)
-                    {
-                        float transitionProgress = (y - transitionStart) / (float)Math.Max(1, capBottom - transitionStart);
-
-                        if (DitherPastThreshold(x, y, transitionProgress, 900))
-                        {
-                            tileHere = SeafloorTile;
-                            wallHere = SeafloorWall;
-                        }
-                    }
-
-                    if (x >= _width - SeamBlendWidth)
-                        ApplySeamBlend(x, y, ref tileHere, ref wallHere);
-
-                    SetSolid(x, y, tileHere, wallHere);
-                }
-            }
-        }
-
-        // Adds rock spires and debris to the open water 
+        // Adds rock spires and debris to the open water
         private static void ScatterWaterClutter()
         {
             const int clusterSpacing = 45;
@@ -662,7 +921,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                     continue;
 
                 if (!InBounds(jitteredX, waterCheckY) || Main.tile[jitteredX, waterCheckY].LiquidAmount == 0)
-                    continue; 
+                    continue;
 
                 if (IsNearSeafloorPocket(jitteredX))
                     continue;
@@ -876,7 +1135,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 angle += turn;
 
                 x += (float)Math.Cos(angle);
-                y += (float)Math.Sin(angle) * 0.6f; 
+                y += (float)Math.Sin(angle) * 0.6f;
 
                 int ix = (int)x;
                 int iy = (int)y;
@@ -884,12 +1143,21 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 if (ix < 5 || ix >= _width - 5 || !InBounds(ix, iy))
                     break;
 
+                // keep worms under the seafloor instead of letting them tunnel out through the beach
+                int safeMinY = FloorAt(ix) + CaveNetworkMinDepthBelowFloor;
+                if (iy < safeMinY)
+                {
+                    iy = safeMinY;
+                    y = iy;
+                    angle = Math.Cos(angle) >= 0 ? 0.4f : MathHelper.Pi - 0.4f; // keep the x direction, head back down
+                }
+
                 int safeMaxY = FloorAt(ix) + CaveNetworkMaxDepthBelowFloor + WormFloorSafetyMargin;
                 if (iy > safeMaxY)
                 {
                     iy = safeMaxY;
                     y = iy;
-                    angle = -Math.Abs(angle); 
+                    angle = -Math.Abs(angle);
                 }
 
                 float endTaper = Math.Min(1f, Math.Min(t, 1f - t) * 3f);
@@ -916,7 +1184,7 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         {
             int maxX = Math.Min(_width - 2, Main.maxTilesX - 5);
             int minY = Math.Max(5, _surfaceY - 70);
-            int maxY = Math.Min(_clearedBottomY, Main.maxTilesY - 5);
+            int maxY = Math.Min(_affectedBottomY, Main.maxTilesY - 5);
 
             for (int x = 2; x < maxX; x++)
             {
@@ -932,8 +1200,8 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
         {
             for (int x = 0; x < _width; x++)
             {
-                int bandTop = Math.Max(_clearTopY, _clearBottomByX[x] - LavaFringeBandTop);
-                int bandBottom = Math.Min(Main.maxTilesY - 5, _clearBottomByX[x] + LavaFringeBandBottom);
+                int bandTop = Math.Max(_clearTopY, _convertBottomByX[x] - LavaFringeBandTop);
+                int bandBottom = Math.Min(Main.maxTilesY - 5, _convertBottomByX[x] + LavaFringeBandBottom);
 
                 for (int y = bandTop; y < bandBottom; y++)
                 {
@@ -949,11 +1217,121 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             }
         }
 
+        // The old version nulled every chest/sign in a rectangle. Now only the tiles in the decoration band get wiped,
+        // and chests deeper down are left alone, so this removes the chest/sign DATA only where the tile is actually gone.
+        private static void PurgeOrphanedChestsAndSigns()
+        {
+            for (int i = 0; i < Main.chest.Length; i++)
+            {
+                Chest chest = Main.chest[i];
+                if (chest == null || chest.x < 0 || chest.x >= _width || chest.y < 5 || chest.y >= _affectedBottomY)
+                    continue;
+
+                Tile tile = Main.tile[chest.x, chest.y];
+                if (!tile.HasTile || !Main.tileContainer[tile.TileType])
+                    Main.chest[i] = null;
+            }
+
+            for (int i = 0; i < Main.sign.Length; i++)
+            {
+                Sign sign = Main.sign[i];
+                if (sign == null || sign.x < 0 || sign.x >= _width || sign.y < 5 || sign.y >= _affectedBottomY)
+                    continue;
+
+                Tile tile = Main.tile[sign.x, sign.y];
+                if (!tile.HasTile || !Main.tileSign[tile.TileType])
+                    Main.sign[i] = null;
+            }
+        }
+
+        // Runs as its own pass near the END of worldgen. Vanilla passes that come after "Settle Liquids Again"
+        // (Micro Biomes: cabins, booby-trapped chests, etc.) can place chests into the finished ocean/shore.
+        public static void CleanupLateGeneration()
+        {
+            if (_seafloorTopByX == null)
+                return;
+
+            try
+            {
+                RemoveStrayChests();
+            }
+            finally
+            {
+                _seafloorTopByX = null;
+            }
+        }
+
+        private static void RemoveStrayChests()
+        {
+            int removed = 0;
+
+            for (int i = 0; i < Main.chest.Length; i++)
+            {
+                Chest chest = Main.chest[i];
+                if (chest == null || chest.x < 0 || chest.x >= _width || chest.y < _clearTopY || chest.y >= _affectedBottomY)
+                    continue;
+
+                if (!InBounds(chest.x, chest.y))
+                    continue;
+
+                Tile origin = Main.tile[chest.x, chest.y];
+                int w = 2;
+                int h = 2;
+
+                if (origin.HasTile)
+                {
+                    TileObjectData data = TileObjectData.GetTileData(origin);
+                    if (data != null)
+                    {
+                        w = data.Width;
+                        h = data.Height;
+                    }
+                }
+
+                bool inWater = false;
+                for (int dx = 0; dx < w && !inWater; dx++)
+                {
+                    for (int dy = 0; dy < h; dy++)
+                    {
+                        if (InBounds(chest.x + dx, chest.y + dy) && Main.tile[chest.x + dx, chest.y + dy].LiquidAmount > 0)
+                        {
+                            inWater = true;
+                            break;
+                        }
+                    }
+                }
+
+                bool onShore = chest.y <= FloorAt(chest.x) + ShoreChestClearDepth;
+                if (!inWater && !onShore)
+                    continue;
+
+                for (int dx = 0; dx < w; dx++)
+                {
+                    for (int dy = 0; dy < h; dy++)
+                    {
+                        int cx = chest.x + dx;
+                        int cy = chest.y + dy;
+                        if (!InBounds(cx, cy))
+                            continue;
+
+                        Tile cell = Main.tile[cx, cy];
+                        if (cell.HasTile && Main.tileContainer[cell.TileType])
+                            cell.ClearTile();
+                    }
+                }
+
+                Main.chest[i] = null;
+                removed++;
+            }
+
+            Log($"removed {removed} stray chests");
+        }
+
         // tiles are written directly with no per-tile framing, so re-frame the whole area once at the end
         private static void FrameAffectedArea()
         {
             int topY = Math.Max(1, _clearTopY - 2);
-            int bottomY = Math.Min(Main.maxTilesY - 2, _clearedBottomY + 200);
+            int bottomY = Math.Min(Main.maxTilesY - 2, _affectedBottomY + 200);
 
             WorldGen.RangeFrame(0, topY, _width + 1, bottomY);
         }
@@ -1006,32 +1384,6 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
                 return;
 
             Main.tile[x, y].ClearTile();
-        }
-
-        private static void ResetTile(int x, int y)
-        {
-            if (!InBounds(x, y))
-                return;
-
-            Main.tile[x, y].ClearEverything();
-        }
-
-
-        private static void PurgeChestsAndSigns(int minX, int maxX, int minY, int maxY)
-        {
-            for (int i = 0; i < Main.chest.Length; i++)
-            {
-                Chest chest = Main.chest[i];
-                if (chest != null && chest.x >= minX && chest.x < maxX && chest.y >= minY && chest.y < maxY)
-                    Main.chest[i] = null;
-            }
-
-            for (int i = 0; i < Main.sign.Length; i++)
-            {
-                Sign sign = Main.sign[i];
-                if (sign != null && sign.x >= minX && sign.x < maxX && sign.y >= minY && sign.y < maxY)
-                    Main.sign[i] = null;
-            }
         }
 
         #endregion
@@ -1130,6 +1482,23 @@ namespace ShatteredIllusion.Content.World.WorldGeneration
             int insertAt = settleLiquidsIndex == -1 ? tasks.Count : settleLiquidsIndex;
 
             tasks.Insert(insertAt, new AshenShoreGenPass());
+
+            // second pass at the very end, after every vanilla pass that can drop chests into our biome
+            int finalCleanupIndex = tasks.FindIndex(genPass => genPass.Name.Equals("Final Cleanup"));
+            tasks.Insert(finalCleanupIndex == -1 ? tasks.Count : finalCleanupIndex, new AshenShoreCleanupGenPass());
+        }
+
+        private class AshenShoreCleanupGenPass : GenPass
+        {
+            public AshenShoreCleanupGenPass() : base("Ashen Shore Cleanup", 0.1f)
+            {
+            }
+
+            protected override void ApplyPass(GenerationProgress progress, GameConfiguration configuration)
+            {
+                progress.Message = "Cleaning up Ashen Shore";
+                AshenShore.CleanupLateGeneration();
+            }
         }
 
         private class AshenShoreGenPass : GenPass

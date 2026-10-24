@@ -238,6 +238,7 @@ Projectiles: {
 	DuneRendPincersProjectile.DisplayName: Dune Rend Pincers Projectile
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 	StarryProjectile.DisplayName: Starry Projectile
+	LivingWandProtoProjectile.DisplayName: Living Wand Proto Projectile
 }
 
 Keybinds: {
