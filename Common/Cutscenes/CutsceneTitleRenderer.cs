@@ -184,6 +184,11 @@ namespace ShatteredIllusion.Common.Cutscenes
             }
         }
 
+        internal static void Unload()
+        {
+            throw new NotImplementedException();
+        }
+
 =======
             float elapsed = timer - titleStart;
 

@@ -1,8 +1,5 @@
 using Microsoft.Xna.Framework.Graphics;
-<<<<<<< Updated upstream
-=======
 using ShatteredIllusion.Common.Cutscenes;
->>>>>>> Stashed changes
 using Terraria;
 using Terraria.Graphics;
 using Terraria.ModLoader;
@@ -26,10 +23,6 @@ namespace ShatteredIllusion.Common.Visuals
         public override void PostDrawInterface(SpriteBatch spriteBatch) => Cinema.DrawOverlay(spriteBatch);
 
         public override void OnWorldUnload() => Cinema.HardReset();
-<<<<<<< Updated upstream
-    }
-}
-=======
 
         public override void Unload()
         {
@@ -38,4 +31,3 @@ namespace ShatteredIllusion.Common.Visuals
         }
     }
 }
->>>>>>> Stashed changes
