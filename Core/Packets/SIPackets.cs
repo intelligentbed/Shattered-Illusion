@@ -15,6 +15,7 @@ namespace ShatteredIllusion.Core.Packets
         ParryVisualEffect = 6,
         StartBossCutscene = 7,
         SyncAntlionDiveState = 8,
+        ParrySucceeded = 9,
     }
 
     internal static class SIPackets

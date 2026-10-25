@@ -11,8 +11,14 @@ namespace ShatteredIllusion.World.WorldGeneration
 {
     public class MossWorldGen : ModSystem
     {
+<<<<<<< Updated upstream
         // 1 in N dirt tiles inside the cavern layer starts a moss vein. Lower = more moss.
         private const int CavernVeinChance = 200;
+=======
+        // How many moss veins get seeded under each tree. Raise these for more moss.
+        private const int MinTreeVeins = 14;
+        private const int MaxTreeVeins = 26;
+>>>>>>> Stashed changes
 
         // Chance (1 in N) for each tile inside a vein's ellipse to be skipped, for a ragged edge.
         private const int SkipChance = 4;
@@ -64,6 +70,7 @@ namespace ShatteredIllusion.World.WorldGeneration
 
             ushort mossType = (ushort)ModContent.TileType<MossBlock>();
 
+<<<<<<< Updated upstream
             int cavernTiles = GenerateCavernMoss(progress, mossType);
             int treeTiles = GenerateTreeMoss(progress, mossType);
 
@@ -107,6 +114,91 @@ namespace ShatteredIllusion.World.WorldGeneration
                         WorldGen.genRand.Next(2, 5),
                         minY,
                         maxY,
+=======
+            int treeTiles = GenerateTreeMoss(progress, mossType);
+
+            Mod.Logger.Info($"[MossGen] Placed {treeTiles} moss tiles under living trees.");
+        }
+
+        /// <summary>
+        /// Puts moss veins in the dirt underneath living trees.
+        /// </summary>
+        private int GenerateTreeMoss(GenerationProgress progress, ushort mossType)
+        {
+            int placed = 0;
+            int lastTreeX = -1000;
+            int surfaceY = (int)Main.worldSurface;
+
+            for (int i = 20; i < Main.maxTilesX - 20; i++)
+            {
+                progress.Set(i / (float)Main.maxTilesX);
+
+                // Only one pass per tree, not one per trunk column.
+                if (i - lastTreeX < TreeColumnSpacing)
+                    continue;
+
+                // Topmost living wood in this column.
+                int trunkY = -1;
+
+                for (int j = 20; j < surfaceY; j++)
+                {
+                    Tile tile = Main.tile[i, j];
+
+                    if (tile.HasTile && tile.TileType == TileID.LivingWood)
+                    {
+                        trunkY = j;
+                        break;
+                    }
+                }
+
+                if (trunkY == -1)
+                    continue;
+
+                // Find the ground below the tree. The trunk can be hollow, so skip
+                // over air, living wood and leaves until we hit real solid ground.
+                int groundY = -1;
+                int searchEnd = System.Math.Min(
+                    trunkY + TreeGroundSearchDepth,
+                    Main.maxTilesY - 20);
+
+                for (int j = trunkY; j < searchEnd; j++)
+                {
+                    Tile tile = Main.tile[i, j];
+
+                    if (!tile.HasTile ||
+                        tile.TileType == TileID.LivingWood ||
+                        tile.TileType == TileID.LeafBlock)
+                    {
+                        continue;
+                    }
+
+                    if (Main.tileSolid[tile.TileType])
+                    {
+                        groundY = j;
+                        break;
+                    }
+                }
+
+                if (groundY == -1)
+                    continue;
+
+                lastTreeX = i;
+
+                int treeVeinCount = WorldGen.genRand.Next(MinTreeVeins, MaxTreeVeins + 1);
+
+                for (int vein = 0; vein < treeVeinCount; vein++)
+                {
+                    int centerX = i + WorldGen.genRand.Next(-14, 15);
+                    int centerY = groundY + WorldGen.genRand.Next(0, 20);
+
+                    placed += PlaceMossVein(
+                        centerX,
+                        centerY,
+                        WorldGen.genRand.Next(3, 7),
+                        WorldGen.genRand.Next(3, 7),
+                        0,
+                        Main.maxTilesY - 20,
+>>>>>>> Stashed changes
                         mossType);
                 }
             }
@@ -115,6 +207,7 @@ namespace ShatteredIllusion.World.WorldGeneration
         }
 
         /// <summary>
+<<<<<<< Updated upstream
         /// Puts moss veins in the dirt underneath living trees.
         /// </summary>
         private int GenerateTreeMoss(GenerationProgress progress, ushort mossType)
@@ -143,6 +236,48 @@ namespace ShatteredIllusion.World.WorldGeneration
                         trunkY = j;
                         break;
                     }
+=======
+        /// Replaces dirt inside an ellipse with moss. Returns how many tiles were changed.
+        /// </summary>
+        private static int PlaceMossVein(
+            int centerX,
+            int centerY,
+            int radiusX,
+            int radiusY,
+            int minY,
+            int maxY,
+            ushort mossType)
+        {
+            int placed = 0;
+
+            for (int i = centerX - radiusX; i <= centerX + radiusX; i++)
+            {
+                for (int j = centerY - radiusY; j <= centerY + radiusY; j++)
+                {
+                    if (!WorldGen.InWorld(i, j, 20) || j < minY || j >= maxY)
+                        continue;
+
+                    float dx = (i - centerX) / (float)radiusX;
+                    float dy = (j - centerY) / (float)radiusY;
+
+                    if (dx * dx + dy * dy > 1f)
+                        continue;
+
+                    // Randomly skip some tiles for a rough edge.
+                    if (WorldGen.genRand.NextBool(SkipChance))
+                        continue;
+
+                    Tile tile = Main.tile[i, j];
+
+                    if (!tile.HasTile || tile.TileType != TileID.Dirt)
+                        continue;
+
+                    // Swap the tile type directly. PlaceTile on an already-occupied tile
+                    // is unreliable, and this keeps walls and other data intact.
+                    tile.TileType = mossType;
+                    WorldGen.SquareTileFrame(i, j, true);
+                    placed++;
+>>>>>>> Stashed changes
                 }
 
                 if (trunkY == -1)
@@ -197,6 +332,7 @@ namespace ShatteredIllusion.World.WorldGeneration
             }
 
             return placed;
+<<<<<<< Updated upstream
         }
 
         /// <summary>
@@ -244,6 +380,8 @@ namespace ShatteredIllusion.World.WorldGeneration
             }
 
             return placed;
+=======
+>>>>>>> Stashed changes
         }
     }
 }

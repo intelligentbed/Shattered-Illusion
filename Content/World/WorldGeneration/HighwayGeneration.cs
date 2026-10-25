@@ -26,9 +26,12 @@ namespace ShatteredIllusion.World.WorldGeneration
         // Extra tiles around the highway that vanilla structures must also stay out of.
         private const int ReservePadding = 12;
 
+<<<<<<< Updated upstream
         // Distance between columns sampled when working out how deep the desert is.
         private const int DepthSampleStep = 8;
 
+=======
+>>>>>>> Stashed changes
         private const string StructurePath =
             "Content/World/Structures/AntlionBossArena.shstruct";
 
@@ -95,6 +98,7 @@ namespace ShatteredIllusion.World.WorldGeneration
         }
 
         /// <summary>
+<<<<<<< Updated upstream
         /// Reads the real size of the structure file, falling back to the old constants.
         /// </summary>
         private static Point16 GetStructureSize()
@@ -124,6 +128,13 @@ namespace ShatteredIllusion.World.WorldGeneration
         private static Point16 ComputePlacement(int width, int height)
         {
             int targetX = Main.maxTilesX / 2 - width / 2;
+=======
+        /// Works out where the highway goes (same logic as before).
+        /// </summary>
+        private static Point16 ComputePlacement()
+        {
+            int targetX = Main.maxTilesX / 2 - StructureWidth / 2;
+>>>>>>> Stashed changes
             int targetY = Main.maxTilesY / 3;
 
             Rectangle desertBounds = GenVars.UndergroundDesertLocation;
@@ -221,14 +232,23 @@ namespace ShatteredIllusion.World.WorldGeneration
         {
             progress.Message = "Reserving space for the highway...";
 
+<<<<<<< Updated upstream
             Point16 size = GetStructureSize();
             Point16 position = ComputePlacement(size.X, size.Y);
+=======
+            Point16 position = ComputePlacement();
+>>>>>>> Stashed changes
 
             reservedArea = new Rectangle(
                 position.X,
                 position.Y,
+<<<<<<< Updated upstream
                 size.X,
                 size.Y);
+=======
+                StructureWidth,
+                StructureHeight);
+>>>>>>> Stashed changes
 
             // Vanilla structure generators check this map before placing anything.
             GenVars.structures.AddProtectedStructure(reservedArea, ReservePadding);
@@ -245,24 +265,43 @@ namespace ShatteredIllusion.World.WorldGeneration
             // If the reserve pass didn't run or came out empty, compute it now.
             if (reservedArea.IsEmpty)
             {
+<<<<<<< Updated upstream
                 Point16 size = GetStructureSize();
                 Point16 fallback = ComputePlacement(size.X, size.Y);
+=======
+                Point16 fallback = ComputePlacement();
+>>>>>>> Stashed changes
 
                 reservedArea = new Rectangle(
                     fallback.X,
                     fallback.Y,
+<<<<<<< Updated upstream
                     size.X,
                     size.Y);
             }
 
             Rectangle area = reservedArea;
             Point16 position = new Point16(area.X, area.Y);
+=======
+                    StructureWidth,
+                    StructureHeight);
+            }
+
+            int targetX = reservedArea.X;
+            int targetY = reservedArea.Y;
+            Point16 position = new Point16(targetX, targetY);
+>>>>>>> Stashed changes
 
             try
             {
                 // Remove anything that generated here anyway (mod structures, chests, caves,
+<<<<<<< Updated upstream
                 // liquids, tile entities, etc.) so the highway is always clean.
                 ClearArea(area);
+=======
+                // liquids, etc.) so the highway is always clean.
+                ClearArea(reservedArea);
+>>>>>>> Stashed changes
 
                 StructureHelper.API.Generator.GenerateStructure(
                     StructurePath,
@@ -282,6 +321,7 @@ namespace ShatteredIllusion.World.WorldGeneration
                 return;
             }
 
+<<<<<<< Updated upstream
             HighwayArea = area;
 
             try
@@ -293,6 +333,13 @@ namespace ShatteredIllusion.World.WorldGeneration
                 ModContent.GetInstance<ShatteredIllusion>().Logger.Warn(
                     $"[HighwayGeneration] Border reframe failed.\n{ex.Message}");
             }
+=======
+            HighwayArea = new Rectangle(
+                targetX,
+                targetY,
+                StructureWidth,
+                StructureHeight);
+>>>>>>> Stashed changes
 
             progress.Message = "Marking the surface above the highway...";
 
@@ -311,7 +358,11 @@ namespace ShatteredIllusion.World.WorldGeneration
         }
 
         /// <summary>
+<<<<<<< Updated upstream
         /// Wipes tiles, walls, liquids, wires, chests, signs and tile entities inside the area.
+=======
+        /// Wipes tiles, walls, liquids, wires, chests and signs inside the area.
+>>>>>>> Stashed changes
         /// </summary>
         private static void ClearArea(Rectangle area)
         {
@@ -331,6 +382,7 @@ namespace ShatteredIllusion.World.WorldGeneration
                     Main.sign[i] = null;
             }
 
+<<<<<<< Updated upstream
             // Item frames, mannequins, weapon racks, etc.
             List<Point16> entityPositions = new List<Point16>();
 
@@ -349,6 +401,8 @@ namespace ShatteredIllusion.World.WorldGeneration
                 }
             }
 
+=======
+>>>>>>> Stashed changes
             for (int x = area.Left; x < area.Right; x++)
             {
                 for (int y = area.Top; y < area.Bottom; y++)
@@ -361,6 +415,7 @@ namespace ShatteredIllusion.World.WorldGeneration
                 }
             }
         }
+<<<<<<< Updated upstream
 
         /// <summary>
         /// Re-frames the tiles just outside the highway so grass, vines and sand
@@ -380,6 +435,8 @@ namespace ShatteredIllusion.World.WorldGeneration
                 WorldGen.SquareTileFrame(area.Right, y, true);
             }
         }
+=======
+>>>>>>> Stashed changes
 
         private static void GenerateSurfaceMarker(int centerX)
         {
@@ -418,6 +475,7 @@ namespace ShatteredIllusion.World.WorldGeneration
             }
         }
 
+<<<<<<< Updated upstream
         private static bool IsSkyTile(int type)
         {
             return type == TileID.Cloud ||
@@ -427,6 +485,8 @@ namespace ShatteredIllusion.World.WorldGeneration
                    type == TileID.Platforms;
         }
 
+=======
+>>>>>>> Stashed changes
         private static int FindSurfaceY(int x)
         {
             // Start at the highest point the surface reaches anywhere in the world, so the

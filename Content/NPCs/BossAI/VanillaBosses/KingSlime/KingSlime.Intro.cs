@@ -285,9 +285,33 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             bool ninja = phase == AttackPhase.NinjaWalk
                 || phase == AttackPhase.NinjaStab
+<<<<<<< Updated upstream
                 || phase == AttackPhase.NinjaStunned
                 || (phase == AttackPhase.TransformToNinja && CurrentStep(npc) == TransformRiseStep);
 
+=======
+                || phase == AttackPhase.NinjaSlash
+                || phase == AttackPhase.NinjaVanish
+                || phase == AttackPhase.NinjaCounter
+                || phase == AttackPhase.NinjaStunned
+                || (phase == AttackPhase.TransformToNinja && CurrentStep(npc) == TransformRiseStep);
+
+            data.ArenaActive = false;
+            data.CrownT = 0f;
+
+            if (IsWeaponFormPhase(phase))
+            {
+                data.WeaponMorph = 0f;
+                ResizeKeepingCenter(npc, data.OriginalWidth, data.OriginalHeight);
+            }
+
+            if (ninja)
+            {
+                SetSlashHitbox(npc, false);
+                npc.alpha = SlimeAlpha;
+            }
+
+>>>>>>> Stashed changes
             SetPhase(npc, AttackPhase.Death);
             SetStep(npc, ninja ? 1 : 0); // step doubles as "which form" for the whole scene
             npc.ai[Slot_Timer] = 0f;

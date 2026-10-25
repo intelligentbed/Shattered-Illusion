@@ -44,9 +44,23 @@ namespace ShatteredIllusion.Content.Biomes
             public int Tex;
         }
 
+<<<<<<< Updated upstream
         private const int MaxPuffs = 700;
         private const int TexSize = 128;
         private const int TexCount = 4;
+=======
+        private struct Bubble
+        {
+            public Vector2 Pos, Vel;
+            public float Size, Life, MaxLife, Phase, Alpha;
+        }
+
+        private const int MaxPuffs = 700;
+        private const int MaxBubbles = 260;
+        private const int TexSize = 128;
+        private const int TexCount = 4;
+        private const int BubbleTexSize = 32;
+>>>>>>> Stashed changes
 
         private static readonly Color FreshColor = new Color(215, 255, 248);
         private static readonly Color OldColor = new Color(110, 220, 205);
@@ -55,6 +69,13 @@ namespace ShatteredIllusion.Content.Biomes
         private int _count;
         private Texture2D[] _tex;
 
+<<<<<<< Updated upstream
+=======
+        private readonly Bubble[] _bubbles = new Bubble[MaxBubbles];
+        private int _bubbleCount;
+        private Texture2D _bubbleTex;
+
+>>>>>>> Stashed changes
         public override void Load()
         {
             if (!Main.dedServ)
@@ -64,10 +85,22 @@ namespace ShatteredIllusion.Content.Biomes
         public override void Unload()
         {
             Texture2D[] old = _tex;
+<<<<<<< Updated upstream
             _tex = null;
 
             if (old != null)
                 Main.QueueMainThreadAction(() => { foreach (Texture2D t in old) t.Dispose(); });
+=======
+            Texture2D oldBubble = _bubbleTex;
+            _tex = null;
+            _bubbleTex = null;
+
+            if (old != null)
+                Main.QueueMainThreadAction(() => { foreach (Texture2D t in old) t.Dispose(); });
+
+            if (oldBubble != null)
+                Main.QueueMainThreadAction(oldBubble.Dispose);
+>>>>>>> Stashed changes
         }
 
         public override void PostUpdateEverything()
@@ -76,14 +109,28 @@ namespace ShatteredIllusion.Content.Biomes
                 return;
 
             UpdatePuffs();
+<<<<<<< Updated upstream
 
             if (Main.LocalPlayer.InModBiome<AshenShoreBiome>())
                 SpawnPuffs();
+=======
+            UpdateBubbles();
+
+            if (Main.LocalPlayer.InModBiome<AshenShoreBiome>())
+            {
+                SpawnPuffs();
+                SpawnBubbles();
+            }
+>>>>>>> Stashed changes
         }
 
         public override void PostDrawTiles()
         {
+<<<<<<< Updated upstream
             if (_tex == null || _count == 0)
+=======
+            if (_tex == null || (_count == 0 && _bubbleCount == 0))
+>>>>>>> Stashed changes
                 return;
 
             Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
@@ -117,9 +164,145 @@ namespace ShatteredIllusion.Content.Biomes
                 Main.spriteBatch.Draw(_tex[p.Tex], screen, null, col, p.Rot, new Vector2(TexSize / 2f), scale, SpriteEffects.None, 0f);
             }
 
+<<<<<<< Updated upstream
             Main.spriteBatch.End();
         }
 
+=======
+            DrawBubbles();
+
+            Main.spriteBatch.End();
+        }
+
+        private void DrawBubbles()
+        {
+            if (_bubbleTex == null)
+                return;
+
+            Vector2 origin = new Vector2(BubbleTexSize / 2f);
+
+            for (int i = 0; i < _bubbleCount; i++)
+            {
+                Bubble b = _bubbles[i];
+                float t = b.Life / b.MaxLife;
+
+                float a = b.Alpha * Smooth(Math.Min(1f, t / 0.1f));
+                if (a <= 0.01f)
+                    continue;
+
+                Vector2 screen = b.Pos - Main.screenPosition;
+                if (screen.X < -16f || screen.Y < -16f || screen.X > Main.screenWidth + 16f || screen.Y > Main.screenHeight + 16f)
+                    continue;
+
+                Color light = Lighting.GetColor((int)(b.Pos.X / 16f), (int)(b.Pos.Y / 16f));
+                float lum = 0.35f + 0.65f * (light.R + light.G + light.B) / 765f;
+
+                // wobble sideways a bit as it rises
+                screen.X += (float)Math.Sin(b.Life * 0.12f + b.Phase) * 1.5f;
+
+                Color col = new Color(0.85f, 1f, 0.97f, 1f) * (a * lum);
+                Main.spriteBatch.Draw(_bubbleTex, screen, null, col, 0f, origin, b.Size / BubbleTexSize, SpriteEffects.None, 0f);
+            }
+        }
+
+        private void UpdateBubbles()
+        {
+            for (int i = _bubbleCount - 1; i >= 0; i--)
+            {
+                Bubble b = _bubbles[i];
+                b.Life++;
+
+                // bigger bubbles rise faster, tiny sway in speed
+                b.Pos += b.Vel;
+
+                bool pop = b.Life >= b.MaxLife;
+
+                if (!pop)
+                {
+                    // only check the tile every few frames, it's plenty
+                    if (((int)b.Life + i) % 4 == 0)
+                    {
+                        int tx = (int)(b.Pos.X / 16f);
+                        int ty = (int)(b.Pos.Y / 16f);
+                        pop = tx < 1 || ty < 1 || tx >= Main.maxTilesX - 1 || ty >= Main.maxTilesY - 1 || Main.tile[tx, ty].LiquidAmount < 32;
+                    }
+                }
+
+                if (pop)
+                {
+                    // bubble burst at the surface leaves a tiny wisp of steam
+                    if (b.Life > 20f && _count < MaxPuffs && Main.rand.NextBool(3))
+                        SpawnPopPuff(b.Pos);
+
+                    _bubbles[i] = _bubbles[--_bubbleCount];
+                    continue;
+                }
+
+                _bubbles[i] = b;
+            }
+        }
+
+        private void SpawnPopPuff(Vector2 pos)
+        {
+            float s = Main.rand.NextFloat(10f, 16f);
+
+            _puffs[_count++] = new Puff
+            {
+                Pos = pos,
+                Phase = Main.rand.NextFloat(MathHelper.TwoPi),
+                Tex = Main.rand.Next(TexCount),
+                Vel = new Vector2(Main.rand.NextFloat(-0.15f, 0.15f), Main.rand.NextFloat(-0.8f, -0.4f)),
+                StartSize = new Vector2(s),
+                EndSize = new Vector2(s * 2.4f, s * 3.2f),
+                MaxLife = Main.rand.Next(40, 80),
+                Alpha = Main.rand.NextFloat(0.15f, 0.28f),
+                Rot = Main.rand.NextFloat(MathHelper.TwoPi),
+                RotSpeed = Main.rand.NextFloat(-0.01f, 0.01f)
+            };
+        }
+
+        private void SpawnBubbles()
+        {
+            Point tl = (Main.screenPosition / 16f).ToPoint();
+            int w = Main.screenWidth / 16 + 2;
+            int h = Main.screenHeight / 16 + 2;
+
+            // random picks, most miss since they aren't water, so a few tries per frame
+            for (int i = 0; i < 8; i++)
+            {
+                if (_bubbleCount >= MaxBubbles)
+                    return;
+
+                int x = tl.X + Main.rand.Next(w);
+                int y = tl.Y + Main.rand.Next(h);
+
+                if (x < 10 || x >= Main.maxTilesX - 10 || y < 10 || y >= Main.maxTilesY - 10)
+                    continue;
+
+                Tile tile = Main.tile[x, y];
+                if (tile.LiquidAmount < 200 || tile.LiquidType != LiquidID.Water || (tile.HasTile && Main.tileSolid[tile.TileType]))
+                    continue;
+
+                // needs water above too, otherwise it just pops instantly
+                Tile above = Main.tile[x, y - 1];
+                if (above.LiquidAmount < 128)
+                    continue;
+
+                float size = Main.rand.NextFloat(5f, 12f);
+
+                _bubbles[_bubbleCount++] = new Bubble
+                {
+                    Pos = new Vector2(x * 16f + Main.rand.NextFloat(16f), y * 16f + Main.rand.NextFloat(16f)),
+                    Vel = new Vector2(0f, -Main.rand.NextFloat(0.5f, 1.1f) - size * 0.04f),
+                    Size = size,
+                    Phase = Main.rand.NextFloat(MathHelper.TwoPi),
+                    MaxLife = Main.rand.Next(80, 240),
+                    Alpha = Main.rand.NextFloat(0.45f, 0.8f)
+                };
+            }
+        }
+
+>>>>>>> Stashed changes
         private void UpdatePuffs()
         {
             float wind = Main.windSpeedCurrent * 0.6f;
@@ -267,6 +450,37 @@ namespace ShatteredIllusion.Content.Biomes
             }
 
             _tex = tex;
+<<<<<<< Updated upstream
+=======
+
+            Color[] bd = new Color[BubbleTexSize * BubbleTexSize];
+
+            for (int y = 0; y < BubbleTexSize; y++)
+            {
+                for (int x = 0; x < BubbleTexSize; x++)
+                {
+                    float nx = (x + 0.5f) / BubbleTexSize * 2f - 1f;
+                    float ny = (y + 0.5f) / BubbleTexSize * 2f - 1f;
+                    float r = (float)Math.Sqrt(nx * nx + ny * ny);
+
+                    float a = 0f;
+                    if (r < 1f)
+                    {
+                        // soft rim, faint fill, small shine up top left
+                        float rim = Smooth(MathHelper.Clamp((r - 0.6f) / 0.3f, 0f, 1f)) * Smooth(MathHelper.Clamp((1f - r) / 0.1f, 0f, 1f));
+                        float dx = nx + 0.35f;
+                        float dy = ny + 0.35f;
+                        float shine = Smooth(MathHelper.Clamp(1f - (float)Math.Sqrt(dx * dx + dy * dy) / 0.25f, 0f, 1f));
+                        a = MathHelper.Clamp(0.08f + rim * 0.7f + shine, 0f, 1f);
+                    }
+
+                    bd[y * BubbleTexSize + x] = new Color(a, a, a, a);
+                }
+            }
+
+            _bubbleTex = new Texture2D(Main.instance.GraphicsDevice, BubbleTexSize, BubbleTexSize);
+            _bubbleTex.SetData(bd);
+>>>>>>> Stashed changes
         }
 
         private static float Smooth(float t) => t * t * (3f - 2f * t);

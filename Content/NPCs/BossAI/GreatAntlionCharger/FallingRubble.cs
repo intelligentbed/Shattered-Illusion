@@ -2,7 +2,9 @@
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using Terraria;
+using ShatteredIllusion.Common.Visuals;
 using Terraria.Audio;
+using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 using ShatteredIllusion.Content.Particles;
@@ -63,6 +65,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             Projectile.tileCollide = true;
 
             Projectile.velocity.Y = Math.Min(Projectile.velocity.Y + 0.35f, 16f);
+            Projectile.rotation += 0.12f * (Projectile.whoAmI % 2 == 0 ? 1f : -1f);
 
             if (Main.rand.NextBool(2))
             {
@@ -201,18 +204,57 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override bool PreDraw(ref Color lightColor)
         {
-
             if (Projectile.timeLeft > 600 - TelegraphTicks)
             {
+                if (Cinema.Enabled)
+                    DrawTelegraph();
+
                 return false;
             }
 
-            return true;
+            if (!Cinema.Enabled)
+                return true;
+
+            Texture2D texture = TextureAssets.Projectile[Projectile.type].Value;
+            Vector2 origin = texture.Size() / 2f;
+            Vector2 half = Projectile.Size / 2f;
+
+            for (int k = Projectile.oldPos.Length - 1; k >= 1; k--)
+            {
+                if (Projectile.oldPos[k] == Vector2.Zero)
+                    continue;
+
+                float fade = 1f - k / (float)Projectile.oldPos.Length;
+                Main.EntitySpriteDraw(texture, Projectile.oldPos[k] + half - Main.screenPosition, null, new Color(200, 160, 110, 0) * (fade * 0.4f), Projectile.rotation, origin, Projectile.scale, SpriteEffects.None, 0);
+            }
+
+            Main.EntitySpriteDraw(texture, Projectile.Center - Main.screenPosition, null, lightColor, Projectile.rotation, origin, Projectile.scale, SpriteEffects.None, 0);
+            return false;
+        }
+
+        // beam from the rubble down to where it lands, gets thicker + brighter as it gets close
+        private void DrawTelegraph()
+        {
+            float progress = MathHelper.Clamp((600 - Projectile.timeLeft) / (float)TelegraphTicks, 0f, 1f);
+            float flicker = 0.75f + 0.25f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 30f + Projectile.whoAmI);
+            float length = MathHelper.Clamp(CachedEndY - CachedStartY, 50f, 600f);
+            float width = MathHelper.Lerp(6f, 22f, progress);
+
+            Vector2 start = new Vector2(Projectile.Center.X, CachedStartY);
+            Vector2 impact = new Vector2(start.X, start.Y + length);
+
+            AntlionFX.Beam(Main.spriteBatch, start, MathHelper.PiOver2, length, width, new Color(255, 70, 45) * (0.1f + 0.5f * progress * flicker));
+            AntlionFX.Beam(Main.spriteBatch, start, MathHelper.PiOver2, length, width * 0.35f, new Color(255, 200, 160) * (0.7f * progress));
+            AntlionFX.Glow(Main.spriteBatch, impact, new Color(255, 80, 50) * (0.8f * progress * flicker), new Vector2(MathHelper.Lerp(50f, 110f, progress), MathHelper.Lerp(14f, 30f, progress)));
         }
 
         public override void OnKill(int timeLeft)
         {
             SoundEngine.PlaySound(SoundID.Dig, Projectile.position);
+
+            AntlionFX.Ring(Projectile.Bottom, new Vector2(150f, 50f), new Color(235, 200, 140), 18);
+            AntlionFX.Embers(Projectile.Center, 6, 2f, 7f, new Color(255, 170, 100), 8f, new Vector2(0f, -2f));
+            AntlionFX.ZoomPunch(Projectile.Center, 0.012f);
 
             for (int i = 0; i < 20; i++)
             {

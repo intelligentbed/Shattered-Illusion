@@ -189,6 +189,11 @@ Items: {
 		Tooltip: ""
 		DisplayName: Ashen Dirt Item
 	}
+
+	DeleteThisLater: {
+		Tooltip: ""
+		DisplayName: Delete This Later
+	}
 }
 
 Buffs: {
@@ -261,6 +266,10 @@ Configs: {
 			SturdinessBar: Sturdiness Bar Header
 			Client: Client
 			Cinematics: Cinematics
+<<<<<<< Updated upstream
+=======
+			BossCinematics: Boss Cinematics Header
+>>>>>>> Stashed changes
 		}
 
 		SturdinessBarLocked: {
@@ -389,4 +398,15 @@ Cutscenes: {
 		The Vicious Monarch      
 		           --King Slime--
 		'''
+}
+
+MainMenu: {
+	Buttons: {
+		SinglePlayer: Single Player
+		Multiplayer: Multiplayer
+		Achievements: Achievements
+		Settings: Settings
+		Workshop: Workshop
+		Exit: Exit
+	}
 }

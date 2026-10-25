@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
@@ -46,6 +46,48 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
 
             NPC parent = Main.npc[parentIndex];
+
+            if (NPC.ai[2] == 3f)
+            {
+                NPC.ai[1]++;
+
+                if (NPC.localAI[0] == 0f)
+                    NPC.localAI[0] = NPC.Center.X;
+
+                KingSlimeInstanceData arena = parent.GetGlobalNPC<KingSlimeInstanceData>();
+                float waveX = NPC.localAI[0] + NPC.ai[3] * KingSlimeOverride.ShockwaveSpeed * NPC.ai[1];
+
+                if (waveX < arena.ArenaMin.X - 40f || waveX > arena.ArenaMax.X + 40f)
+                {
+                    NPC.active = false;
+                    return;
+                }
+
+                NPC.Center = new Vector2(waveX, KingSlimeOverride.ShockwaveY(parent));
+                float waveScale = MathHelper.Clamp(NPC.ai[1] / 6f, 0f, 1f);
+                NPC.scale = 0.85f * waveScale;
+                NPC.alpha = (int)MathHelper.Lerp(255, 30, waveScale);
+                NPC.spriteDirection = NPC.ai[3] > 0f ? 1 : -1;
+                return;
+            }
+
+            if (NPC.ai[2] == 2f)
+            {
+                NPC.ai[1]++;
+
+                if (NPC.ai[1] > KingSlimeOverride.SweepDuration(parent))
+                {
+                    NPC.active = false;
+                    return;
+                }
+
+                NPC.Center = KingSlimeOverride.SweepPosition(parent, NPC.ai[3], NPC.ai[1]);
+                float sweepScale = MathHelper.Clamp(NPC.ai[1] / 8f, 0f, 1f);
+                NPC.scale = 0.85f * sweepScale;
+                NPC.alpha = (int)MathHelper.Lerp(255, 30, sweepScale);
+                NPC.spriteDirection = NPC.ai[3] > 0f ? 1 : -1;
+                return;
+            }
             NPC.ai[1]++;
             float timer = NPC.ai[1];
             bool isVertical = NPC.ai[2] == 1f;

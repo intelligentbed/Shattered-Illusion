@@ -44,7 +44,16 @@ namespace ShatteredIllusion.Common.Visuals
 
     public static partial class Cinema
     {
+<<<<<<< Updated upstream
         private const float LetterboxHeightFraction = 0.12f;
+=======
+        // Letterbox bars aim for a cinematic frame ratio instead of a fixed fraction of the screen height.
+        // The max matches the old fixed 12%, so 16:9 and narrower screens look exactly as before;
+        // ultrawide screens (already close to cinematic) get thinner bars.
+        private const float CinematicAspect = 2.39f;
+        private const float LetterboxMinFraction = 0.04f;
+        private const float LetterboxMaxFraction = 0.12f;
+>>>>>>> Stashed changes
         private const float MaxZoom = 0.35f;
 
         private static float letterbox, letterboxTarget;
@@ -85,6 +94,34 @@ namespace ShatteredIllusion.Common.Visuals
         public static bool IntroEnabled => Enabled && Cfg.IntroEntrance;
         public static bool DeathCameraEnabled => Enabled && Cfg.DeathSequence;
 
+<<<<<<< Updated upstream
+=======
+        // Whether the letterbox / vignette dressing is allowed by the player's config. Other UI that wants
+        // to match the cinematic look (e.g. the journal) should respect these.
+        public static bool LetterboxAllowed => Enabled && Cfg.Letterbox;
+        public static bool VignetteAllowed => Enabled && Cfg.Vignette;
+
+        // Height in UI pixels of one letterbox bar at full strength for a screen of the given UI-space size.
+        // Pass different min/max fractions for UI that wants thinner bars than a cutscene.
+        public static float LetterboxBarHeight(float uiWidth, float uiHeight, float minFraction = LetterboxMinFraction, float maxFraction = LetterboxMaxFraction)
+        {
+            if (uiWidth <= 0f || uiHeight <= 0f)
+                return 0f;
+
+            float needed = (uiHeight - uiWidth / CinematicAspect) * 0.5f;
+            return MathHelper.Clamp(needed, uiHeight * minFraction, uiHeight * maxFraction);
+        }
+
+        // Height in UI pixels of the letterbox bars being drawn right now (0 when none are showing).
+        public static float CurrentLetterboxHeight()
+        {
+            if (Main.dedServ || letterbox <= 0.005f)
+                return 0f;
+
+            return LetterboxBarHeight(Main.screenWidth / Main.UIScale, Main.screenHeight / Main.UIScale) * letterbox;
+        }
+
+>>>>>>> Stashed changes
         public static float TotalZoom => 1f + MathHelper.Clamp(holdZoom + punchZoom, 0f, MaxZoom);
 
         private static bool Active =>
@@ -278,6 +315,51 @@ namespace ShatteredIllusion.Common.Visuals
             Main.screenPosition = Vector2.Lerp(Main.screenPosition, desired, focusWeight);
         }
 
+<<<<<<< Updated upstream
+=======
+        private static Texture2D vignetteTex;
+
+        // One smooth gradient texture stretched over the screen: no layered strips, so no banding lines.
+        private static Texture2D GetVignetteTexture()
+        {
+            if (vignetteTex != null && !vignetteTex.IsDisposed)
+                return vignetteTex;
+
+            const int size = 512;
+            var data = new Color[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = Math.Abs((x + 0.5f) / size * 2f - 1f);
+                    float v = Math.Abs((y + 0.5f) / size * 2f - 1f);
+
+                    float d = (float)Math.Pow(Math.Pow(u, 4) + Math.Pow(v, 4), 0.25);
+
+                    float t = MathHelper.Clamp((d - 0.5f) / 0.7f, 0f, 1f);
+                    t = t * t * (3f - 2f * t);
+
+                    byte a = (byte)(t * 0.75f * 255f + 0.5f);
+                    data[y * size + x] = new Color((byte)0, (byte)0, (byte)0, a);
+                }
+            }
+
+            vignetteTex = new Texture2D(Main.graphics.GraphicsDevice, size, size);
+            vignetteTex.SetData(data);
+            return vignetteTex;
+        }
+
+        internal static void DisposeVignette()
+        {
+            Main.QueueMainThreadAction(() =>
+            {
+                vignetteTex?.Dispose();
+                vignetteTex = null;
+            });
+        }
+
+>>>>>>> Stashed changes
         internal static void DrawOverlay(SpriteBatch sb)
         {
             if (Main.dedServ || !Active)
@@ -290,6 +372,7 @@ namespace ShatteredIllusion.Common.Visuals
 
             if (vignette > 0.01f)
             {
+<<<<<<< Updated upstream
                 const int layers = 12;
                 float step = Math.Min(w, h) * 0.035f;
 
@@ -304,20 +387,35 @@ namespace ShatteredIllusion.Common.Visuals
                     sb.Draw(px, new Rectangle((int)o, 0, (int)step + 1, (int)h + 1), c);
                     sb.Draw(px, new Rectangle((int)(w - o - step), 0, (int)step + 1, (int)h + 1), c);
                 }
+=======
+                sb.Draw(GetVignetteTexture(),
+                    new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, (int)Math.Ceiling(h) + 2),
+                    Color.White * vignette);
+>>>>>>> Stashed changes
             }
 
             if (letterbox > 0.005f)
             {
+<<<<<<< Updated upstream
                 int barH = (int)(h * LetterboxHeightFraction * letterbox);
                 sb.Draw(px, new Rectangle(0, 0, (int)w + 1, barH), Color.Black);
                 sb.Draw(px, new Rectangle(0, (int)h - barH, (int)w + 1, barH + 1), Color.Black);
+=======
+                int barH = (int)(LetterboxBarHeight(w, h) * letterbox);
+                sb.Draw(px, new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, barH), Color.Black);
+                sb.Draw(px, new Rectangle(0, (int)Math.Ceiling(h) - barH, (int)Math.Ceiling(w) + 2, barH + 2), Color.Black);
+>>>>>>> Stashed changes
             }
 
             if (titleTimer > 0 && titleDuration > 0)
                 DrawTitleCard(sb, px, w, h);
 
             if (flashAlpha > 0.01f)
+<<<<<<< Updated upstream
                 sb.Draw(px, new Rectangle(0, 0, (int)w + 1, (int)h + 1), flashColor * flashAlpha);
+=======
+                sb.Draw(px, new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, (int)Math.Ceiling(h) + 2), flashColor * flashAlpha);
+>>>>>>> Stashed changes
         }
 
         // Zoom punch, flash, ring, upward sparks, optional dust debris and ground skirt.
