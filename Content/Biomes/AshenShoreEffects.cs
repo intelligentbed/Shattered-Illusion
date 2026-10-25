@@ -44,11 +44,6 @@ namespace ShatteredIllusion.Content.Biomes
             public int Tex;
         }
 
-<<<<<<< Updated upstream
-        private const int MaxPuffs = 700;
-        private const int TexSize = 128;
-        private const int TexCount = 4;
-=======
         private struct Bubble
         {
             public Vector2 Pos, Vel;
@@ -60,7 +55,6 @@ namespace ShatteredIllusion.Content.Biomes
         private const int TexSize = 128;
         private const int TexCount = 4;
         private const int BubbleTexSize = 32;
->>>>>>> Stashed changes
 
         private static readonly Color FreshColor = new Color(215, 255, 248);
         private static readonly Color OldColor = new Color(110, 220, 205);
@@ -69,13 +63,10 @@ namespace ShatteredIllusion.Content.Biomes
         private int _count;
         private Texture2D[] _tex;
 
-<<<<<<< Updated upstream
-=======
         private readonly Bubble[] _bubbles = new Bubble[MaxBubbles];
         private int _bubbleCount;
         private Texture2D _bubbleTex;
 
->>>>>>> Stashed changes
         public override void Load()
         {
             if (!Main.dedServ)
@@ -85,12 +76,6 @@ namespace ShatteredIllusion.Content.Biomes
         public override void Unload()
         {
             Texture2D[] old = _tex;
-<<<<<<< Updated upstream
-            _tex = null;
-
-            if (old != null)
-                Main.QueueMainThreadAction(() => { foreach (Texture2D t in old) t.Dispose(); });
-=======
             Texture2D oldBubble = _bubbleTex;
             _tex = null;
             _bubbleTex = null;
@@ -100,7 +85,6 @@ namespace ShatteredIllusion.Content.Biomes
 
             if (oldBubble != null)
                 Main.QueueMainThreadAction(oldBubble.Dispose);
->>>>>>> Stashed changes
         }
 
         public override void PostUpdateEverything()
@@ -109,11 +93,6 @@ namespace ShatteredIllusion.Content.Biomes
                 return;
 
             UpdatePuffs();
-<<<<<<< Updated upstream
-
-            if (Main.LocalPlayer.InModBiome<AshenShoreBiome>())
-                SpawnPuffs();
-=======
             UpdateBubbles();
 
             if (Main.LocalPlayer.InModBiome<AshenShoreBiome>())
@@ -121,16 +100,11 @@ namespace ShatteredIllusion.Content.Biomes
                 SpawnPuffs();
                 SpawnBubbles();
             }
->>>>>>> Stashed changes
         }
 
         public override void PostDrawTiles()
         {
-<<<<<<< Updated upstream
-            if (_tex == null || _count == 0)
-=======
             if (_tex == null || (_count == 0 && _bubbleCount == 0))
->>>>>>> Stashed changes
                 return;
 
             Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
@@ -164,11 +138,6 @@ namespace ShatteredIllusion.Content.Biomes
                 Main.spriteBatch.Draw(_tex[p.Tex], screen, null, col, p.Rot, new Vector2(TexSize / 2f), scale, SpriteEffects.None, 0f);
             }
 
-<<<<<<< Updated upstream
-            Main.spriteBatch.End();
-        }
-
-=======
             DrawBubbles();
 
             Main.spriteBatch.End();
@@ -302,7 +271,6 @@ namespace ShatteredIllusion.Content.Biomes
             }
         }
 
->>>>>>> Stashed changes
         private void UpdatePuffs()
         {
             float wind = Main.windSpeedCurrent * 0.6f;
@@ -450,8 +418,6 @@ namespace ShatteredIllusion.Content.Biomes
             }
 
             _tex = tex;
-<<<<<<< Updated upstream
-=======
 
             Color[] bd = new Color[BubbleTexSize * BubbleTexSize];
 
@@ -480,7 +446,6 @@ namespace ShatteredIllusion.Content.Biomes
 
             _bubbleTex = new Texture2D(Main.instance.GraphicsDevice, BubbleTexSize, BubbleTexSize);
             _bubbleTex.SetData(bd);
->>>>>>> Stashed changes
         }
 
         private static float Smooth(float t) => t * t * (3f - 2f * t);

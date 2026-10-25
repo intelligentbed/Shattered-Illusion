@@ -266,10 +266,7 @@ Configs: {
 			SturdinessBar: Sturdiness Bar Header
 			Client: Client
 			Cinematics: Cinematics
-<<<<<<< Updated upstream
-=======
 			BossCinematics: Boss Cinematics Header
->>>>>>> Stashed changes
 		}
 
 		SturdinessBarLocked: {

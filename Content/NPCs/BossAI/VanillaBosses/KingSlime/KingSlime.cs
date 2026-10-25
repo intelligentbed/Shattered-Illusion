@@ -1119,30 +1119,30 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     // Split-axis telegraph 
                     for (int pass = 0; pass < (IsArena(npc) ? 2 : 1); pass++)
                     {
-                        bool splitVerticalTelegraph = SplitVertical(npc) ^ (pass == 1);
-                        Vector2 axis = splitVerticalTelegraph ? Vector2.UnitY : Vector2.UnitX;
-                        float maxReach = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
-                        float reach = MathHelper.Lerp(40f, maxReach, windupT);
-                        const float segmentSpacing = 26f;
+                    bool splitVerticalTelegraph = SplitVertical(npc) ^ (pass == 1);
+                    Vector2 axis = splitVerticalTelegraph ? Vector2.UnitY : Vector2.UnitX;
+                    float maxReach = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
+                    float reach = MathHelper.Lerp(40f, maxReach, windupT);
+                    const float segmentSpacing = 26f;
 
-                        // Evenly spaced dashes that extend outward as the windup builds. Respawned every tick
-                        // (duration 2) so the line is steady instead of flickering at random spots.
-                        foreach (float sign in SplitTelegraphSigns)
+                    // Evenly spaced dashes that extend outward as the windup builds. Respawned every tick
+                    // (duration 2) so the line is steady instead of flickering at random spots.
+                    foreach (float sign in SplitTelegraphSigns)
+                    {
+                        for (float d = segmentSpacing; d <= reach; d += segmentSpacing)
                         {
-                            for (float d = segmentSpacing; d <= reach; d += segmentSpacing)
-                            {
-                                float fade = MathHelper.Clamp(1.2f - d / maxReach, 0.35f, 1f);
+                            float fade = MathHelper.Clamp(1.2f - d / maxReach, 0.35f, 1f);
 
-                                BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
-                                    position: (npc.Center + axis * (sign * d)).ToNumerics(),
-                                    velocity: SystemVector2.Zero,
-                                    rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
-                                    scale: new SystemVector2(24f, 8f),
-                                    color: new Color(0, 180, 255, 255) * (fade * (0.4f + 0.5f * windupT)),
-                                    duration: 2
-                                ));
-                            }
+                            BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
+                                position: (npc.Center + axis * (sign * d)).ToNumerics(),
+                                velocity: SystemVector2.Zero,
+                                rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
+                                scale: new SystemVector2(24f, 8f),
+                                color: new Color(0, 180, 255, 255) * (fade * (0.4f + 0.5f * windupT)),
+                                duration: 2
+                            ));
                         }
+                    }
                     }
 
                     if (timer >= 45f)
