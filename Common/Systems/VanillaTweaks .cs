@@ -108,4 +108,43 @@ namespace ShatteredIllusion.Common.Systems
             Mod.Logger.Info("King Slime bag pool not found; Cha Crown added as a separate drop.");
         }
     }
+
+    public class BossDespawnTweak : GlobalNPC
+    {
+        private static uint lastCheck;
+        private static bool bossAlive;
+
+        // cached per tick so we're not looping every npc for every npc
+        public static bool BossAlive
+        {
+            get
+            {
+                if (lastCheck != Main.GameUpdateCount)
+                {
+                    lastCheck = Main.GameUpdateCount;
+                    bossAlive = false;
+                    foreach (NPC n in Main.npc)
+                    {
+                        if (n.active && (n.boss || n.type == NPCID.EaterofWorldsHead
+                            || n.type == NPCID.EaterofWorldsBody || n.type == NPCID.EaterofWorldsTail))
+                        {
+                            bossAlive = true;
+                            break;
+                        }
+                    }
+                }
+                return bossAlive;
+            }
+        }
+
+        public override void PostAI(NPC npc)
+        {
+            if (!BossAlive || npc.boss || npc.friendly || npc.townNPC)
+                return;
+
+            // refund 3 of every 4 ticks of despawn timer
+            if (npc.timeLeft < NPC.activeTime && Main.GameUpdateCount % 4 != 0)
+                npc.timeLeft++;
+        }
+    }
 }

@@ -205,6 +205,61 @@ Items: {
 		Tooltip: ""
 		DisplayName: Delete This Later
 	}
+
+	MandibleStaff: {
+		DisplayName: Mandible Staff
+		Tooltip:
+			'''
+			Conjures antlion jaws at your cursor
+			The jaws pull enemies in, then snap shut
+			'''
+	}
+
+	MycelialMaul: {
+		DisplayName: Mycelial Maul
+		Tooltip:
+			'''
+			Hits release lingering poison spore clouds
+			Poisoned enemies take 20% more damage
+			'''
+	}
+
+	FrostBlaster: {
+		DisplayName: Tundra Blaster
+		Tooltip:
+			'''
+			Turns bullets into frost bolts that inflict Frostburn
+			Every 4th shot is an icicle that lodges in enemies, then shatters
+			'''
+	}
+
+	LivingWoodBow: {
+		DisplayName: Living Wood Bow
+		Tooltip:
+			'''
+			Wooden arrows sprout into three mid-flight
+			Arrows that hit first burst into leaves
+			'''
+	}
+
+	BluebellStaff: {
+		DisplayName: Bluebell Staff
+		Tooltip:
+			'''
+			Summons a bluebell bloom that throws homing petals
+			Blooms link with threads that cut through enemies
+			Three or more form a ring around the target
+			'''
+	}
+
+	CinderBlowpipe: {
+		DisplayName: Cinder Blowpipe
+		Tooltip:
+			'''
+			Darts set enemies on fire
+			Hitting a burning enemy throws embers outward
+			'''
+	}
 }
 
 Buffs: {
@@ -232,6 +287,11 @@ Buffs: {
 		DisplayName: Bleeding
 		Description: Mods.ShatteredIllusion.Buffs.Bleeding.Description
 	}
+
+	BluebellBuff: {
+		DisplayName: Bluebell
+		Description: The bluebells will fight for you
+	}
 }
 
 Tiles: {
@@ -256,6 +316,13 @@ Projectiles: {
 	StarryProjectile.DisplayName: Starry Projectile
 	LivingWandProtoProjectile.DisplayName: Living Wand Proto Projectile
 	ChaCrownProjectile.DisplayName: Cha Crown Projectile
+	FrostBoltProjectile.DisplayName: Frost Bolt Projectile
+	SporeCloud.DisplayName: Spore Cloud
+	MandibleJaws.DisplayName: Mandible Jaws
+	LeafArrowProjectile.DisplayName: Leaf Arrow
+	BluebellMinion.DisplayName: Bluebell
+	BluebellPetal.DisplayName: Bluebell Petal
+	CinderDartProjectile.DisplayName: Cinder Dart
 }
 
 Keybinds: {

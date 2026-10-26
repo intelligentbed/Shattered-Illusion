@@ -44,7 +44,8 @@ namespace ShatteredIllusion.Content.Items.TreasureBags
             itemLoot.Add(ItemDropRule.OneFromOptions(1, new int[]
             {
                 ModContent.ItemType<MandibleShooter>(),
-                ModContent.ItemType<DuneRendPincers>()
+                ModContent.ItemType<DuneRendPincers>(),
+                ModContent.ItemType<MandibleStaff>(),
             }));
         }
     }

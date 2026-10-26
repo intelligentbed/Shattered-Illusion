@@ -4,6 +4,7 @@ using System.IO;
 using Microsoft.Xna.Framework;
 using ShatteredIllusion.Common.Visuals;
 using ShatteredIllusion.Content.Buffs.StatBuffs;
+using ShatteredIllusion.Content.NPCs;
 using ShatteredIllusion.Content.Particles;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
@@ -258,6 +259,9 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             {
                 boss = parryOverrideContainer.BehaviorOverride as IParryable;
             }
+
+            if (boss is null && VanillaMeleeParry.MeleeWielders.Contains(attacker.type))
+                boss = new VanillaMeleeParryable(attacker);
 
             return boss is not null;
         }
