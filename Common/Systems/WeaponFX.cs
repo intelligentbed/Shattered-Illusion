@@ -100,24 +100,6 @@ namespace ShatteredIllusion.Common.Systems
                 delta.ToRotation(), new Vector2(0f, 0.5f), new Vector2(delta.Length(), thickness), SpriteEffects.None, 0);
         }
 
-        /// <summary>Soft pulsing aura behind an item lying on the ground. Call from PostDrawInWorld.</summary>
-        public static void DrawWorldAura(Item item, float rotation, float scale, Color color)
-        {
-            Texture2D tex = TextureAssets.Item[item.type].Value;
-            Vector2 center = item.Center - Main.screenPosition;
-            float pulse = 0.8f + 0.2f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 3f + item.whoAmI);
-            float size = Math.Max(tex.Width, tex.Height) / 64f;
-
-            DrawGlow(center, Additive(color, 0.45f * pulse), size * 1.8f * scale);
-
-            for (int i = 0; i < 4; i++)
-            {
-                Vector2 offset = (MathHelper.PiOver2 * i + Main.GlobalTimeWrappedHourly).ToRotationVector2() * 2f;
-                Main.spriteBatch.Draw(tex, center + offset, null, Additive(color, 0.3f * pulse), rotation,
-                    tex.Size() * 0.5f, scale, SpriteEffects.None, 0f);
-            }
-        }
-
         // ---------------------------------------------------------------- dust
 
         public static void DustRing(Vector2 center, int dustType, int count, float speed, float scale = 1f, bool noGravity = true)

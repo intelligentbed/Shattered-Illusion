@@ -87,11 +87,5 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
 
             return proj;
         }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 214, 140));
-        }
     }
 }

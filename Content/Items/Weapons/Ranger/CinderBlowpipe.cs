@@ -17,9 +17,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
     {
         public override void SetDefaults()
         {
-            Item.width = 23;
-            Item.height = 6;
-            Item.scale = 1.7f; // sprite is small, so it's drawn bigger in the hand
+            Item.width = 46;
+            Item.height = 12;
 
             // Balance target: ~22 dps from darts + ~10 from flashover embers (pre-Eye of Cthulhu).
             // The pipe's damage ADDS to the dart's, so keep this low.
@@ -60,12 +59,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             Vector2 muzzle = position + velocity.SafeNormalize(Vector2.UnitX * player.direction) * 28f;
             if (Collision.CanHit(position, 0, 0, muzzle, 0, 0))
                 position = muzzle;
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 150, 60));
         }
     }
 

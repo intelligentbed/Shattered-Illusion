@@ -60,11 +60,5 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage
 
             return true; // let the game spawn the bolt normally
         }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 214, 110));
-        }
     }
 }

@@ -41,12 +41,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             Item.value = Item.buyPrice(silver: 50);
             Item.rare = ItemRarityID.Green;
         }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(130, 255, 110));
-        }
     }
 
     public class LivingWoodGreatClubHoldout : ModProjectile

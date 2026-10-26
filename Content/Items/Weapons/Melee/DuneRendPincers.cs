@@ -57,12 +57,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         }
 
         public override bool MeleePrefix() => true;
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 200, 110));
-        }
     }
 
     internal class DuneRendPincersProjectile : ModProjectile

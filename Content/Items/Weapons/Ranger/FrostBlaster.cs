@@ -20,9 +20,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
 
         public override void SetDefaults()
         {
-            Item.width = 22;
-            Item.height = 13;
-            Item.scale = 1.6f; // sprite is small, so it's drawn bigger in the hand
+            Item.width = 44;
+            Item.height = 26;
 
             // Balance target: ~28 dps with Musket Balls (gold-tier, pre-Eye of Cthulhu).
             // NOTE: the gun's damage ADDS to the bullet's damage, so keep this number low -
@@ -89,12 +88,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             WeaponFX.DustCone(position, velocity, 0.4f, DustID.BlueTorch, icicle ? 8 : 3, 1.5f, 4f, 1f);
 
             return false;
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(130, 210, 255));
         }
     }
 

@@ -25,9 +25,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage
 
         public override void SetDefaults()
         {
-            Item.width = 21;
-            Item.height = 27;
-            Item.scale = 1.6f; // sprite is small, so it's drawn bigger in the hand
+            Item.width = 42;
+            Item.height = 54;
 
             // Balance target: ~23 dps on one enemy (gold-tier, pre-Eye of Cthulhu),
             // more when the bite catches a group.
@@ -50,6 +49,16 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage
             Item.rare = ItemRarityID.Green;
         }
 
+        // PLACEHOLDER recipe using vanilla materials - swap in your own antlion drops.
+        public override void AddRecipes()
+        {
+            CreateRecipe()
+                .AddIngredient(ItemID.AntlionMandible, 10)
+                .AddIngredient(ItemID.SandBlock, 20)
+                .AddTile(TileID.Anvils)
+                .Register();
+        }
+
         public override bool Shoot(Player player, EntitySource_ItemUse_WithAmmo source, Vector2 position,
             Vector2 velocity, int type, int damage, float knockback)
         {
@@ -66,12 +75,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Mage
             WeaponFX.DustCone(tip, velocity, 0.7f, DustID.Sand, 8, 1.5f, 4f, 1.1f);
 
             return false;
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 160, 80));
         }
     }
 

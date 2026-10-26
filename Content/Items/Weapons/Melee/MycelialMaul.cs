@@ -19,9 +19,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
         public override void SetDefaults()
         {
-            Item.width = 30;
-            Item.height = 30;
-            Item.scale = 1.5f; // bigger swing; this also lengthens the hitbox
+            Item.width = 60;
+            Item.height = 60;
 
             // Balance target: ~27 dps, ~32 against poisoned enemies (gold-tier, pre-Eye of Cthulhu).
             Item.damage = 17;
@@ -85,12 +84,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
             Projectile.NewProjectile(player.GetSource_ItemUse(Item), target.Center, Main.rand.NextVector2Circular(1.5f, 1.5f),
                 cloudType, cloudDamage, 0f, player.whoAmI);
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(120, 255, 210));
         }
     }
 

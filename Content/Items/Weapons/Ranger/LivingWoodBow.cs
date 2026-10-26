@@ -20,9 +20,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
     {
         public override void SetDefaults()
         {
-            Item.width = 12;
-            Item.height = 24;
-            Item.scale = 1.5f; // sprite is small, so it's drawn bigger in the hand
+            Item.width = 22;
+            Item.height = 42;
 
             // Balance target: ~18 dps with one arrow, ~38 at best when the sprout lands
             // all 3 arrows (pre-Eye of Cthulhu). The bow's damage ADDS to the arrow's,
@@ -77,12 +76,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
 
             WeaponFX.DustCone(position, velocity, 0.4f, DustID.Grass, 3, 1f, 3f, 0.9f);
             return false;
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 220, 140));
         }
     }
 

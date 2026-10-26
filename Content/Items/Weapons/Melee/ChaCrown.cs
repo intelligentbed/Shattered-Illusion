@@ -69,12 +69,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
             return false;
         }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 210, 90));
-        }
     }
 
     public class ChaCrownProjectile : ModProjectile

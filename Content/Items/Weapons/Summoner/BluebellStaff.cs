@@ -26,9 +26,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Summoner
 
         public override void SetDefaults()
         {
-            Item.width = 32;
-            Item.height = 45;
-            Item.scale = 1.3f; // drawn bigger in the hand
+            Item.width = 64;
+            Item.height = 90;
 
             // Balance target (pre-Eye of Cthulhu, minion slots are scarce):
             //   1 bloom ~13 dps, 2 blooms ~35 dps, 3 blooms ~66 dps
@@ -76,12 +75,6 @@ namespace ShatteredIllusion.Content.Items.Weapons.Summoner
 
             WeaponFX.DustRing(position, DustID.BlueTorch, 10, 3f, 1.2f);
             return false;
-        }
-
-        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
-            float rotation, float scale, int whoAmI)
-        {
-            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(90, 160, 255));
         }
     }
 
