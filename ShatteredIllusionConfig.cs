@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using ShatteredIllusion.Common.GUI.SturdinessBar;
 using Terraria.ModLoader.Config;
 
@@ -85,5 +85,12 @@ namespace ShatteredIllusion
         [Increment(0.1f)]
         [Slider]
         public float ShakeIntensity = 1f;
+
+        // Scales how many sparks and streaks effects spawn. Rings, flashes and telegraphs are never reduced.
+        [DefaultValue(1f)]
+        [Range(0.25f, 1f)]
+        [Increment(0.25f)]
+        [Slider]
+        public float EffectDensity = 1f;
     }
 }

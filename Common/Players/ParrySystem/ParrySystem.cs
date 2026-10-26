@@ -633,17 +633,13 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             SpawnRing(Player.Center, DustID.GoldFlame, 30f, 16, 3.5f, alpha: 70, scale: 1.3f);
             SpawnShockwaveRing(contact, DustID.GoldFlame, 70f, 0.2f, alpha: 60, scale: 1.4f);
 
-            // cone of sparks flung back at the player's side, plus a small even pop
-            SpawnParrySparks(contact, count: 9, speedMin: 5f, speedMax: 9f, color: new Color(255, 250, 225, 0), sparkScale: 9f, duration: 20, direction: -hitDirection, spread: 0.8f);
-            SpawnParrySparks(contact, count: 7, speedMin: 2f, speedMax: 5f, color: new Color(255, 210, 110, 0), sparkScale: 7f, duration: 18);
+            VisualFX.Play(Fx.PerfectParry, contact, hitDirection);
 
-            Shake(hitDirection, 6f, 9);
-
+            // This effect plays on every client, but only the parrying player's camera should react.
             if (Player.whoAmI == Main.myPlayer)
             {
+                VisualFX.Play(Fx.PerfectParryCamera, contact, hitDirection);
                 impactHoldTimer = ImpactHoldFrames;
-                Cinema.ZoomPunch(0.015f);
-                Cinema.Flash(new Color(255, 230, 160), 0.07f);
             }
         }
 
@@ -803,23 +799,10 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             SpawnRing(center, dustType, startRadius, count, speed, alpha, scale);
         }
 
+        // Goes through VisualFX so it respects ImpactParticles and EffectDensity like every other particle path.
         private void SpawnParrySparks(Vector2 center, int count, float speedMin, float speedMax, Color color, float sparkScale, int duration, Vector2? direction = null, float spread = MathHelper.Pi)
         {
-            for (int i = 0; i < count; i++)
-            {
-                Vector2 velocity = direction.HasValue
-                    ? direction.Value.RotatedByRandom(spread) * Main.rand.NextFloat(speedMin, speedMax)
-                    : Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(speedMin, speedMax);
-
-                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                    position: center.ToNumerics(),
-                    velocity: velocity.ToNumerics(),
-                    rotation: 0f,
-                    scale: new SystemVector2(sparkScale, sparkScale),
-                    color: color,
-                    duration: duration
-                ));
-            }
+            VisualFX.Sparks(center, direction ?? Vector2.UnitX, direction.HasValue ? spread : MathHelper.Pi, count, speedMin, speedMax, color, sparkScale, duration);
         }
 
         private static readonly Vector2[] ShieldOutlinePoints = BuildShieldOutline();

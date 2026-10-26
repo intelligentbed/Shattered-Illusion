@@ -35,49 +35,59 @@ namespace ShatteredIllusion.Content.Particles
         /// <summary>Single growing focal point for long charge-up windups (e.g. King Slime's split).</summary>
         public static ParticleBuffer<ChargeCoreParticle> ChargeCores { get; private set; }
 
+        /// <summary>Quick soft glow pops - impact flashes, charge-up finishers. Drawn above NPCs.</summary>
+        public static ParticleBuffer<FlashParticle> Flashes { get; private set; }
+
         // Never build particle buffers on the server - there's nothing to draw.
         public override bool IsLoadingEnabled(Mod mod) => !Main.dedServ;
 
         public override void OnModLoad()
         {
             // Buffer size = how many of that particle type can exist AT ONCE
-            // before new ones stop spawning. 
+            // before new ones stop spawning. ParticleLibrary's ParticleLimit setting
+            // divides every size below by 8 (Low), 4 (Medium) or 2 (High).
+            // SandStreaks: PhaseTransition alone keeps ~36 alive at once, so even at Low (/8) it needs 36+ with room for other effects.
 
-            SandStreaks = new ParticleBuffer<SandStreakParticle>(200)
+            SandStreaks = new ParticleBuffer<SandStreakParticle>(600)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(SandStreaks);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, SandStreaks);
 
-            EmberBursts = new ParticleBuffer<EmberBurstParticle>(150)
+            EmberBursts = new ParticleBuffer<EmberBurstParticle>(400)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(EmberBursts);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, EmberBursts);
 
-            Shockwaves = new ParticleBuffer<ShockwaveRingParticle>(16)
+            Shockwaves = new ParticleBuffer<ShockwaveRingParticle>(48)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(Shockwaves);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, Shockwaves);
 
 
-            TelegraphSegments = new ParticleBuffer<TelegraphSegmentParticle>(400)
+            TelegraphSegments = new ParticleBuffer<TelegraphSegmentParticle>(600)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(TelegraphSegments);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, TelegraphSegments);
 
-            GroundWarnings = new ParticleBuffer<GroundWarningRingParticle>(16)
+            GroundWarnings = new ParticleBuffer<GroundWarningRingParticle>(32)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(GroundWarnings);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, GroundWarnings);
 
-            GroundMarkers = new ParticleBuffer<GroundMarkerParticle>(16)
+            GroundMarkers = new ParticleBuffer<GroundMarkerParticle>(32)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(GroundMarkers);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, GroundMarkers);
 
-            ChargeCores = new ParticleBuffer<ChargeCoreParticle>(8)
+            ChargeCores = new ParticleBuffer<ChargeCoreParticle>(16)
                 .SetBlendState(BlendState.Additive);
             ParticleManagerV3.RegisterUpdatable(ChargeCores);
             ParticleManagerV3.RegisterRenderable(Layer.BeforeNPCs, ChargeCores);
+
+            Flashes = new ParticleBuffer<FlashParticle>(32)
+                .SetBlendState(BlendState.Additive);
+            ParticleManagerV3.RegisterUpdatable(Flashes);
+            ParticleManagerV3.RegisterRenderable(Layer.BeforeProjectiles, Flashes);
         }
     }
 }

@@ -323,6 +323,8 @@ Projectiles: {
 	BluebellMinion.DisplayName: Bluebell
 	BluebellPetal.DisplayName: Bluebell Petal
 	CinderDartProjectile.DisplayName: Cinder Dart
+	ThreeDTestSprite.DisplayName: Three D Test Sprite
+	ThreeDTestWall.DisplayName: Three D Test Wall
 }
 
 Keybinds: {
@@ -431,6 +433,11 @@ Configs: {
 		ShakeIntensity: {
 			Label: Added Screen Shake Intensity
 			Tooltip: Scales the extra camera shake from the cinematic layer. The fight's original shake is unaffected.
+		}
+
+		EffectDensity: {
+			Tooltip: ""
+			Label: Effect Density
 		}
 	}
 
