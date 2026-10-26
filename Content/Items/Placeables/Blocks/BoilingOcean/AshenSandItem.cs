@@ -18,6 +18,7 @@ namespace ShatteredIllusion.Content.Items.Placeables.Blocks.BoilingOcean
             Item.useAnimation = 15;
             Item.useStyle = ItemUseStyleID.Swing;
             Item.consumable = true;
+            Item.maxStack = 9999;
             Item.value = 0;
             Item.createTile = ModContent.TileType<AshenSand>();
         }

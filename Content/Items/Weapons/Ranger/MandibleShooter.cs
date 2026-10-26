@@ -1,4 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using ShatteredIllusion.Common.Systems;
+using ShatteredIllusion.Content.Projectiles.Ranger;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.ID;
@@ -23,8 +26,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
             Item.rare = ItemRarityID.Green;
             Item.UseSound = SoundID.Item11;
             Item.autoReuse = true;
-            Item.shoot = ModContent.ProjectileType<Projectiles.Ranger.MandibleShooterBullet>();
-            Item.shootSpeed = 12f; // unused 
+            Item.shoot = ModContent.ProjectileType<MandibleShooterBullet>();
+            Item.shootSpeed = 12f; // unused
 
             Item.useAmmo = AmmoID.None;
         }
@@ -33,11 +36,12 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
         {
             return new Vector2(2f, -4f);
         }
+
         public override void ModifyShootStats(Player player, ref Vector2 position, ref Vector2 velocity,
             ref int type, ref int damage, ref float knockback)
         {
             Vector2 aimDir = (Main.MouseWorld - position).SafeNormalize(Vector2.UnitX * player.direction);
-            float muzzleLength = 34f; // distance in pixels from hand 
+            float muzzleLength = 34f; // distance in pixels from hand
             position += aimDir * muzzleLength;
         }
 
@@ -46,26 +50,48 @@ namespace ShatteredIllusion.Content.Items.Weapons.Ranger
         {
             Vector2 target = Main.MouseWorld;
 
-            SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: 1f);
-            SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: -1f);
+            Projectile right = SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: 1f);
+            Projectile left = SpawnBullet(source, position, target, damage, knockback, player.whoAmI, side: -1f);
+
+            // Pair them up so they can draw the thread between them.
+            if (right.ModProjectile is MandibleShooterBullet r && left.ModProjectile is MandibleShooterBullet l)
+            {
+                r.PartnerWho = left.whoAmI;
+                l.PartnerWho = right.whoAmI;
+                right.netUpdate = true;
+                left.netUpdate = true;
+            }
+
+            // muzzle flash
+            Vector2 aimDir = (target - position).SafeNormalize(Vector2.UnitX * player.direction);
+            WeaponFX.DustCone(position, aimDir, 0.55f, DustID.Sand, 8, 2f, 6f, 1.2f);
+            WeaponFX.DustCone(position, aimDir, 0.3f, DustID.Sandstorm, 4, 3f, 7f, 1f);
 
             return false;
         }
 
-        private void SpawnBullet(EntitySource_ItemUse_WithAmmo source, Vector2 position,
+        private Projectile SpawnBullet(EntitySource_ItemUse_WithAmmo source, Vector2 position,
             Vector2 target, int damage, float knockback, int owner, float side)
         {
-            int type = ModContent.ProjectileType<Projectiles.Ranger.MandibleShooterBullet>();
+            int type = ModContent.ProjectileType<MandibleShooterBullet>();
 
             Projectile proj = Projectile.NewProjectileDirect(source, position, Vector2.Zero,
                 type, damage, knockback, owner, ai0: side);
 
-            if (proj.ModProjectile is Projectiles.Ranger.MandibleShooterBullet bullet)
+            if (proj.ModProjectile is MandibleShooterBullet bullet)
             {
                 bullet.Start = position;
                 bullet.Target = target;
                 proj.netUpdate = true;
             }
+
+            return proj;
+        }
+
+        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
+            float rotation, float scale, int whoAmI)
+        {
+            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 214, 140));
         }
     }
 }

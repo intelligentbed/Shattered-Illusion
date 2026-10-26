@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using Terraria;
+using Terraria.Audio;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -73,21 +74,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             if (NPC.ai[2] == 2f)
             {
-                NPC.ai[1]++;
-
-                if (NPC.ai[1] > KingSlimeOverride.SweepDuration(parent))
-                {
-                    NPC.active = false;
-                    return;
-                }
-
-                NPC.Center = KingSlimeOverride.SweepPosition(parent, NPC.ai[3], NPC.ai[1]);
-                float sweepScale = MathHelper.Clamp(NPC.ai[1] / 8f, 0f, 1f);
-                NPC.scale = 0.85f * sweepScale;
-                NPC.alpha = (int)MathHelper.Lerp(255, 30, sweepScale);
-                NPC.spriteDirection = NPC.ai[3] > 0f ? 1 : -1;
+                EchoDiveAI(parent);
                 return;
             }
+
             NPC.ai[1]++;
             float timer = NPC.ai[1];
             bool isVertical = NPC.ai[2] == 1f;
@@ -144,26 +134,157 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             NPC.spriteDirection = parent.spriteDirection;
         }
 
+        private static float EaseOutBack(float x)
+        {
+            x = MathHelper.Clamp(x, 0f, 1f);
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            float i = x - 1f;
+
+            return 1f + c3 * i * i * i + c1 * i * i;
+        }
+
+        // Echo Dive: pop in at the ceiling, dive onto the locked floor spot, bounce, rise on the mirrored diagonal.
+        // localAI[0] = distance travelled along the path, localAI[1] = distance last tick, localAI[2] = stretch (for drawing).
+        private void EchoDiveAI(NPC parent)
+        {
+            if ((int)parent.ai[0] != (int)KingSlimeOverride.AttackPhase.EchoDive)
+            {
+                NPC.active = false;
+                return;
+            }
+
+            NPC.ai[1]++;
+            float t = NPC.ai[1];
+            int side = NPC.ai[3] >= 0f ? 1 : -1;
+            float fx = Math.Abs(NPC.ai[3]);
+            const float baseScale = 0.85f;
+
+            NPC.spriteDirection = side;
+
+            float appear = KingSlimeOverride.EchoAppear;
+            bool appearing = t <= appear;
+            float pop = MathHelper.Clamp(t / appear, 0f, 1f);
+
+            float distance = Math.Max(0f, t - appear) * KingSlimeOverride.EchoSpeed;
+            Vector2 pos = KingSlimeOverride.EchoPosition(parent, side, fx, distance, out bool finished);
+
+            KingSlimeOverride.EchoPath(parent, side, fx, out Vector2 a, out Vector2 b, out Vector2 c);
+            float l1 = Vector2.Distance(a, b);
+
+            if (t <= 1f && !Main.dedServ)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    Dust d = Dust.NewDustPerfect(a + Main.rand.NextVector2Circular(14f, 14f), DustID.t_Slime,
+                        Main.rand.NextVector2Circular(2.5f, 2.5f), 100, Color.Cyan, 1.4f);
+                    d.noGravity = true;
+                }
+            }
+
+            if (finished)
+            {
+                if (!Main.dedServ)
+                {
+                    for (int i = 0; i < 12; i++)
+                    {
+                        Dust.NewDustPerfect(pos, DustID.t_Slime, Main.rand.NextVector2Circular(4f, 4f), 100, Color.Cyan, 1.5f);
+                    }
+                }
+
+                NPC.active = false;
+                return;
+            }
+
+            // Bounce beat: the moment we cross from the dive into the rebound.
+            float previous = NPC.localAI[1];
+
+            if (previous < l1 && distance >= l1 && distance > 0f)
+            {
+                SoundEngine.PlaySound(SoundID.NPCDeath39 with { Pitch = 0.3f, Volume = 0.7f }, pos);
+                KingSlimeOverride.EchoBounceImpact(new Vector2(pos.X, pos.Y + 19f));
+
+                if (!Main.dedServ)
+                {
+                    for (int i = 0; i < 14; i++)
+                    {
+                        Vector2 v = new Vector2(Main.rand.NextFloat(-5f, 5f), -Main.rand.NextFloat(1f, 5f));
+                        Dust.NewDustPerfect(pos + new Vector2(0f, 12f), DustID.t_Slime, v, 100, Color.Cyan, 1.6f);
+                    }
+                }
+            }
+
+            NPC.localAI[1] = distance;
+            NPC.localAI[0] = distance;
+
+            Vector2 heading = distance < l1 ? b - a : c - b;
+            heading = heading.LengthSquared() > 0.01f ? Vector2.Normalize(heading) : new Vector2(side, 0f);
+
+            // Tilt into the travel direction; mirrored for the flipped sprite.
+            NPC.rotation = side * (float)Math.Atan2(heading.Y, Math.Abs(heading.X)) * 0.6f;
+
+            float stretch = appearing ? 0f : 0.28f;
+            NPC.localAI[2] = stretch;
+
+            NPC.Center = pos;
+            NPC.scale = baseScale * (appearing ? EaseOutBack(pop) : 1f);
+            NPC.alpha = (int)MathHelper.Lerp(255, 30, pop);
+            NPC.damage = appearing ? 0 : NPC.defDamage;
+
+            // Gel trail.
+            if (!appearing && !Main.dedServ)
+            {
+                Dust d = Dust.NewDustPerfect(pos - heading * 14f + Main.rand.NextVector2Circular(8f, 8f), DustID.t_Slime,
+                    -heading * 1.5f, 100, Color.Cyan, 1.2f);
+                d.noGravity = true;
+            }
+        }
+
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-
             Texture2D texture = (cloneAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/KingSlimeClone")).Value;
 
             Rectangle sourceRectangle = new Rectangle(0, 0, texture.Width, texture.Height);
             Vector2 drawOrigin = new Vector2(texture.Width / 2f, texture.Height / 2f);
             Vector2 drawPos = NPC.Center - screenPos;
+            SpriteEffects effects = NPC.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+            float opacity = (255 - NPC.alpha) / 255f;
 
-            spriteBatch.Draw(
-                texture,
-                drawPos,
-                sourceRectangle,
-                drawColor * ((255 - NPC.alpha) / 255f),
-                NPC.rotation,
-                drawOrigin,
-                NPC.scale,
-                NPC.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None,
-                0f
-            );
+            Vector2 scale = new Vector2(NPC.scale);
+            bool echo = NPC.ai[2] == 2f;
+
+            if (echo)
+            {
+                float stretch = NPC.localAI[2];
+                scale = new Vector2(NPC.scale * (1f + stretch), NPC.scale * (1f - stretch * 0.55f));
+
+                int parentIndex = (int)NPC.ai[0];
+
+                if (stretch > 0f && parentIndex >= 0 && parentIndex < Main.maxNPCs && Main.npc[parentIndex].active)
+                {
+                    NPC parent = Main.npc[parentIndex];
+                    int side = NPC.ai[3] >= 0f ? 1 : -1;
+                    float fx = Math.Abs(NPC.ai[3]);
+                    float distance = NPC.localAI[0];
+                    Color ghostTint = Color.Lerp(drawColor, new Color(120, 255, 220), 0.7f);
+
+                    for (int k = 5; k >= 1; k--)
+                    {
+                        float ghostDistance = distance - k * KingSlimeOverride.EchoSpeed * 0.75f;
+
+                        if (ghostDistance < 0f)
+                            continue;
+
+                        Vector2 ghostPos = KingSlimeOverride.EchoPosition(parent, side, fx, ghostDistance, out _);
+                        float fade = 1f - k / 6f;
+
+                        spriteBatch.Draw(texture, ghostPos - screenPos, sourceRectangle, ghostTint * (opacity * fade * fade * 0.55f),
+                            NPC.rotation, drawOrigin, scale * (1f - k * 0.05f), effects, 0f);
+                    }
+                }
+            }
+
+            spriteBatch.Draw(texture, drawPos, sourceRectangle, drawColor * opacity, NPC.rotation, drawOrigin, scale, effects, 0f);
 
             return false;
         }

@@ -26,13 +26,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const float ArenaFloorPadding = 24f;
         private const float ArenaDashSpacing = 44f;
 
-        private const float SweepRowSpawnLead = 40f;
-        private static readonly float[] SweepRowOffsets = { 24f, 90f, 150f };
-        private static readonly int[][] SweepWaves = { new[] { 0, 2 }, new[] { 1 }, new[] { 0, 2 } };
+        // Echo Dive: clones drop from the ceiling in a 45-ish degree V (down onto a locked floor spot, bounce, back up).
+        public const float EchoAppear = 10f;
+        private const float EchoSpawnLead = 46f;
+        private const float EchoDiveSlope = 0.85f;
+        private const float EchoLockTime = 14f;
 
         private static float ArenaTempo => Main.masterMode ? 1.3f : Main.expertMode ? 1.15f : 1f;
-        private static int SweepRounds => Main.masterMode ? 3 : 2;
-        private static float SweepSpeed => Main.masterMode ? 16f : Main.expertMode ? 13f : 10f;
+        private static int EchoWaves => Main.masterMode ? 5 : Main.expertMode ? 4 : 3;
+        public static float EchoSpeed => Main.masterMode ? 20f : Main.expertMode ? 17f : 14f;
 
         private static bool IsArena(NPC npc) => npc.GetGlobalNPC<KingSlimeInstanceData>().ArenaActive;
 
@@ -149,7 +151,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 AttackPhase.HugeJump => (650f, 1000f, 0f),
                 AttackPhase.Teleport => (1500f, 600f, 200f),
                 AttackPhase.SplitAttack => vertical ? (650f, 1100f, 0f) : (1500f, 550f, 0f),
-                AttackPhase.CloneSweep => (1500f, 500f, 0f),
+                AttackPhase.EchoDive => (1500f, 500f, 0f),
                 AttackPhase.CrownSummon => (900f, 700f, 0f),
                 AttackPhase.WeaponSword => (1000f, 800f, 0f),
                 AttackPhase.WeaponSpear => (1000f, 520f, 0f),
@@ -324,25 +326,157 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
-        public static float SweepDuration(NPC parent)
+        // ---------------------------------------------------------------------------------------------
+        // Echo Dive
+        // ---------------------------------------------------------------------------------------------
+
+        private static float EchoFloorY(KingSlimeInstanceData data) => data.ArenaFloorY - 19f;
+        private static float EchoCeilY(KingSlimeInstanceData data) => data.ArenaMin.Y + 36f;
+        private static float EchoDrop(KingSlimeInstanceData data) => Math.Max(80f, EchoFloorY(data) - EchoCeilY(data));
+        private static float EchoRun(KingSlimeInstanceData data) => EchoDrop(data) * EchoDiveSlope;
+
+        // side = +1 travels left -> right (starts left of the floor point), -1 the other way round.
+        public static void EchoPath(NPC parent, int side, float fx, out Vector2 start, out Vector2 bounce, out Vector2 end)
         {
             KingSlimeInstanceData data = parent.GetGlobalNPC<KingSlimeInstanceData>();
-            return Math.Max(1f, (data.ArenaMax.X - data.ArenaMin.X) / SweepSpeed);
+            float drop = EchoDrop(data);
+            float run = drop * EchoDiveSlope;
+            float floorY = EchoFloorY(data);
+
+            start = new Vector2(fx - side * run, floorY - drop);
+            bounce = new Vector2(fx, floorY);
+
+            // The rebound is cut short when it would leave the arena through a side wall.
+            float room = side > 0 ? data.ArenaMax.X - 10f - fx : fx - (data.ArenaMin.X + 10f);
+            float run2 = MathHelper.Clamp(room, 8f, run);
+            end = new Vector2(fx + side * run2, floorY - drop * (run2 / run));
         }
 
-        public static Vector2 SweepPosition(NPC parent, float ai3, float t)
+        public static Vector2 EchoPosition(NPC parent, int side, float fx, float distance, out bool finished)
         {
-            KingSlimeInstanceData data = parent.GetGlobalNPC<KingSlimeInstanceData>();
-            int side = ai3 > 0f ? 1 : -1;
-            int row = (int)Math.Abs(ai3) - 1;
-            float y = data.ArenaMax.Y - ArenaFloorPadding - SweepRowOffsets[row];
-            float startX = side > 0 ? data.ArenaMin.X : data.ArenaMax.X;
-            float endX = side > 0 ? data.ArenaMax.X : data.ArenaMin.X;
+            EchoPath(parent, side, fx, out Vector2 a, out Vector2 b, out Vector2 c);
 
-            return new Vector2(MathHelper.Lerp(startX, endX, MathHelper.Clamp(t / SweepDuration(parent), 0f, 1f)), y);
+            float l1 = Math.Max(1f, Vector2.Distance(a, b));
+            float l2 = Math.Max(1f, Vector2.Distance(b, c));
+            finished = distance >= l1 + l2;
+
+            if (distance < l1)
+                return Vector2.Lerp(a, b, Math.Max(0f, distance) / l1);
+
+            return Vector2.Lerp(b, c, MathHelper.Clamp((distance - l1) / l2, 0f, 1f));
         }
 
-        private void DoCloneSweep(NPC npc)
+        public static void EchoBounceImpact(Vector2 pos)
+        {
+            if (!Main.dedServ)
+                SlimeImpact(pos, 0.4f);
+        }
+
+        private static int EchoFitSide(KingSlimeInstanceData data, float x, int preferred)
+        {
+            float run = EchoRun(data);
+            bool fits = preferred > 0 ? x - run >= data.ArenaMin.X + 16f : x + run <= data.ArenaMax.X - 16f;
+
+            return fits ? preferred : -preferred;
+        }
+
+        private static float EchoClampFx(KingSlimeInstanceData data, int side, float x)
+        {
+            float run = EchoRun(data);
+            float lo = data.ArenaMin.X + 16f + (side > 0 ? run : 0f);
+            float hi = data.ArenaMax.X - 16f - (side < 0 ? run : 0f);
+
+            return MathHelper.Clamp(x, lo, hi);
+        }
+
+        // Wave rhythm: single dive -> pincer (two clones, same spot, opposite sides) -> lead shot (aimed where you're going).
+        private static (int side, float fx)[] EchoWaveClones(KingSlimeInstanceData data, int wave)
+        {
+            int pattern = wave % 3;
+            int preferred = wave % 2 == 0 ? 1 : -1;
+            float x = data.EchoTargetX;
+
+            if (pattern == 1)
+            {
+                float run = EchoRun(data);
+                float fx = MathHelper.Clamp(x, data.ArenaMin.X + run + 16f, data.ArenaMax.X - run - 16f);
+
+                return new[] { (1, fx), (-1, fx) };
+            }
+
+            int side = EchoFitSide(data, x, preferred);
+
+            return new[] { (side, EchoClampFx(data, side, x)) };
+        }
+
+        private static void DrawEchoTelegraph(NPC npc, KingSlimeInstanceData data, int wave, float t, bool locked, bool firstTick)
+        {
+            Color col = (locked ? Color.White : new Color(120, 255, 220)) * (0.2f + 0.6f * t);
+
+            foreach ((int side, float fx) in EchoWaveClones(data, wave))
+            {
+                EchoPath(npc, side, fx, out Vector2 a, out Vector2 b, out Vector2 c);
+
+                DashLine(a, b, col, 9f);
+                DashLine(b, c, col * 0.55f, 7f);
+
+                const float size = 90f;
+                Vector2 marker = new Vector2(b.X, data.ArenaFloorY - 3f);
+                float inner = MathHelper.Lerp(size * 0.2f, size, t);
+
+                BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                    position: marker.ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(size, size * 0.3f),
+                    color: col,
+                    duration: 2
+                ));
+
+                BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                    position: marker.ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(inner, inner * 0.3f),
+                    color: col,
+                    duration: 2
+                ));
+
+                if (firstTick)
+                {
+                    BossParticleSystem.ChargeCores.Create(new ParticleInfo(
+                        position: a.ToNumerics(),
+                        velocity: SystemVector2.Zero,
+                        rotation: 0f,
+                        scale: new SystemVector2(30f, 30f),
+                        color: new Color(120, 255, 220, 255),
+                        duration: (int)(EchoSpawnLead / ArenaTempo) + 2
+                    ));
+                }
+            }
+        }
+
+        private void SpawnEchoWave(NPC npc, KingSlimeInstanceData data, int wave)
+        {
+            foreach ((int side, float fx) in EchoWaveClones(data, wave))
+            {
+                EchoPath(npc, side, fx, out Vector2 start, out _, out _);
+
+                // ai3 carries both the side (sign) and the floor X (magnitude); world X is always positive.
+                NPC.NewNPC(npc.GetSource_FromAI(), (int)start.X, (int)start.Y + 20, ModContent.NPCType<KingSlimeClone>(),
+                    ai0: npc.whoAmI, ai1: 0f, ai2: 2f, ai3: side * fx);
+            }
+
+            SoundEngine.PlaySound(SoundID.Item8 with { Pitch = -0.4f, Volume = 1.0f }, npc.Center);
+
+            // The boss hops with every wave so he reads as the one conducting it.
+            if (npc.velocity.Y == 0f)
+                npc.velocity.Y = -4.5f;
+
+            npc.netUpdate = true;
+        }
+
+        private void DoEchoDive(NPC npc, Player target)
         {
             npc.noGravity = false;
             npc.noTileCollide = false;
@@ -353,57 +487,47 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             ref float timer = ref npc.ai[Slot_Timer];
             KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
 
-            float first = 55f / ArenaTempo;
-            float gap = 45f / ArenaTempo;
-            float lead = SweepRowSpawnLead / ArenaTempo;
-            int rounds = SweepRounds;
+            float first = 60f / ArenaTempo;
+            float gap = 64f / ArenaTempo;
+            float lead = EchoSpawnLead / ArenaTempo;
+            int waves = EchoWaves;
 
             if (timer <= 1f)
+            {
                 SoundEngine.PlaySound(SoundID.Roar with { Pitch = 0.1f, Volume = 1.1f }, npc.Center);
+                data.EchoTargetX = target.Center.X;
+            }
 
-            for (int w = 0; w < rounds; w++)
+            for (int w = 0; w < waves; w++)
             {
                 float spawnAt = first + w * gap;
-                int[] rows = SweepWaves[w % SweepWaves.Length];
+                float telegraphAt = spawnAt - lead;
+                float lockAt = spawnAt - EchoLockTime;
 
-                if (!Main.dedServ && timer < spawnAt && timer >= spawnAt - lead)
+                if (timer >= telegraphAt && timer < spawnAt)
                 {
-                    float t = (timer - (spawnAt - lead)) / lead;
-
-                    foreach (int row in rows)
+                    if (timer < lockAt)
                     {
-                        float y = data.ArenaMax.Y - ArenaFloorPadding - SweepRowOffsets[row];
+                        float aimX = target.Center.X;
 
-                        for (float x = data.ArenaMin.X; x <= data.ArenaMax.X; x += ArenaDashSpacing)
-                        {
-                            BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
-                                position: new SystemVector2(x, y),
-                                velocity: SystemVector2.Zero,
-                                rotation: 0f,
-                                scale: new SystemVector2(26f, 8f),
-                                color: new Color(120, 255, 220, 255) * (0.25f + 0.55f * t),
-                                duration: 2
-                            ));
-                        }
+                        // Every third wave is a lead shot: aim where the player is heading, not where they are.
+                        if (w % 3 == 2)
+                            aimX += MathHelper.Clamp(target.velocity.X * 22f, -220f, 220f);
+
+                        data.EchoTargetX = MathHelper.Lerp(data.EchoTargetX, aimX, 0.2f);
                     }
+
+                    if (!Main.dedServ)
+                        DrawEchoTelegraph(npc, data, w, MathHelper.Clamp((timer - telegraphAt) / lead, 0f, 1f), timer >= lockAt, (int)timer == (int)telegraphAt);
                 }
 
                 if (IsAuthority && (int)timer == (int)spawnAt)
-                {
-                    for (int k = 0; k < rows.Length; k++)
-                    {
-                        float ai3 = ((w + k) % 2 == 0 ? 1 : -1) * (rows[k] + 1);
-                        Vector2 pos = SweepPosition(npc, ai3, 0f);
-
-                        NPC.NewNPC(npc.GetSource_FromAI(), (int)pos.X, (int)pos.Y, ModContent.NPCType<KingSlimeClone>(),
-                            ai0: npc.whoAmI, ai1: 0f, ai2: 2f, ai3: ai3);
-                    }
-
-                    SoundEngine.PlaySound(SoundID.Item8 with { Pitch = -0.4f, Volume = 1.0f }, npc.Center);
-                }
+                    SpawnEchoWave(npc, data, w);
             }
 
-            if (timer >= first + (rounds - 1) * gap + SweepDuration(npc) + 20f)
+            float pathTicks = 2f * (float)Math.Sqrt(EchoRun(data) * EchoRun(data) + EchoDrop(data) * EchoDrop(data)) / EchoSpeed;
+
+            if (timer >= first + (waves - 1) * gap + EchoAppear + pathTicks + 24f)
                 EnterCooldown(npc);
         }
 

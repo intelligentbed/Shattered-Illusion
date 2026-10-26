@@ -1,8 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ShatteredIllusion.Common.Systems;
 using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
+using Terraria.Graphics.CameraModifiers;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -39,6 +41,12 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             Item.value = Item.buyPrice(silver: 50);
             Item.rare = ItemRarityID.Green;
         }
+
+        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
+            float rotation, float scale, int whoAmI)
+        {
+            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(130, 255, 110));
+        }
     }
 
     public class LivingWoodGreatClubHoldout : ModProjectile
@@ -53,6 +61,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         private float baseKnockback = -1f;
 
         private bool hasSlammed;
+        private bool readyFlashDone;
 
         private const int MaxChargeTime = 50;
         private const int SwingTime = 30;
@@ -79,6 +88,15 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
         private const float SpriteNeutralAngle = -MathHelper.PiOver4; // -45°
         private const float SpriteRotationOffset = -SpriteNeutralAngle; // +45°
+
+        // Swing trail: the last few club angles, newest first.
+        private const int HistoryLength = 8;
+        private readonly float[] swingHistory = new float[HistoryLength];
+        private int historyCount;
+        private float lastRawRotation;
+
+        private static readonly Color LeafGreen = new Color(130, 255, 110);
+        private static readonly Color DarkGreen = new Color(30, 130, 60);
 
         public override void SetDefaults()
         {
@@ -145,6 +163,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             else
             {
                 rotation = DoSwinging(player, direction, out bool justFinishedSwing);
+                RecordSwing(rotation);
+                SwingDust(player, rotation);
 
                 if (!hasSlammed && CanDamage() == true && TryGetTileSlamPosition(player, rotation, out Vector2 slamPosition))
                 {
@@ -165,6 +185,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
                 }
             }
 
+            lastRawRotation = rotation;
+
             Vector2 gripPosition = player.MountedCenter + rotation.ToRotationVector2() * HandReachDistance;
 
             Projectile.Center = gripPosition;
@@ -179,7 +201,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         /// Holds the club coiled further back the longer the button is held,
         /// capping at MaxChargeTime. Releasing the button (or hitting the cap
         /// and then releasing) transitions into the swing.
-        /// </summary> im new to this :)
+        /// </summary>
         private float DoCharging(Player player, int direction)
         {
             Projectile.timeLeft = 5;
@@ -191,9 +213,10 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             float fullChargeAngle = GetFullChargeAngle(direction);
             float rotation = MathHelper.Lerp(startAngle, fullChargeAngle, MathHelper.SmoothStep(0f, 1f, chargeRatio));
 
-
             if (chargeRatio >= 1f)
                 rotation += (float)System.Math.Sin(Main.GameUpdateCount * 0.3f) * 0.04f;
+
+            ChargeVisuals(player, rotation, chargeRatio);
 
             if (!player.channel)
             {
@@ -229,6 +252,60 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             return rotation;
         }
 
+        // ------------------------------------------------------------------ visuals
+
+        private Vector2 GetHeadPosition(Player player, float rawRotation) =>
+            player.MountedCenter + rawRotation.ToRotationVector2() * (HandReachDistance + ClubHeadReach);
+
+        /// <summary>
+        /// While charging: leaf motes get sucked into the club head, and a flash +
+        /// ring + sound tells you the instant it reaches full power.
+        /// </summary>
+        private void ChargeVisuals(Player player, float rotation, float chargeRatio)
+        {
+            Vector2 head = GetHeadPosition(player, rotation);
+
+            if (chargeRatio < 1f)
+            {
+                if (Main.rand.NextFloat() < 0.15f + chargeRatio * 0.5f)
+                {
+                    Vector2 offset = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(30f, 55f);
+                    Dust mote = Dust.NewDustPerfect(head + offset, DustID.Grass, -offset * 0.08f, 0, default, 1f + chargeRatio * 0.4f);
+                    mote.noGravity = true;
+                }
+            }
+            else if (!readyFlashDone)
+            {
+                readyFlashDone = true;
+                SoundEngine.PlaySound(SoundID.MaxMana, head);
+                WeaponFX.DustRing(head, DustID.GreenTorch, 16, 4f, 1.3f);
+            }
+            else if (Main.rand.NextBool(4))
+            {
+                Dust ember = Dust.NewDustPerfect(head + Main.rand.NextVector2Circular(14f, 14f), DustID.GreenTorch,
+                    new Vector2(0f, -1f), 0, default, 1f);
+                ember.noGravity = true;
+            }
+        }
+
+        private void RecordSwing(float rawRotation)
+        {
+            for (int i = HistoryLength - 1; i > 0; i--)
+                swingHistory[i] = swingHistory[i - 1];
+
+            swingHistory[0] = rawRotation;
+            historyCount = System.Math.Min(historyCount + 1, HistoryLength);
+        }
+
+        private void SwingDust(Player player, float rawRotation)
+        {
+            if (Projectile.ai[0] / SwingTime < DamageStartProgress || !Main.rand.NextBool(2))
+                return;
+
+            Dust leaf = Dust.NewDustPerfect(GetHeadPosition(player, rawRotation) + Main.rand.NextVector2Circular(10f, 10f),
+                DustID.Grass, Main.rand.NextVector2Circular(1.5f, 1.5f), 0, default, 1.1f);
+            leaf.noGravity = true;
+        }
 
         /// <summary>
         /// Checks whether the head of the club (out past the grip, along the
@@ -293,8 +370,10 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         public override bool PreDraw(ref Color lightColor)
         {
             Texture2D texture = TextureAssets.Projectile[Projectile.type].Value;
+            Player player = Main.player[Projectile.owner];
 
-            bool flipped = Projectile.spriteDirection == -1;
+            int direction = Projectile.spriteDirection == 0 ? 1 : Projectile.spriteDirection;
+            bool flipped = direction == -1;
             SpriteEffects effects = flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
 
             float originX = flipped ? texture.Width - GripPixel.X : GripPixel.X;
@@ -302,30 +381,61 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
             Vector2 drawPosition = Projectile.Center - Main.screenPosition;
 
-            Main.EntitySpriteDraw(
-                texture,
-                drawPosition,
-                null,
-                lightColor,
-                Projectile.rotation,
-                origin,
-                Projectile.scale,
-                effects,
-                0
-            );
+            bool swinging = (Phase)Projectile.localAI[0] == Phase.Swinging;
+            float chargeRatio = swinging ? Projectile.localAI[1] : Projectile.ai[0] / MaxChargeTime;
+
+            // --- swing trail: ghost copies of the club + a green crescent along the head's path
+            if (swinging)
+            {
+                for (int i = historyCount - 1; i >= 1; i--)
+                {
+                    float k = 1f - i / (float)historyCount;
+                    Main.EntitySpriteDraw(texture, drawPosition, null,
+                        WeaponFX.Additive(LeafGreen, 0.35f * k * k * (0.4f + chargeRatio)),
+                        swingHistory[i] + Mirror(SpriteRotationOffset, direction),
+                        origin, Projectile.scale, effects, 0);
+                }
+
+                for (int i = 0; i < historyCount - 1; i++)
+                {
+                    float k = 1f - i / (float)historyCount;
+                    WeaponFX.DrawLine(GetHeadPosition(player, swingHistory[i]), GetHeadPosition(player, swingHistory[i + 1]),
+                        WeaponFX.Additive(LeafGreen, 0.8f * k), (3f + 7f * chargeRatio) * k + 1f);
+                }
+            }
+
+            // --- the club
+            Main.EntitySpriteDraw(texture, drawPosition, null, lightColor, Projectile.rotation, origin,
+                Projectile.scale, effects, 0);
+
+            // --- glow on the head that grows with charge
+            Vector2 headScreen = GetHeadPosition(player, lastRawRotation) - Main.screenPosition;
+            float pulse = chargeRatio >= 1f && !swinging
+                ? 0.8f + 0.2f * (float)System.Math.Sin(Main.GlobalTimeWrappedHourly * 14f)
+                : 1f;
+
+            if (chargeRatio > 0.05f)
+                WeaponFX.DrawGlow(headScreen, WeaponFX.Additive(LeafGreen, (0.15f + 0.55f * chargeRatio) * pulse), 0.5f + 1.1f * chargeRatio);
 
             return false;
         }
 
         private void CreateImpact(Player player, int direction, Vector2 impactPosition)
         {
+            float chargeRatio = Projectile.localAI[1];
+
+            // Sound, dust and screen shake are cosmetic, so everyone sees them...
+            SoundEngine.PlaySound(SoundID.Item70, impactPosition);
+            SpawnImpactDust(impactPosition, direction, chargeRatio);
+
+            Main.instance.CameraModifiers.Add(new PunchCameraModifier(impactPosition,
+                Main.rand.NextFloat(MathHelper.TwoPi).ToRotationVector2(),
+                MathHelper.Lerp(2f, 7f, chargeRatio), 6f, 18, 1000f, "LivingWoodClubSlam"));
+
+            // ...but only the owner spawns the actual rubble projectiles.
             if (Main.myPlayer != Projectile.owner)
                 return;
 
-            float chargeRatio = Projectile.localAI[1];
-
-            SoundEngine.PlaySound(SoundID.Item70, impactPosition);
-            SpawnImpactDust(impactPosition, direction, chargeRatio);
             SpawnRubble(impactPosition, direction, chargeRatio);
         }
 
@@ -352,6 +462,12 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
                 Main.dust[dust].noGravity = false;
                 Main.dust[dust].scale = Main.rand.NextFloat(1f, 1.6f);
             }
+
+            // leaves kicked up with the dirt
+            WeaponFX.DustCone(impactPosition, -Vector2.UnitY, 1.1f, DustID.Grass, (int)MathHelper.Lerp(6f, 14f, chargeRatio), 2f, 6f, 1.2f);
+
+            if (chargeRatio >= 1f)
+                WeaponFX.DustRing(impactPosition, DustID.GreenTorch, 18, 5f, 1.4f);
         }
 
         private void SpawnRubble(Vector2 impactPosition, int direction, float chargeRatio)
@@ -407,6 +523,13 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
             if (Projectile.velocity.Y > 12f)
                 Projectile.velocity.Y = 12f;
+
+            if (Main.rand.NextBool(3))
+            {
+                Dust d = Dust.NewDustPerfect(Projectile.Center, DustID.Grass,
+                    Main.rand.NextVector2Circular(0.6f, 0.6f), 0, default, 0.9f);
+                d.noGravity = true;
+            }
         }
 
         public override bool OnTileCollide(Vector2 oldVelocity)
@@ -415,6 +538,17 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             Projectile.velocity.Y = -oldVelocity.Y * 0.35f;
 
             return false;
+        }
+
+        public override void OnKill(int timeLeft)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Dust.NewDust(Projectile.position, Projectile.width, Projectile.height, DustID.WoodFurniture,
+                    Main.rand.NextFloat(-2f, 2f), Main.rand.NextFloat(-3f, 0f));
+            }
+
+            WeaponFX.DustRing(Projectile.Center, DustID.Grass, 6, 2.5f, 1f);
         }
     }
 }

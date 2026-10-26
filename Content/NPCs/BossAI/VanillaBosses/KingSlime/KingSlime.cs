@@ -41,7 +41,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             NinjaStunned,
 
             TransformToSlime,
-            CloneSweep,
+            EchoDive,
             CrownSummon,
             WeaponSword,
             WeaponSpear,
@@ -108,7 +108,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         {
             AttackPhase.Jump,
             AttackPhase.WeaponSpear,
-            AttackPhase.CloneSweep,
+            AttackPhase.EchoDive,
             AttackPhase.WeaponBow,
             AttackPhase.BigJump,
             AttackPhase.WeaponSword,
@@ -434,8 +434,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     DoRevert(npc, target);
                     break;
 
-                case AttackPhase.CloneSweep:
-                    DoCloneSweep(npc);
+                case AttackPhase.EchoDive:
+                    DoEchoDive(npc, target);
                     break;
 
                 case AttackPhase.CrownSummon:

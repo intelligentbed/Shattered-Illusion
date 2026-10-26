@@ -21,8 +21,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const int WeaponRecoverStep = 3;
         private const int WeaponUnmorphStep = 4;
 
-        private const float WeaponMorphDuration = 24f;
-        private const float WeaponUnmorphDuration = 20f;
+        private const float WeaponMorphDuration = 36f;
+        private const float WeaponUnmorphDuration = 34f;
+        private const float WeaponHandoffDuration = 16f;
+
+        // Morph progress p runs 0..1. 0..WeaponGather the slime squashes into a glowing orb; WeaponGather..1 the weapon
+        // grows out of it. WeaponHandoffP is the "orb" pose weapon -> weapon transitions pass straight through.
+        private const float WeaponGather = 0.38f;
+        private const float WeaponHandoffP = 0.30f;
         private const float WeaponStunDuration = 80f;
 
         private const float SwordLength = 380f;
@@ -64,50 +70,187 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
+        private static float Smooth01(float x)
+        {
+            x = MathHelper.Clamp(x, 0f, 1f);
+            return x * x * (3f - 2f * x);
+        }
+
+        private static float EaseOutCubic(float x)
+        {
+            float i = 1f - MathHelper.Clamp(x, 0f, 1f);
+            return 1f - i * i * i;
+        }
+
+        // Half-extents (from the weapon's center) that cover everything the weapon draws; the grow-out reveal expands to this.
+        private static Vector2 WeaponExtent(AttackPhase phase) => phase switch
+        {
+            AttackPhase.WeaponSword => new Vector2(120f, 340f),
+            AttackPhase.WeaponSpear => new Vector2(420f, 70f),
+            AttackPhase.WeaponHammer => new Vector2(190f, 430f),
+            AttackPhase.WeaponBow => new Vector2(110f, 190f),
+            _ => new Vector2(300f, 300f),
+        };
+
+        private static bool NextArenaPhaseIsWeapon(NPC npc)
+        {
+            if (!IsArena(npc))
+                return false;
+
+            int next = SequenceIndex(npc) + 1;
+
+            return next < ArenaSequence.Length && IsWeaponFormPhase(ArenaSequence[next]);
+        }
+
+        // Gel flicks off the leading edge of the reveal while the weapon grows out of (or sinks back into) the blob.
+        private static void MorphGoo(NPC npc, float p, float timer)
+        {
+            if (Main.dedServ || (int)timer % 2 != 0)
+                return;
+
+            float reveal = MathHelper.Clamp((p - WeaponGather) / (1f - WeaponGather), 0f, 1f);
+
+            if (reveal <= 0.02f || reveal >= 0.98f)
+                return;
+
+            Vector2 ext = WeaponExtent(CurrentPhase(npc));
+            float e = EaseOutCubic(reveal);
+            float hx = MathHelper.Lerp(16f, ext.X, e);
+            float hy = MathHelper.Lerp(16f, ext.Y, e);
+            float sign = Main.rand.NextBool() ? 1f : -1f;
+
+            Vector2 edge = ext.X > ext.Y
+                ? new Vector2(sign * hx, Main.rand.NextFloat(-8f, 8f))
+                : new Vector2(Main.rand.NextFloat(-8f, 8f), sign * hy);
+
+            Dust d = Dust.NewDustPerfect(npc.Center + edge, DustID.t_Slime,
+                Vector2.Normalize(edge) * 1.5f + Main.rand.NextVector2Circular(1.2f, 1.2f), 100, Color.Cyan, 1.3f);
+            d.noGravity = true;
+        }
+
         private static bool MorphIn(NPC npc, KingSlimeInstanceData data, Vector2 center, Vector2 size, float timer)
         {
-            float t = MathHelper.Clamp(timer / WeaponMorphDuration, 0f, 1f);
-            float e = t * t * (3f - 2f * t);
-            data.WeaponMorph = e;
+            float p0 = data.WeaponHandoffIn ? WeaponHandoffP : 0f;
+            float t = MathHelper.Clamp(timer / (WeaponMorphDuration * (1f - p0)), 0f, 1f);
+            float p = MathHelper.Lerp(p0, 1f, t);
+            data.WeaponMorph = p;
 
-            SetWeaponBox(npc, Vector2.Lerp(data.WeaponFrom, center, e),
-                MathHelper.Lerp(data.OriginalWidth, size.X, e), MathHelper.Lerp(data.OriginalHeight, size.Y, e));
+            // The orb travels to the weapon's spot while it is still forming, so the weapon unfolds on arrival.
+            float travelStart = Math.Max(p0, 0.15f);
+            float travel = Smooth01((p - travelStart) / (0.70f - travelStart));
+            float boxT = Smooth01((p - 0.25f) / 0.12f);
 
-            return t >= 1f;
+            SetWeaponBox(npc, Vector2.Lerp(data.WeaponFrom, center, travel),
+                MathHelper.Lerp(data.OriginalWidth, size.X, boxT), MathHelper.Lerp(data.OriginalHeight, size.Y, boxT));
+
+            MorphGoo(npc, p, timer);
+
+            if (t < 1f)
+                return false;
+
+            data.WeaponHandoffIn = false;
+            return true;
         }
 
         private void GoUnmorph(NPC npc, KingSlimeInstanceData data)
         {
             data.WeaponAnchor = new Vector2(npc.width, npc.height);
+            data.WeaponFrom = npc.Center;
+            data.WeaponHandoff = NextArenaPhaseIsWeapon(npc);
             SetStep(npc, WeaponUnmorphStep);
             npc.ai[Slot_Timer] = 0f;
         }
 
+        // Weapon -> weapon: the weapon sinks into the orb, then the next weapon grows out of that same orb.
+        private void HandoffToNextWeapon(NPC npc, KingSlimeInstanceData data)
+        {
+            int nextIndex = SequenceIndex(npc) + 1;
+            npc.ai[Slot_SequenceIndex] = nextIndex;
+
+            AttackPhase next = ArenaSequence[nextIndex];
+            SetPhase(npc, next);
+            SetArenaTarget(npc, next);
+            SetStep(npc, WeaponMorphStep);
+            npc.ai[Slot_Timer] = 0f;
+
+            data.WeaponHandoff = false;
+            data.WeaponHandoffIn = true;
+            data.WeaponMorph = WeaponHandoffP;
+
+            if (IsAuthority)
+                npc.netUpdate = true;
+        }
+
         private void MorphOut(NPC npc, KingSlimeInstanceData data, float timer)
         {
-            float t = MathHelper.Clamp(timer / WeaponUnmorphDuration, 0f, 1f);
-            float e = t * t * (3f - 2f * t);
-            data.WeaponMorph = 1f - e;
+            bool handoff = data.WeaponHandoff;
+            float duration = handoff ? WeaponHandoffDuration : WeaponUnmorphDuration;
+            float t = MathHelper.Clamp(timer / duration, 0f, 1f);
 
-            Vector2 inside = new Vector2(
-                MathHelper.Clamp(npc.Center.X, data.ArenaMin.X + 80f, data.ArenaMax.X - 80f),
-                MathHelper.Clamp(npc.Center.Y, data.ArenaMin.Y + 80f, data.ArenaMax.Y - 80f));
-            Vector2 center = Vector2.Lerp(npc.Center, inside, 0.25f);
+            float p;
+            Vector2 center;
 
-            SetWeaponBox(npc, center, MathHelper.Lerp(data.WeaponAnchor.X, data.OriginalWidth, e),
-                MathHelper.Lerp(data.WeaponAnchor.Y, data.OriginalHeight, e));
-
-            if (t >= 1f)
+            if (handoff)
             {
-                data.WeaponMorph = 0f;
-                EnterCooldown(npc);
+                p = MathHelper.Lerp(1f, WeaponHandoffP, Smooth01(t));
+                center = npc.Center;
             }
+            else
+            {
+                const float retractSpan = 0.45f;
+
+                Vector2 inside = new Vector2(
+                    MathHelper.Clamp(data.WeaponFrom.X, data.ArenaMin.X + 80f, data.ArenaMax.X - 80f),
+                    MathHelper.Clamp(data.WeaponFrom.Y, data.ArenaMin.Y + 80f, data.ArenaMax.Y - 80f));
+
+                float hoverT = Smooth01(t / retractSpan);
+                Vector2 hover = Vector2.Lerp(data.WeaponFrom, inside, hoverT);
+
+                if (t < retractSpan)
+                {
+                    // Weapon sinks back into the orb while it hovers.
+                    p = MathHelper.Lerp(1f, WeaponGather, hoverT);
+                    center = hover;
+                }
+                else
+                {
+                    // Orb drops to the floor and re-forms into the slime, landing just as it finishes.
+                    float u = (t - retractSpan) / (1f - retractSpan);
+                    float groundY = data.ArenaFloorY - data.OriginalHeight * 0.5f;
+
+                    p = WeaponGather * (1f - EaseOutCubic(u));
+                    center = new Vector2(hover.X, MathHelper.Lerp(hover.Y, groundY, u * u));
+                }
+            }
+
+            data.WeaponMorph = p;
+
+            float boxT = Smooth01((p - 0.25f) / 0.12f);
+            SetWeaponBox(npc, center, MathHelper.Lerp(data.OriginalWidth, data.WeaponAnchor.X, boxT),
+                MathHelper.Lerp(data.OriginalHeight, data.WeaponAnchor.Y, boxT));
+
+            MorphGoo(npc, p, timer);
+
+            if (t < 1f)
+                return;
+
+            if (handoff)
+            {
+                HandoffToNextWeapon(npc, data);
+                return;
+            }
+
+            data.WeaponMorph = 0f;
+            data.SquishSpringVel += 0.18f;
+            EnterCooldown(npc);
         }
 
         private void EnterWeaponStun(NPC npc)
         {
             KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
             data.WeaponMorph = 0f;
+            data.WeaponHandoff = false;
+            data.WeaponHandoffIn = false;
             ResizeKeepingCenter(npc, data.OriginalWidth, data.OriginalHeight);
 
             SetPhase(npc, AttackPhase.WeaponStunned);
@@ -591,6 +734,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private static bool penGhost;
         private static float penTime;
         private static float penWobble;
+        private static bool penClip;
+        private static Vector2 penClipMin;
+        private static Vector2 penClipMax;
 
         private static float PenSnap(float v) => (float)Math.Round(v / PenPixel) * PenPixel;
 
@@ -600,6 +746,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             y0 = PenSnap(y0);
             x1 = PenSnap(x1);
             y1 = PenSnap(y1);
+
+            if (penClip)
+            {
+                x0 = Math.Max(x0, penClipMin.X);
+                y0 = Math.Max(y0, penClipMin.Y);
+                x1 = Math.Min(x1, penClipMax.X);
+                y1 = Math.Min(y1, penClipMax.Y);
+            }
 
             if (x1 <= x0 || y1 <= y0)
                 return;
@@ -748,24 +902,62 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private static void DrawWeaponForm(NPC npc, SpriteBatch spriteBatch, Texture2D texture, Rectangle frame,
             Vector2 screenPos, Color drawColor, KingSlimeInstanceData data)
         {
-            float m = data.WeaponMorph;
+            float p = data.WeaponMorph;
+            float gather = Smooth01(p / WeaponGather);
+            float reveal = MathHelper.Clamp((p - WeaponGather) / (1f - WeaponGather), 0f, 1f);
+            float revealEase = EaseOutCubic(reveal);
             Vector2 c = npc.Center;
+            SpriteEffects effects = npc.spriteDirection == 1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
 
-            if (m < 1f)
+            // The slime itself: squashes into a glowing orb (anticipation), then shrinks away as the weapon grows out of it.
+            float melt = Smooth01(reveal / 0.7f);
+            float blobAlpha = 1f - melt;
+
+            if (blobAlpha > 0.01f)
             {
-                spriteBatch.Draw(texture, c - screenPos, frame, npc.GetAlpha(drawColor) * (1f - m), 0f, frame.Size() * 0.5f,
-                    new Vector2(npc.width / (float)frame.Width, npc.height / (float)frame.Height), SpriteEffects.None, 0f);
+                float squash = (float)Math.Sin(gather * MathHelper.Pi);
+                float shrink = MathHelper.Lerp(1f, 0.5f, gather) * MathHelper.Lerp(1f, 0.5f, melt);
+                float jelly = (data.SquishOffset + (float)Math.Sin(data.WobbleClock * 0.1f) * 0.02f) * (1f - gather);
+                Vector2 blobScale = new Vector2(
+                    npc.scale * shrink * (1f + 0.25f * squash) * (1f - jelly * 0.6f),
+                    npc.scale * shrink * (1f - 0.2f * squash) * (1f + jelly));
+                Vector2 anchor = Vector2.Lerp(npc.Bottom + new Vector2(0f, 2f), c, gather);
+                Vector2 origin = frame.Size() * new Vector2(0.5f, MathHelper.Lerp(1f, 0.5f, gather));
+
+                Color tint = npc.GetAlpha(drawColor);
+                Color body = Color.Lerp(tint, Color.White * (tint.A / 255f), gather * 0.35f) * blobAlpha;
+
+                if (gather > 0.15f)
+                {
+                    float aura = 0.12f + 0.1f * (float)Math.Sin(Main.GameUpdateCount * 0.3f);
+                    spriteBatch.Draw(texture, anchor - screenPos, frame, Color.White * (aura * gather * blobAlpha), 0f, origin, blobScale * 1.18f, effects, 0f);
+                }
+
+                spriteBatch.Draw(texture, anchor - screenPos, frame, body, 0f, origin, blobScale, effects, 0f);
             }
 
-            if (m <= 0.02f)
+            if (reveal <= 0.001f)
                 return;
+
+            AttackPhase phase = CurrentPhase(npc);
+            Vector2 ext = WeaponExtent(phase);
+            float hx = MathHelper.Lerp(16f, ext.X, revealEase);
+            float hy = MathHelper.Lerp(16f, ext.Y, revealEase);
+            bool clipping = reveal < 0.999f;
+            float m = Smooth01(reveal / 0.3f);
 
             penBatch = spriteBatch;
             penScreen = new Vector2((int)screenPos.X, (int)screenPos.Y);
             penLit = drawColor.ToVector3();
             penTime = Main.GameUpdateCount;
-            penWobble = 2f * m;
+
+            // Extra jelly wobble while the weapon is still unfolding; settles to the normal sway once fully out.
+            penWobble = 2f * m + 5f * (1f - revealEase);
             penGhost = false;
+
+            penClip = clipping;
+            penClipMin = new Vector2(PenSnap(c.X - hx), PenSnap(c.Y - hy));
+            penClipMax = new Vector2(PenSnap(c.X + hx), PenSnap(c.Y + hy));
 
             Vector2 delta = npc.position - npc.oldPosition;
             bool striking = CurrentStep(npc) == WeaponStrikeStep && CurrentPhase(npc) != AttackPhase.WeaponBow;
@@ -785,6 +977,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             penAlpha = m;
             DrawWeaponPass(npc, c, data, m);
+            penClip = false;
+
+            if (clipping)
+            {
+                // Sparkles ride the leading edge of the reveal.
+                float sparkAlpha = (float)Math.Sin(reveal * MathHelper.Pi);
+                penAlpha = 1f;
+
+                PenSpark(c.X + hx, c.Y, 3f, sparkAlpha);
+                PenSpark(c.X - hx, c.Y, 3f, sparkAlpha);
+                PenSpark(c.X, c.Y + hy, 3f, sparkAlpha);
+                PenSpark(c.X, c.Y - hy, 3f, sparkAlpha);
+            }
         }
 
         private static void DrawWeaponPass(NPC npc, Vector2 c, KingSlimeInstanceData data, float m)

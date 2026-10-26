@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ShatteredIllusion.Common.Systems;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.GameContent;
@@ -23,18 +24,17 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             Item.knockBack = 5f;
             Item.crit = 4;
 
-         
             Item.useTime = 20;
             Item.useAnimation = 20;
             Item.useStyle = ItemUseStyleID.Shoot;
             Item.UseSound = SoundID.Item1;
             Item.autoReuse = true;
 
-            Item.noMelee = true;      
-            Item.noUseGraphic = true; 
+            Item.noMelee = true;
+            Item.noUseGraphic = true;
 
             Item.shoot = ModContent.ProjectileType<DuneRendPincersProjectile>();
-            Item.shootSpeed = 1f; 
+            Item.shootSpeed = 1f;
 
             Item.value = Item.sellPrice(gold: 5);
             Item.rare = ItemRarityID.LightRed;
@@ -47,7 +47,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             NextComboStage = (NextComboStage + 1) % 3;
             comboExpireTimer = 0;
 
-            return false; 
+            return false;
         }
 
         public override void UpdateInventory(Player player)
@@ -57,6 +57,12 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         }
 
         public override bool MeleePrefix() => true;
+
+        public override void PostDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor,
+            float rotation, float scale, int whoAmI)
+        {
+            WeaponFX.DrawWorldAura(Item, rotation, scale, new Color(255, 200, 110));
+        }
     }
 
     internal class DuneRendPincersProjectile : ModProjectile
@@ -67,19 +73,30 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         private Stage CurrentStage => (Stage)Projectile.ai[0];
 
         private ref float Timer => ref Projectile.ai[1];
-        private ref float Progress => ref Projectile.localAI[0]; 
+        private ref float Progress => ref Projectile.localAI[0];
         private ref float Size => ref Projectile.localAI[1];
 
-        private const float SwingRange = MathHelper.Pi * 0.9f; 
+        private const float SwingRange = MathHelper.Pi * 0.9f;
         private const float WindupTime = 6f;
         private const float SwingTime = 10f;
         private const float FadeTime = 6f;
         private const float DashSpeed = 11f;
-        private const float HeldSpriteScale = 1.5f;  
-        private const float DashKnockbackMult = 2.2f; 
+        private const float HeldSpriteScale = 1.5f;
+        private const float DashKnockbackMult = 2.2f;
+
+        // Past blade angles, newest first. Used to draw the swing trail.
+        private const int HistoryLength = 8;
+        private readonly float[] rotHistory = new float[HistoryLength];
+        private int historyCount;
+
+        private static readonly Color SandGold = new Color(255, 200, 110);
+        private static readonly Color SandDeep = new Color(200, 120, 50);
 
         private float InitialAngle;
         private Player Owner => Main.player[Projectile.owner];
+
+        private bool Swinging => Timer >= WindupTime && Timer < WindupTime + SwingTime + FadeTime;
+        private float BladeLength => Projectile.Size.Length() * Projectile.scale;
 
         public override void SetDefaults()
         {
@@ -101,17 +118,18 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
 
             switch (CurrentStage)
             {
-                case Stage.Overhead: 
+                case Stage.Overhead:
                     InitialAngle = -MathHelper.PiOver2 - SwingRange * 0.5f;
                     break;
 
-                case Stage.Underhand: 
+                case Stage.Underhand:
                     InitialAngle = MathHelper.PiOver2 + SwingRange * 0.5f;
                     break;
 
-                default: 
+                default:
                     InitialAngle = -SwingRange * 0.5f;
                     Owner.velocity.X = DashSpeed * Owner.direction;
+                    WeaponFX.DustCone(Owner.Bottom, new Vector2(-Owner.direction, -0.2f), 0.6f, DustID.Sand, 14, 2f, 6f, 1.4f);
                     break;
             }
         }
@@ -125,6 +143,7 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             {
                 Owner.immune = true;
                 Owner.immuneTime = 2;
+                DashDust();
             }
 
             if (!Owner.active || Owner.dead || Owner.noItems || Owner.CCed)
@@ -156,6 +175,8 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             }
 
             PositionSword();
+            RecordHistory();
+            TipDust();
             Timer++;
         }
 
@@ -178,6 +199,40 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
             Owner.heldProj = Projectile.whoAmI;
         }
 
+        private void RecordHistory()
+        {
+            if (!Swinging)
+                return;
+
+            for (int i = HistoryLength - 1; i > 0; i--)
+                rotHistory[i] = rotHistory[i - 1];
+
+            rotHistory[0] = Projectile.rotation;
+            historyCount = System.Math.Min(historyCount + 1, HistoryLength);
+        }
+
+        private Vector2 TipFor(float rotation) => Projectile.Center + rotation.ToRotationVector2() * BladeLength;
+
+        private void TipDust()
+        {
+            if (!Swinging || CurrentStage == Stage.Dash || !Main.rand.NextBool(2))
+                return;
+
+            Dust d = Dust.NewDustPerfect(TipFor(Projectile.rotation), DustID.Sand,
+                Main.rand.NextVector2Circular(1.5f, 1.5f), 0, default, 1.2f);
+            d.noGravity = true;
+        }
+
+        private void DashDust()
+        {
+            Dust d = Dust.NewDustPerfect(Owner.Center + new Vector2(-Owner.direction * 10f, Main.rand.NextFloat(-14f, 14f)),
+                Main.rand.NextBool() ? DustID.Sand : DustID.Sandstorm,
+                new Vector2(-Owner.direction * Main.rand.NextFloat(1f, 3f), Main.rand.NextFloat(-0.5f, 0.5f)), 0, default, 1.4f);
+            d.noGravity = true;
+
+            Lighting.AddLight(Owner.Center, 0.6f, 0.45f, 0.2f);
+        }
+
         public override bool PreDraw(ref Color lightColor)
         {
             Texture2D texture = TextureAssets.Projectile[Type].Value;
@@ -198,8 +253,33 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
                 effects = SpriteEffects.FlipHorizontally;
             }
 
+            Vector2 drawPosition = Projectile.Center - Main.screenPosition;
 
-            Main.spriteBatch.Draw(texture, Projectile.Center - Main.screenPosition, null,
+            // --- swing trail: fading copies of the blade, plus a bright crescent along the tip path
+            for (int i = historyCount - 1; i >= 1; i--)
+            {
+                float k = 1f - i / (float)historyCount;
+                Main.spriteBatch.Draw(texture, drawPosition, null,
+                    WeaponFX.Additive(SandGold, 0.4f * k * k), rotHistory[i] + rotationOffset,
+                    origin, Projectile.scale, effects, 0f);
+            }
+
+            for (int i = 0; i < historyCount - 1; i++)
+            {
+                float k = 1f - i / (float)historyCount;
+                WeaponFX.DrawLine(TipFor(rotHistory[i]), TipFor(rotHistory[i + 1]),
+                    WeaponFX.Additive(SandGold, 0.9f * k), 6f * k * Projectile.scale / HeldSpriteScale + 1f);
+            }
+
+            if (Swinging)
+                WeaponFX.DrawGlow(TipFor(Projectile.rotation) - Main.screenPosition, WeaponFX.Additive(SandGold, 0.6f), 0.8f);
+
+            // --- dash: warm glow around the player
+            if (CurrentStage == Stage.Dash && Size > 0f)
+                WeaponFX.DrawGlow(Owner.Center - Main.screenPosition, WeaponFX.Additive(SandDeep, 0.5f * Size), 1.9f);
+
+            // --- the blade itself
+            Main.spriteBatch.Draw(texture, drawPosition, null,
                 lightColor * Projectile.Opacity, Projectile.rotation + rotationOffset, origin, Projectile.scale, effects, 0f);
 
             return false;
@@ -224,6 +304,16 @@ namespace ShatteredIllusion.Content.Items.Weapons.Melee
         {
             if (CurrentStage == Stage.Dash)
                 modifiers.Knockback *= DashKnockbackMult;
+        }
+
+        public override void OnHitNPC(NPC target, NPC.HitInfo hit, int damageDone)
+        {
+            // spray sand from the point on the enemy nearest the blade tip
+            Vector2 hitPoint = Vector2.Clamp(TipFor(Projectile.rotation), target.position, target.BottomRight);
+            Vector2 away = (target.Center - Owner.Center).SafeNormalize(Vector2.UnitX * Owner.direction);
+
+            WeaponFX.DustCone(hitPoint, away, 0.9f, DustID.Sand, CurrentStage == Stage.Dash ? 16 : 9, 2f, 6f, 1.3f);
+            WeaponFX.DustRing(hitPoint, DustID.Enchanted_Gold, 5, 2f, 0.9f);
         }
     }
 }

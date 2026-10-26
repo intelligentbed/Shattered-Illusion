@@ -298,6 +298,37 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 SlimeImpact(npc.Center, 1.4f, false);
             }
 
+            // Weapon form: the weapon finishes growing out of the blob.
+            if (IsWeaponFormPhase(phase) && prevStep == WeaponMorphStep && step == WeaponTrackStep)
+            {
+                Cinema.ZoomPunch(0.03f);
+                Cinema.Flash(new Color(200, 240, 255), 0.18f);
+
+                if (Cinema.ParticlesEnabled)
+                    BossParticleSystem.Shockwaves.Create(new ParticleInfo(
+                        position: npc.Center.ToNumerics(),
+                        velocity: SystemVector2.Zero,
+                        rotation: 0f,
+                        scale: new SystemVector2(170f, 170f),
+                        color: new Color(150, 225, 255, 255),
+                        duration: 16
+                    ));
+            }
+
+            // Weapon -> weapon: the old weapon has melted into the blob and the next one is about to grow out.
+            if (IsWeaponFormPhase(prevPhase) && prevStep == WeaponUnmorphStep && IsWeaponFormPhase(phase))
+            {
+                Cinema.Flash(new Color(190, 235, 255), 0.2f);
+                Cinema.ZoomPunch(0.02f);
+            }
+
+            // Weapon -> slime: the orb has dropped to the floor and re-formed.
+            if (IsWeaponFormPhase(prevPhase) && prevStep == WeaponUnmorphStep && phase == AttackPhase.Cooldown)
+            {
+                SlimeImpact(npc.Bottom, 0.55f);
+                RequestHitStop(data, 3);
+            }
+
             if (phase == AttackPhase.Despawn)
                 Cinema.ReleaseAll();
         }

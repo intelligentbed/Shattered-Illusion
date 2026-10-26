@@ -72,6 +72,17 @@ Items: {
 		DisplayName: EverJade Charm
 	}
 
+	ChaCrown: {
+		DisplayName: Cha Crown
+		Tooltip:
+			'''
+			Each throw uses the next gem in the crown
+			Ruby: heavy hit with huge knockback
+			Emerald: bounces between up to 3 enemies
+			Sapphire: hovers and spins, slowing and pulling in enemies
+			'''
+	}
+
 	LivingWandProto: {
 		DisplayName: Living Wand Proto
 		Tooltip: ""
@@ -244,6 +255,7 @@ Projectiles: {
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 	StarryProjectile.DisplayName: Starry Projectile
 	LivingWandProtoProjectile.DisplayName: Living Wand Proto Projectile
+	ChaCrownProjectile.DisplayName: Cha Crown Projectile
 }
 
 Keybinds: {
@@ -392,7 +404,7 @@ Cutscenes: {
 		'''
 	KingSlime.Title:
 		'''
-		The Vicious Monarch      
+		The Congealing Mass      
 		           --King Slime--
 		'''
 }

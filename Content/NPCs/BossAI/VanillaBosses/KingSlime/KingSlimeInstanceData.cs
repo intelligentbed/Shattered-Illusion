@@ -49,6 +49,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         public int WeaponSide;
         public int NinjaClock;
 
+        // Ninja walk-cycle phase. Advances with ground speed so the legs match the movement.
+        public float WalkClock;
+
+        // Smoothed floor-impact X for the Echo Dive telegraph (tracks the player, then locks).
+        public float EchoTargetX;
+
+        // Weapon -> weapon transformation: the first weapon melts into the goo blob and the next one
+        // grows straight out of it instead of dropping to the floor in between.
+        public bool WeaponHandoff;
+        public bool WeaponHandoffIn;
+
         public int NinjaComboDone;
         public int NinjaComboTotal;
         public bool NinjaFlicker;

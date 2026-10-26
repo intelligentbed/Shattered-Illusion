@@ -112,7 +112,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const float NinjaVanishFadeDuration = 16f;
         private static float NinjaVanishHiddenDuration => 48f / NinjaTempo;
         private static float NinjaVanishLockTime => 14f / NinjaTempo;
-        private const float NinjaVanishAppearDuration = 8f;
+        private const float NinjaVanishAppearDuration = 12f;
         private const float NinjaVanishBehindDistance = 110f;
 
         private const int NinjaStunnedFrameCount = 5;
@@ -195,6 +195,18 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             {
                 npc.direction = npc.velocity.X > 0 ? 1 : -1;
                 npc.spriteDirection = npc.direction;
+            }
+
+            // Walk cycle advances with ground speed (feet match movement; he idles when he stops).
+            KingSlimeInstanceData walkData = npc.GetGlobalNPC<KingSlimeInstanceData>();
+            float prevClock = walkData.WalkClock;
+            walkData.WalkClock += Math.Abs(npc.velocity.X) * 0.028f;
+
+            if (!Main.dedServ && npc.velocity.Y == 0f && Math.Abs(npc.velocity.X) > 1.2f
+                && (int)prevClock != (int)walkData.WalkClock && (int)walkData.WalkClock % 2 == 0)
+            {
+                Dust.NewDust(new Vector2(npc.Center.X - 8f, npc.Bottom.Y - 4f), 16, 4, DustID.Smoke,
+                    -npc.direction * 0.6f, -0.3f, 150, Color.White, 0.6f);
             }
 
             float timer = npc.ai[Slot_Timer];
@@ -536,7 +548,15 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 npc.alpha = (int)MathHelper.Lerp(SlimeAlpha, 255, timer / fade);
 
                 if (!Main.dedServ)
-                    SmokePuff(npc, 2);
+                {
+                    SmokePuff(npc, 1);
+
+                    if (Main.rand.NextBool(2))
+                    {
+                        Dust.NewDust(new Vector2(npc.position.X, npc.Bottom.Y - 6f), npc.width, 6, DustID.t_Slime,
+                            Main.rand.NextFloat(-1.5f, 1.5f), -Main.rand.NextFloat(0.5f, 2.5f), 100, Color.Cyan, 1.2f);
+                    }
+                }
 
                 if (timer >= fade)
                 {
@@ -908,40 +928,77 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 case AttackPhase.NinjaStunned:
                     DrawNinjaStunned(npc, spriteBatch, screenPos, drawColor);
                     return;
+
+                case AttackPhase.NinjaVanish:
+                    DrawNinjaVanish(npc, spriteBatch, screenPos, drawColor);
+                    return;
             }
 
+            DrawNinjaWalkCycle(npc, spriteBatch, screenPos, drawColor);
+        }
+
+        // Damped spring, 1 -> 0 with a little overshoot. Drives the squash/stretch settle after each move.
+        private static float NinjaSpring(float u) => (float)(Math.Exp(-4.2 * u) * Math.Cos(Math.Clamp(u, 0f, 1f) * 9.0));
+
+        private static void DrawNinjaSprite(SpriteBatch sb, Texture2D tex, Rectangle frame, Vector2 origin, Vector2 anchor,
+            Vector2 screenPos, Color color, Vector2 scale, float rotation, SpriteEffects fx)
+        {
+            sb.Draw(tex, anchor - screenPos, frame, color, rotation, origin, scale, fx, 0f);
+        }
+
+        private static void DrawNinjaTrail(SpriteBatch sb, Texture2D tex, Rectangle frame, Vector2 origin, Vector2 anchor,
+            Vector2 screenPos, Vector2 velocity, Color tint, Vector2 scale, float rotation, SpriteEffects fx,
+            int count, float spacing, float alpha)
+        {
+            for (int i = count; i >= 1; i--)
+            {
+                float fade = 1f - i / (float)(count + 1);
+                DrawNinjaSprite(sb, tex, frame, origin, anchor - velocity * (i * spacing), screenPos,
+                    tint * (alpha * fade * fade), scale, rotation, fx);
+            }
+        }
+
+        private void DrawNinjaWalkCycle(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
+        {
             Texture2D ninjaTexture = (ninjaWalkAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaWalk"
             )).Value;
 
+            KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
             int frameCount = Math.Max(1, NinjaWalkFrameCount);
             int frameHeight = Math.Max(1, ninjaTexture.Height / frameCount);
 
-            float animTimer = npc.ai[Slot_Timer];
-            int frameIndex = (int)(animTimer / NinjaWalkFrameDuration) % frameCount;
+            float speed = Math.Abs(npc.velocity.X);
+            bool moving = speed > 0.45f;
+            int frameIndex = moving ? (int)data.WalkClock % frameCount : 0;
 
             var frame = new Rectangle(0, frameIndex * frameHeight, ninjaTexture.Width, frameHeight);
 
-            SpriteEffects spriteEffects = npc.spriteDirection == 1
-                ? SpriteEffects.None
-                : SpriteEffects.FlipHorizontally;
-
+            SpriteEffects spriteEffects = npc.spriteDirection == 1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
             Vector2 origin = frame.Size() * new Vector2(0.5f, 1f);
-            Vector2 drawPos = npc.Bottom - screenPos;
 
-            var draw = new DrawData(
-                ninjaTexture,
-                drawPos,
-                frame,
-                npc.GetAlpha(drawColor),
-                npc.rotation,
-                origin,
-                npc.scale,
-                spriteEffects,
-                0f
-            );
+            float sx;
+            float sy;
 
-            draw.Draw(spriteBatch);
+            if (moving)
+            {
+                // Each footfall compresses him slightly; he leans into the run.
+                float step = (float)Math.Abs(Math.Sin(data.WalkClock * MathHelper.Pi));
+                sy = 1f - 0.035f * step;
+                sx = 1f + 0.02f * step;
+            }
+            else
+            {
+                float breath = (float)Math.Sin(data.NinjaClock * 0.11f);
+                sy = 1f + 0.018f * breath;
+                sx = 1f - 0.01f * breath;
+            }
+
+            float lean = MathHelper.Clamp(npc.velocity.X * 0.014f, -0.09f, 0.09f);
+
+            DrawNinjaSprite(spriteBatch, ninjaTexture, frame, origin, npc.Bottom, screenPos, npc.GetAlpha(drawColor),
+                new Vector2(npc.scale * sx, npc.scale * sy), npc.rotation + lean, spriteEffects);
         }
 
         private void DrawNinjaStab(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
@@ -953,38 +1010,70 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             int step = CurrentStep(npc);
             float timer = npc.ai[Slot_Timer];
             KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+            float telegraph = StabTelegraph(data);
+            float recovery = Math.Max(1f, StabRecovery(data));
+            int dir = npc.direction;
 
             int frameIndex = step switch
             {
-                NinjaStabWindupStep => timer >= StabTelegraph(data) - NinjaStabSwingAnticipation ? 1 : 0,
+                NinjaStabWindupStep => timer >= telegraph - NinjaStabSwingAnticipation ? 1 : 0,
                 NinjaStabStrikeStep => 2,
-                _ => 3 + (int)MathHelper.Clamp(timer / (StabRecovery(data) / 3f), 0f, 2f),
+                _ => 3 + (int)MathHelper.Clamp(timer / (recovery / 3f), 0f, 2f),
             };
 
             frameIndex = Math.Clamp(frameIndex, 0, NinjaStabFrameCount - 1);
 
             var frame = stabTexture.Frame(1, NinjaStabFrameCount, 0, frameIndex);
-
-            SpriteEffects spriteEffects = npc.spriteDirection == 1
-                ? SpriteEffects.None
-                : SpriteEffects.FlipHorizontally;
-
+            SpriteEffects spriteEffects = npc.spriteDirection == 1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
             Vector2 origin = frame.Size() * new Vector2(0.5f, 1f);
-            Vector2 drawPos = npc.Bottom - screenPos;
 
-            var draw = new DrawData(
-                stabTexture,
-                drawPos,
-                frame,
-                npc.GetAlpha(drawColor),
-                npc.rotation,
-                origin,
-                npc.scale,
-                spriteEffects,
-                0f
-            );
+            float sx = 1f;
+            float sy = 1f;
+            float rot = 0f;
+            Vector2 shake = Vector2.Zero;
 
-            draw.Draw(spriteBatch);
+            if (step == NinjaStabWindupStep)
+            {
+                // Coil back: crouch, lean away from the dash, then tremble during the lock-in.
+                float coilSpan = Math.Max(1f, telegraph - NinjaStabSwingAnticipation);
+                float coil = Smooth01(timer / coilSpan);
+
+                sx = 1f + 0.06f * coil;
+                sy = 1f - 0.08f * coil;
+                rot = -dir * 0.10f * coil;
+
+                if (timer >= coilSpan)
+                {
+                    shake.X = (float)Math.Sin(timer * 4.1f) * 1.5f;
+                    sy -= 0.03f;
+                }
+            }
+            else if (step == NinjaStabStrikeStep)
+            {
+                sx = 1.18f;
+                sy = 0.9f;
+                rot = dir * 0.1f;
+            }
+            else
+            {
+                float spring = NinjaSpring(timer / recovery);
+
+                sx = 1f + 0.16f * spring;
+                sy = 1f - 0.12f * spring;
+                rot = dir * 0.06f * spring;
+            }
+
+            Vector2 scale = new Vector2(npc.scale * sx, npc.scale * sy);
+            Vector2 anchor = npc.Bottom + shake;
+
+            if (step == NinjaStabStrikeStep)
+            {
+                Color cyan = Color.Lerp(npc.GetAlpha(drawColor), new Color(120, 255, 220), 0.65f);
+                DrawNinjaTrail(spriteBatch, stabTexture, frame, origin, anchor, screenPos, npc.velocity, cyan, scale, npc.rotation + rot,
+                    spriteEffects, 5, 0.55f, 0.55f);
+            }
+
+            DrawNinjaSprite(spriteBatch, stabTexture, frame, origin, anchor, screenPos, npc.GetAlpha(drawColor), scale, npc.rotation + rot, spriteEffects);
         }
 
         private void DrawNinjaSlash(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
@@ -995,8 +1084,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             int step = CurrentStep(npc);
             float timer = npc.ai[Slot_Timer];
+            int dir = npc.direction;
 
             bool counter = CurrentPhase(npc) == AttackPhase.NinjaCounter;
+            bool followUp = npc.localAI[Local_SlashHit] > 0f;
 
             int frameIndex = counter ? (step == NinjaCounterStanceStep ? 0 : 5) : step switch
             {
@@ -1010,30 +1101,87 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             bool facingRight = npc.spriteDirection == 1;
             SpriteEffects spriteEffects = facingRight ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
-
             Vector2 origin = new Vector2(facingRight ? NinjaSlashOriginX : NinjaSlashSheetWidth - NinjaSlashOriginX, frame.Height);
 
             float widened = Math.Max(0, npc.width - (int)(NinjaHitboxWidth * npc.scale));
-            Vector2 drawPos = npc.Bottom - screenPos - new Vector2(npc.direction * widened / 2f, 0f);
+            Vector2 anchor = npc.Bottom - new Vector2(dir * widened / 2f, 0f);
 
+            float sx = 1f;
+            float sy = 1f;
+            float rot = 0f;
+            Vector2 shake = Vector2.Zero;
+
+            if (counter)
+            {
+                if (step == NinjaCounterStanceStep)
+                {
+                    float pulse = 0.5f + 0.5f * (float)Math.Sin(timer * 0.35f);
+                    sx = 1f + 0.03f * pulse;
+                    sy = 1f - 0.03f * pulse;
+                    shake.X = (float)Math.Sin(timer * 2.3f) * 0.6f;
+                }
+                else
+                {
+                    float spring = NinjaSpring(timer / NinjaCounterRecoveryDuration);
+                    sx = 1f + 0.1f * spring;
+                    sy = 1f - 0.08f * spring;
+                }
+            }
+            else if (step == NinjaSlashWindupStep)
+            {
+                float duration = Math.Max(1f, followUp ? NinjaSlashFollowUpDuration : NinjaSlashTelegraphDuration);
+                float coil = Smooth01(timer / duration);
+
+                sx = 1f + 0.05f * coil;
+                sy = 1f - 0.07f * coil;
+                rot = -dir * 0.09f * coil;
+
+                if (timer >= duration - NinjaSlashLockTime)
+                    shake.X = (float)Math.Sin(timer * 4.1f) * 1.2f;
+            }
+            else if (step == NinjaSlashSwingStep)
+            {
+                float u = MathHelper.Clamp(timer / NinjaSlashSwingDuration, 0f, 1f);
+
+                sx = MathHelper.Lerp(1.16f, 1.04f, u);
+                sy = MathHelper.Lerp(0.92f, 0.98f, u);
+                rot = dir * MathHelper.Lerp(0.14f, 0.04f, u);
+            }
+            else
+            {
+                float spring = NinjaSpring(timer / Math.Max(1f, NinjaSlashRecoveryDuration));
+                sx = 1f + 0.1f * spring;
+                sy = 1f - 0.08f * spring;
+                rot = dir * 0.05f * spring;
+            }
+
+            Vector2 scale = new Vector2(npc.scale * sx, npc.scale * sy);
+            anchor += shake;
             Color color = npc.GetAlpha(drawColor);
 
             if (counter && step == NinjaCounterStanceStep)
+            {
+                float pulse = 0.5f + 0.5f * (float)Math.Sin(timer * 0.35f);
+
+                // Pixel-art style red outline glow: four offset copies behind the sprite.
+                foreach (Vector2 o in new[] { new Vector2(3f, 0f), new Vector2(-3f, 0f), new Vector2(0f, 3f), new Vector2(0f, -3f) })
+                {
+                    DrawNinjaSprite(spriteBatch, slashTexture, frame, origin, anchor + o, screenPos,
+                        new Color(255, 70, 70) * (0.2f + 0.3f * pulse), scale, npc.rotation + rot, spriteEffects);
+                }
+
                 color = Color.Lerp(color, new Color(255, 90, 90), 0.3f + 0.25f * (float)Math.Sin(timer * 0.35f));
+            }
 
-            var draw = new DrawData(
-                slashTexture,
-                drawPos,
-                frame,
-                color,
-                npc.rotation,
-                origin,
-                npc.scale,
-                spriteEffects,
-                0f
-            );
+            if (!counter && step == NinjaSlashSwingStep && timer < 8f)
+            {
+                // Smear behind the lunge.
+                Color gold = Color.Lerp(color, new Color(255, 210, 140), 0.6f);
+                DrawNinjaTrail(spriteBatch, slashTexture, frame, origin, anchor, screenPos, new Vector2(dir * 9f, 0f), gold, scale,
+                    npc.rotation + rot, spriteEffects, 3, 1.1f, 0.5f * (1f - timer / 8f));
+            }
 
-            draw.Draw(spriteBatch);
+            DrawNinjaSprite(spriteBatch, slashTexture, frame, origin, anchor, screenPos, color, scale, npc.rotation + rot, spriteEffects);
         }
 
         private void DrawNinjaStunned(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
@@ -1051,27 +1199,45 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             );
 
             Rectangle frame = NinjaStunFrames[frameIndex];
-
-            SpriteEffects spriteEffects = npc.spriteDirection == 1
-                ? SpriteEffects.None
-                : SpriteEffects.FlipHorizontally;
-
+            SpriteEffects spriteEffects = npc.spriteDirection == 1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
             Vector2 origin = frame.Size() * new Vector2(0.5f, 1f);
-            Vector2 drawPos = npc.Bottom - screenPos;
 
-            var draw = new DrawData(
-                parryTexture,
-                drawPos,
-                frame,
-                npc.GetAlpha(drawColor),
-                npc.rotation,
-                origin,
-                npc.scale,
-                spriteEffects,
-                0f
-            );
+            // Jitters while he re-materializes, then sways dizzily once he's solid again.
+            float materialize = MathHelper.Clamp(timer / NinjaStunnedMaterializeDuration, 0f, 1f);
+            Vector2 jitter = new Vector2((float)Math.Sin(timer * 2.3f) * 1.4f * (1f - materialize), 0f);
+            float sway = materialize >= 1f ? (float)Math.Sin(timer * 0.22f) * 0.06f : 0f;
 
-            draw.Draw(spriteBatch);
+            DrawNinjaSprite(spriteBatch, parryTexture, frame, origin, npc.Bottom + jitter, screenPos, npc.GetAlpha(drawColor),
+                new Vector2(npc.scale), npc.rotation + sway, spriteEffects);
+        }
+
+        // Vanish / ambush: he melts into the goo (popup sheet forwards) and re-forms from it (sheet backwards)
+        // rather than just fading out. Fully opaque on purpose - npc.alpha is driven to 255 for the hidden step.
+        private void DrawNinjaVanish(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
+        {
+            int step = CurrentStep(npc);
+
+            if (step == NinjaVanishHiddenStep)
+                return;
+
+            Texture2D popupTexture = (ninjaPopupAsset ??= ModContent.Request<Texture2D>(
+                "ShatteredIllusion/Content/NPCs/BossAI/VanillaBosses/KingSlime/NinjaPopup"
+            )).Value;
+
+            KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+            bool quick = data.NinjaFlicker && data.NinjaComboDone > 0;
+            bool sinking = step == NinjaVanishFadeStep;
+            float duration = sinking ? (quick ? 6f : NinjaVanishFadeDuration) : NinjaVanishAppearDuration;
+            float t = MathHelper.Clamp(npc.ai[Slot_Timer] / duration, 0f, 1f);
+
+            int stage = (int)MathHelper.Clamp(t * NinjaPopupFrameCount, 0f, NinjaPopupFrameCount - 1);
+            Rectangle frame = NinjaPopupFrames[sinking ? stage : NinjaPopupFrameCount - 1 - stage];
+
+            SpriteEffects spriteEffects = npc.spriteDirection == 1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
+            Vector2 origin = frame.Size() * new Vector2(0.5f, 1f);
+
+            DrawNinjaSprite(spriteBatch, popupTexture, frame, origin, npc.Bottom, screenPos, drawColor,
+                new Vector2(npc.scale), npc.rotation, spriteEffects);
         }
 
         private void DrawNinjaPopup(NPC npc, SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor, bool sinking)
