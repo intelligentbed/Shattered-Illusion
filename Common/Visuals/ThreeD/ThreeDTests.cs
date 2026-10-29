@@ -7,7 +7,7 @@ using Terraria.ModLoader;
 
 namespace ShatteredIllusion.Common.Visuals.ThreeD
 {
-    // Test-only: delete this file before release.
+    // Dev/test command, shipped on purpose.
     public class ThreeDTestWall : ShapeProjectile
     {
         public override string Texture => "Terraria/Images/Projectile_" + ProjectileID.Bullet;

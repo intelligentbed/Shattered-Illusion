@@ -49,11 +49,8 @@ namespace ShatteredIllusion.Common.Visuals
             .Tinted(new Color(120, 200, 255))
             .At(0, static c =>
             {
-                Cinema.ZoomPunch(0.035f * c.Scale);
-                Cinema.Flash(c.Hot, 0.22f * c.Scale);
-                Cinema.Shake(c.Pos, Vector2.UnitY, 8f * c.Scale, 14f, 8 + (int)(14 * c.Scale));
+                Cinema.ImpactCamera(c.Pos, Vector2.UnitY, c.Scale, c.Hot);
                 SoundEngine.PlaySound(HeavyImpact, c.Pos);
-                ScreenFX.Ripple(c.Pos, 520f * c.Scale, 28, 0.8f * c.Scale);
             })
             .Extra(0, static c =>
             {
@@ -95,6 +92,7 @@ namespace ShatteredIllusion.Common.Visuals
                 ScreenFX.Ripple(c.Pos, 900f * c.Scale, 40, 1.2f);
                 ScreenFX.Aberration(1f, 22);
                 ScreenFX.ZoomBlur(0.6f, 14, c.Pos);
+                ScreenFX.Grade(0.6f, 1.1f, c.Tint, 0.15f, 40);
             })
             .Extra(PhaseBurstFrame, static c =>
             {

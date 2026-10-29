@@ -206,6 +206,9 @@ namespace ShatteredIllusion.Common.Visuals
 
             alpha *= Cfg.FlashIntensity;
 
+            if (Cfg.ScreenReduceFlashing)
+                alpha *= ScreenFX.ReduceFlashScale;
+
             if (alpha <= 0.01f)
                 return;
 
@@ -221,6 +224,7 @@ namespace ShatteredIllusion.Common.Visuals
             focusTarget = 0f;
             vignetteTarget = 0f;
             ReleaseCameraOffset();
+            ScreenFX.ReleaseGrade();
         }
 
         public static void HardReset()
@@ -381,7 +385,20 @@ namespace ShatteredIllusion.Common.Visuals
                 sb.Draw(px, new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, (int)Math.Ceiling(h) + 2), flashColor * flashAlpha);
         }
 
-        // Zoom punch, flash, ring, upward sparks, optional dust debris and ground skirt.
+        // Camera half of a heavy impact: zoom punch, flash, shake and screen ripple.
+        // Shared by Impact and Fx.BossLanding so the two can't drift apart.
+        public static void ImpactCamera(Vector2 pos, Vector2 shakeDir, float power, Color flash)
+        {
+            if (!Enabled)
+                return;
+
+            ZoomPunch(0.035f * power);
+            Flash(flash, 0.22f * power);
+            Shake(pos, shakeDir, 8f * power, 14f, 8 + (int)(14 * power));
+            ScreenFX.Ripple(pos, 520f * power, 28, 0.8f * power);
+        }
+
+        // Camera work, ring, upward sparks, optional dust debris and ground skirt.
         // ground = true flattens the ring into a ground-hugging ellipse; false gives a full circle.
         public static void Impact(Vector2 pos, float power, ImpactStyle style = null, bool ground = true)
         {
@@ -390,9 +407,7 @@ namespace ShatteredIllusion.Common.Visuals
 
             style ??= ImpactStyle.Default;
 
-            ZoomPunch(0.035f * power);
-            Flash(style.Flash, 0.22f * power);
-            Shake(pos, Main.rand.NextVector2Unit(), 8f * power, 14f, 8 + (int)(14 * power));
+            ImpactCamera(pos, Main.rand.NextVector2Unit(), power, style.Flash);
 
             if (style.Sound is SoundStyle sound)
                 SoundEngine.PlaySound(sound, pos);
@@ -403,46 +418,13 @@ namespace ShatteredIllusion.Common.Visuals
             float flatten = ground ? 0.28f : 1f;
             Vector2 ringPos = ground ? pos - new Vector2(0f, 3f) : pos;
 
-            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                position: ringPos.ToNumerics(),
-                velocity: SystemVector2.Zero,
-                rotation: 0f,
-                scale: new SystemVector2(150f * power, 150f * power * flatten),
-                color: style.InnerRing,
-                duration: 20
-            ));
+            VisualFX.Ring(ringPos, 150f * power, style.InnerRing, 20, flatten);
 
             // Only the big moments get a second, wider ring.
             if (power >= 1.5f)
-            {
-                BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                    position: ringPos.ToNumerics(),
-                    velocity: SystemVector2.Zero,
-                    rotation: 0f,
-                    scale: new SystemVector2(250f * power, 250f * power * flatten),
-                    color: style.OuterRing,
-                    duration: 32
-                ));
-            }
+                VisualFX.Ring(ringPos, 250f * power, style.OuterRing, 32, flatten);
 
-            int sparks = (int)(8 * power);
-            for (int i = 0; i < sparks; i++)
-            {
-                float angle = ground
-                    ? Main.rand.NextFloat(-MathHelper.Pi * 0.9f, -MathHelper.Pi * 0.1f)
-                    : Main.rand.NextFloat(MathHelper.TwoPi);
-
-                Vector2 v = angle.ToRotationVector2() * Main.rand.NextFloat(2.5f, 7f);
-
-                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                    position: pos.ToNumerics(),
-                    velocity: v.ToNumerics(),
-                    rotation: 0f,
-                    scale: new SystemVector2(9f, 9f),
-                    color: style.Spark,
-                    duration: Main.rand.Next(16, 26)
-                ));
-            }
+            VisualFX.Sparks(pos, -Vector2.UnitY, ground ? 1.26f : MathHelper.Pi, (int)(8 * power), 2.5f, 7f, style.Spark, 9f, 21);
 
             if (style.DebrisDust >= 0)
             {

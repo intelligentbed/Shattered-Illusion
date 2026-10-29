@@ -150,19 +150,34 @@ namespace ShatteredIllusion.Common.Visuals
                 return new FxHandle(i, inst.Id);
             }
 
+            WarnSlotsFull();
             return default;
+        }
+
+        private static uint lastFullWarning;
+
+        // Effects past MaxInstances are dropped. Say so, at most about once every 5 seconds, so a busy fight doesn't fail silently.
+        private static void WarnSlotsFull()
+        {
+            if (lastFullWarning != 0 && Main.GameUpdateCount - lastFullWarning < 300)
+                return;
+
+            lastFullWarning = Main.GameUpdateCount == 0 ? 1 : Main.GameUpdateCount;
+
+            if (ModLoader.TryGetMod("ShatteredIllusion", out Mod mod))
+                mod.Logger.Warn($"VisualFX: all {MaxInstances} effect slots are in use, dropping effects. Raise MaxInstances if this is expected.");
         }
 
         // Entity slots are reused: an NPC or projectile can die and a different one take over the same object or index,
         // and `active` alone cannot tell the difference. The key is the type (NPC) or spawn identity (projectile).
-        private static int FollowKeyOf(Entity e) => e switch
+        internal static int FollowKeyOf(Entity e) => e switch
         {
             NPC n => n.type,
             Projectile p => p.identity,
             _ => 0
         };
 
-        private static bool StillFollowing(Entity e, int key)
+        internal static bool StillFollowing(Entity e, int key)
         {
             if (!e.active)
                 return false;

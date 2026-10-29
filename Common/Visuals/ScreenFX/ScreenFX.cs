@@ -1,354 +1,228 @@
 using System;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using ReLogic.Content;
 using Terraria;
-using Terraria.Graphics.Effects;
-using Terraria.Graphics.Shaders;
-using Terraria.ModLoader;
 
 namespace ShatteredIllusion.Common.Visuals
 {
-    // One fullscreen shader pass for every screen effect. The filter is only active while something is playing,
-    // so an idle screen costs nothing. Pulses decay on their own; re-calling one every frame holds it.
-    public static class ScreenFX
+    // Every value is "1 = a strong, clear amount". Mul channels (Saturation, Contrast, Exposure, WobbleFreq, WobbleSpeed)
+    // take the value they should reach, 1 = unchanged. Pixelate is the block size in pixels, Hue is radians.
+    public enum Channel
     {
-        internal const string EffectPath = "Common/Visuals/ScreenFX/ScreenFX";
-        internal const string FilterName = "ShatteredIllusion:ScreenFX";
-
-        private const int MaxRipples = 4;
-        private const float RippleAmp = 0.025f;
-
-        private struct Pulse
-        {
-            public float Peak;
-            public int Life, Age;
-
-            public float Value
-            {
-                get
-                {
-                    if (Life <= 0)
-                        return 0f;
-
-                    float t = 1f - (float)Age / Life;
-                    return Peak * t * t;
-                }
-            }
-
-            public void Start(float peak, int life)
-            {
-                if (peak < Value)
-                    return;
-
-                Peak = peak;
-                Life = Math.Max(1, life);
-                Age = 0;
-            }
-
-            public void Tick()
-            {
-                if (Life > 0 && ++Age >= Life)
-                    Life = 0;
-            }
-        }
-
-        private struct RippleState
-        {
-            public Vector2 Pos;
-            public float Radius, Strength;
-            public int Life, Age;
-        }
-
-        private static readonly RippleState[] ripples = new RippleState[MaxRipples];
-        private static Pulse aberration, blur, wobble, glitch, invert;
-        private static Vector2 blurCenter;
-        private static bool blurHasCenter;
-
-        private static float satNow = 1f, satGoal = 1f, conNow = 1f, conGoal = 1f, tintNow, tintGoal;
-        private static Color tint = Color.White;
-        private static int gradeRelease;
-
-        private static bool registered;
-
-        private static ShatteredIllusionConfig Cfg => ModContent.GetInstance<ShatteredIllusionConfig>();
-
-        public static bool Allowed => Cinema.Enabled && Cfg.ScreenFilters && Cfg.ScreenFilterIntensity > 0.001f;
-
-        // radius = world pixels the ring travels, strength 1 = a clear but not nauseating bend.
-        public static void Ripple(Vector2 worldPos, float radius, int frames = 30, float strength = 1f)
-        {
-            if (!Allowed)
-                return;
-
-            int slot = 0;
-
-            for (int i = 0; i < MaxRipples; i++)
-            {
-                if (ripples[i].Life <= 0)
-                {
-                    slot = i;
-                    break;
-                }
-
-                if (ripples[i].Age > ripples[slot].Age)
-                    slot = i;
-            }
-
-            ripples[slot] = new RippleState { Pos = worldPos, Radius = radius, Strength = strength, Life = Math.Max(1, frames) };
-        }
-
-        public static void Aberration(float strength, int frames = 20)
-        {
-            if (Allowed)
-                aberration.Start(strength, frames);
-        }
-
-        public static void ZoomBlur(float strength, int frames = 18, Vector2? worldCenter = null)
-        {
-            if (!Allowed)
-                return;
-
-            blur.Start(strength, frames);
-            blurHasCenter = worldCenter.HasValue;
-            blurCenter = worldCenter ?? default;
-        }
-
-        public static void Wobble(float strength, int frames = 60)
-        {
-            if (Allowed)
-                wobble.Start(strength, frames);
-        }
-
-        public static void Glitch(float strength, int frames = 20)
-        {
-            if (Allowed)
-                glitch.Start(strength, frames);
-        }
-
-        public static void Invert(float strength, int frames = 8)
-        {
-            if (Allowed)
-                invert.Start(strength, frames);
-        }
-
-        // Eases to the target and stays until released. saturation/contrast 1 = unchanged, tintAmount 0 = no tint.
-        public static void Grade(float saturation = 1f, float contrast = 1f, Color? tintColor = null, float tintAmount = 0f, int autoReleaseFrames = 0)
-        {
-            if (!Allowed)
-                return;
-
-            satGoal = saturation;
-            conGoal = contrast;
-            tintGoal = tintAmount;
-            tint = tintColor ?? Color.White;
-            gradeRelease = autoReleaseFrames;
-        }
-
-        public static void ReleaseGrade()
-        {
-            satGoal = 1f;
-            conGoal = 1f;
-            tintGoal = 0f;
-            gradeRelease = 0;
-        }
-
-        public static void Clear()
-        {
-            Array.Clear(ripples);
-            aberration = blur = wobble = glitch = invert = default;
-            satNow = satGoal = conNow = conGoal = 1f;
-            tintNow = tintGoal = 0f;
-            gradeRelease = 0;
-            SetActive(false);
-        }
-
-        internal static void Register(Asset<Effect> effect)
-        {
-            Filters.Scene[FilterName] = new Filter(new Data(effect, "ScreenFX"), EffectPriority.VeryHigh);
-            Filters.Scene[FilterName].Load();
-            registered = true;
-        }
-
-        internal static void Update()
-        {
-            if (Main.dedServ || !registered)
-                return;
-
-            if (!Allowed)
-            {
-                Clear();
-                return;
-            }
-
-            int live = 0;
-
-            for (int i = 0; i < MaxRipples; i++)
-            {
-                if (ripples[i].Life <= 0)
-                    continue;
-
-                if (++ripples[i].Age >= ripples[i].Life)
-                    ripples[i].Life = 0;
-                else
-                    live++;
-            }
-
-            aberration.Tick();
-            blur.Tick();
-            wobble.Tick();
-            glitch.Tick();
-            invert.Tick();
-
-            if (gradeRelease > 0 && --gradeRelease == 0)
-                ReleaseGrade();
-
-            satNow = Ease(satNow, satGoal);
-            conNow = Ease(conNow, conGoal);
-            tintNow = Ease(tintNow, tintGoal);
-
-            bool busy = live > 0 || aberration.Life > 0 || blur.Life > 0 || wobble.Life > 0 || glitch.Life > 0 || invert.Life > 0
-                || satNow != 1f || conNow != 1f || tintNow != 0f;
-
-            SetActive(busy);
-        }
-
-        private static float Ease(float now, float goal)
-        {
-            now = MathHelper.Lerp(now, goal, 0.06f);
-            return Math.Abs(now - goal) < 0.002f ? goal : now;
-        }
-
-        private static void SetActive(bool on)
-        {
-            if (!registered)
-                return;
-
-            Filter f = Filters.Scene[FilterName];
-
-            if (on && !f.IsActive())
-                Filters.Scene.Activate(FilterName);
-            else if (!on && f.IsActive())
-                Filters.Scene.Deactivate(FilterName);
-        }
-
-        internal static void Unload()
-        {
-            if (registered)
-                Clear();
-
-            registered = false;
-        }
-
-        // World position to 0-1 screen UV, matching what the zoomed world was drawn with.
-        private static Vector2 ToUV(Vector2 world, Matrix zoom, Vector2 size)
-            => Vector2.Transform(world - Main.screenPosition, zoom) / size;
-
-        private sealed class Data : ScreenShaderData
-        {
-            private readonly Vector4[] rippleData = new Vector4[MaxRipples];
-            private readonly float[] rippleWidth = new float[MaxRipples];
-            private bool bound;
-
-            private EffectParameter pRipple, pRippleWidth, pAspect, pTime, pAberration, pBlur, pBlurCenter,
-                pWobble, pGlitch, pSaturation, pContrast, pTint, pTintAmount, pInvert;
-
-            public Data(Asset<Effect> effect, string pass) : base(effect, pass) { }
-
-            public override void Apply()
-            {
-                if (!bound)
-                    Bind();
-
-                Push();
-                base.Apply();
-            }
-
-            private void Bind()
-            {
-                var p = Shader.Parameters;
-
-                pRipple = p["fxRipple"];
-                pRippleWidth = p["fxRippleWidth"];
-                pAspect = p["fxAspect"];
-                pTime = p["fxTime"];
-                pAberration = p["fxAberration"];
-                pBlur = p["fxBlur"];
-                pBlurCenter = p["fxBlurCenter"];
-                pWobble = p["fxWobble"];
-                pGlitch = p["fxGlitch"];
-                pSaturation = p["fxSaturation"];
-                pContrast = p["fxContrast"];
-                pTint = p["fxTint"];
-                pTintAmount = p["fxTintAmount"];
-                pInvert = p["fxInvert"];
-                bound = true;
-            }
-
-            private void Push()
-            {
-                float k = MathHelper.Clamp(Cfg.ScreenFilterIntensity, 0f, 1f);
-                Vector2 size = new Vector2(Main.screenWidth, Main.screenHeight);
-                Matrix zoomMatrix = Main.GameViewMatrix.ZoomMatrix;
-                float zoom = Main.GameViewMatrix.Zoom.Y;
-
-                for (int i = 0; i < MaxRipples; i++)
-                {
-                    ref RippleState r = ref ripples[i];
-
-                    if (r.Life <= 0)
-                    {
-                        rippleData[i] = default;
-                        rippleWidth[i] = 1f;
-                        continue;
-                    }
-
-                    float inv = 1f - (float)r.Age / r.Life;
-                    float radiusUV = r.Radius * zoom / size.Y;
-                    Vector2 uv = ToUV(r.Pos, zoomMatrix, size);
-
-                    rippleData[i] = new Vector4(uv.X, uv.Y, radiusUV * (1f - inv * inv), RippleAmp * r.Strength * inv * inv * k);
-                    rippleWidth[i] = MathHelper.Clamp(radiusUV * 0.3f, 0.03f, 0.12f);
-                }
-
-                Vector2 center = blurHasCenter ? blurCenter : Main.LocalPlayer.Center;
-
-                pRipple?.SetValue(rippleData);
-                pRippleWidth?.SetValue(rippleWidth);
-                pAspect?.SetValue(size.X / size.Y);
-                pTime?.SetValue(Main.GlobalTimeWrappedHourly);
-                pAberration?.SetValue(aberration.Value * 0.03f * k);
-                pBlur?.SetValue(blur.Value * 0.2f * k);
-                pBlurCenter?.SetValue(ToUV(center, zoomMatrix, size));
-                pWobble?.SetValue(wobble.Value * 0.006f * k);
-                pGlitch?.SetValue(MathHelper.Clamp(glitch.Value, 0f, 1f) * k);
-                pSaturation?.SetValue(MathHelper.Lerp(1f, satNow, k));
-                pContrast?.SetValue(MathHelper.Lerp(1f, conNow, k));
-                pTint?.SetValue(tint.ToVector3());
-                pTintAmount?.SetValue(tintNow * k);
-                pInvert?.SetValue(MathHelper.Clamp(invert.Value, 0f, 1f) * k);
-            }
-        }
+        Aberration, ZoomBlur, MotionX, MotionY, Wobble, WobbleFreq, WobbleSpeed, Glitch, Lens, Pixelate,
+        Posterize, Scanlines, Grain,
+        Saturation, Contrast, Exposure, Brightness, Hue, Tint, Invert, Vignette, Fade
     }
 
-    public class ScreenFXSystem : ModSystem
+    public enum Curve { Linear, In, Out, InOut }
+
+    public enum PointKind { Ring, Swirl, Bulge }
+
+    // Attack frames up, Sustain frames held (-1 = until released), Release frames down.
+    public readonly struct Env
     {
-        public override void OnModLoad()
-        {
-            if (Main.dedServ)
-                return;
+        public readonly int Attack, Sustain, Release;
+        public readonly Curve Ease;
 
-            ScreenFX.Register(Mod.Assets.Request<Effect>(ScreenFX.EffectPath, AssetRequestMode.ImmediateLoad));
+        public Env(int attack, int sustain, int release, Curve ease = Curve.Out)
+        {
+            Attack = attack;
+            Sustain = sustain;
+            Release = release;
+            Ease = ease;
         }
 
-        public override void PostUpdateEverything() => ScreenFX.Update();
+        public static Env Pulse(int frames, Curve ease = Curve.Out) => new Env(0, 0, frames, ease);
+        public static Env Hold(int attack = 20, int release = 30, Curve ease = Curve.Out) => new Env(attack, -1, release, ease);
+        public static Env Timed(int attack, int sustain, int release, Curve ease = Curve.Out) => new Env(attack, sustain, release, ease);
+    }
 
-        public override void OnWorldUnload()
+    public readonly struct ScreenHandle
+    {
+        internal readonly int Slot, Id;
+
+        internal ScreenHandle(int slot, int id)
         {
-            if (!Main.dedServ)
-                ScreenFX.Clear();
+            Slot = slot;
+            Id = id;
         }
 
-        public override void Unload() => ScreenFX.Unload();
+        public bool IsPlaying => ScreenFX.IsPlaying(this);
+        public void Release(int frames = -1) => ScreenFX.Release(this, frames);
+        public void Retarget(float value) => ScreenFX.Retarget(this, value);
+        public void Stop() => ScreenFX.Stop(this);
+    }
+
+    // The public face of the screen filter system. Core.cs runs it, Shaders.cs talks to the GPU.
+    // Quick pulses first, then the generic Pulse/Hold/Add that reach every channel, then custom shaders.
+    public static partial class ScreenFX
+    {
+        // ---- point effects (a position on screen, up to 4 at once) ----
+
+        // radius = world pixels the ring travels, strength 1 = a clear but not nauseating bend.
+        public static ScreenHandle Ripple(Vector2 worldPos, float radius, int frames = 30, float strength = 1f)
+            => AddPoint(PointKind.Ring, worldPos, radius, strength, Env.Pulse(frames));
+
+        // angle in radians at the center, fading to nothing at the radius.
+        public static ScreenHandle Swirl(Vector2 worldPos, float radius, float angle, Env env, Entity follow = null)
+            => AddPoint(PointKind.Swirl, worldPos, radius, angle, env, follow);
+
+        // positive magnifies, negative pinches. 0.5 is strong.
+        public static ScreenHandle Bulge(Vector2 worldPos, float radius, float strength, Env env, Entity follow = null)
+            => AddPoint(PointKind.Bulge, worldPos, radius, strength, env, follow);
+
+        public static ScreenHandle AddPoint(PointKind kind, Vector2 worldPos, float radius, float strength, Env env, Entity follow = null, string tag = null)
+        {
+            Vector2 pos = follow != null ? worldPos - follow.Center : worldPos;
+
+            return Spawn(new Track
+            {
+                IsPoint = true,
+                Kind = kind,
+                Pos = pos,
+                Radius = Math.Max(1f, radius),
+                Target = strength,
+                Env = env,
+                Follow = follow,
+                FollowKey = VisualFX.FollowKeyOf(follow),
+                Tag = tag
+            }, false);
+        }
+
+        // ---- quick pulses (calling one every frame holds it at full) ----
+
+        public static ScreenHandle Aberration(float strength, int frames = 20) => Pulse(Channel.Aberration, strength, frames);
+
+        // Center is where the blur streams toward; null = the local player.
+        public static ScreenHandle ZoomBlur(float strength, int frames = 18, Vector2? worldCenter = null)
+        {
+            zoomCenterSet = worldCenter.HasValue;
+            zoomCenter = worldCenter ?? default;
+            return Pulse(Channel.ZoomBlur, strength, frames);
+        }
+
+        // direction in screen fractions, (1, 0) smears a strong amount to the right.
+        public static void MotionBlur(Vector2 direction, int frames = 12)
+        {
+            Pulse(Channel.MotionX, direction.X, frames);
+            Pulse(Channel.MotionY, direction.Y, frames);
+        }
+
+        public static ScreenHandle Wobble(float strength, int frames = 60) => Pulse(Channel.Wobble, strength, frames);
+        public static ScreenHandle Glitch(float strength, int frames = 20) => Pulse(Channel.Glitch, strength, frames);
+        public static ScreenHandle Invert(float strength, int frames = 8) => Pulse(Channel.Invert, strength, frames);
+        public static ScreenHandle Lens(float strength, int frames = 30) => Pulse(Channel.Lens, strength, frames);
+        public static ScreenHandle Pixelate(float blockPixels, int frames = 30) => Pulse(Channel.Pixelate, blockPixels, frames);
+        public static ScreenHandle Posterize(float strength, int frames = 30) => Pulse(Channel.Posterize, strength, frames);
+        public static ScreenHandle Scanlines(float strength, int frames = 60) => Pulse(Channel.Scanlines, strength, frames);
+        public static ScreenHandle Grain(float strength, int frames = 60) => Pulse(Channel.Grain, strength, frames);
+
+        public static ScreenHandle Vignette(float strength, Color? color = null, int frames = 40)
+            => Pulse(Channel.Vignette, strength, frames, color ?? Color.Black);
+
+        // Fades the whole picture toward a color. This is the screen flash, and it works under zoom.
+        public static ScreenHandle Flash(Color color, float amount = 0.5f, int frames = 10)
+            => Pulse(Channel.Fade, amount, frames, color);
+
+        // ---- generic: reaches every channel ----
+
+        public static ScreenHandle Pulse(Channel channel, float value, int frames, Color? color = null)
+            => Spawn(MakeTrack(channel, value, Env.Pulse(frames), color, null, null), true);
+
+        // Eases in and stays until released: ScreenFX.Hold(...).Release() or ScreenFX.Release("tag").
+        // Calling it again with the same tag retargets the running one instead of stacking.
+        public static ScreenHandle Hold(Channel channel, float value, int attack = 20, Color? color = null, Entity follow = null, string tag = null)
+            => Add(channel, value, Env.Hold(attack), color, follow, tag);
+
+        // Full control. color only matters for Tint, Vignette and Fade. follow releases it when the entity dies.
+        public static ScreenHandle Add(Channel channel, float value, Env env, Color? color = null, Entity follow = null, string tag = null)
+            => Spawn(MakeTrack(channel, value, env, color, follow, tag), false);
+
+        // ---- color grade ----
+
+        // Eases to the target and stays until released (or autoReleaseFrames). saturation/contrast 1 = unchanged.
+        public static void Grade(float saturation = 1f, float contrast = 1f, Color? tintColor = null, float tintAmount = 0f, int autoReleaseFrames = 0)
+        {
+            Release(GradeTag, 40);
+
+            Env env = autoReleaseFrames > 0 ? Env.Timed(25, autoReleaseFrames, 40) : Env.Hold(25, 40);
+
+            if (saturation != 1f)
+                Add(Channel.Saturation, saturation, env, tag: GradeTag);
+
+            if (contrast != 1f)
+                Add(Channel.Contrast, contrast, env, tag: GradeTag);
+
+            if (tintAmount != 0f)
+                Add(Channel.Tint, tintAmount, env, tintColor ?? Color.White, tag: GradeTag);
+        }
+
+        public static void ReleaseGrade() => Release(GradeTag, 40);
+
+        // ---- custom shaders ----
+
+        // Runs your own shader as a filter. level is 0-1 (times peak, times the player's intensity setting) and the
+        // filter is only active while level is above zero, so make the shader do nothing at level 0.
+        // apply sets your uniforms each frame. tML's standard uTime, uScreenResolution and uScreenPosition also work.
+        public static ScreenHandle Play(ScreenShader shader, float peak, Env env, string tag = null)
+        {
+            if (shader == null)
+                return default;
+
+            return Spawn(new Track { Shader = shader, Target = peak, Env = env, Tag = tag, Color = Color.White }, false);
+        }
+
+        // ---- control ----
+
+        public static void Release(ScreenHandle handle, int frames = -1)
+        {
+            if (IsPlaying(handle))
+                BeginRelease(ref tracks[handle.Slot], frames);
+        }
+
+        // Releases everything started with this tag.
+        public static void Release(string tag, int frames = -1)
+        {
+            for (int i = 0; i < MaxTracks; i++)
+            {
+                if (tracks[i].Id != 0 && tracks[i].Tag == tag)
+                    BeginRelease(ref tracks[i], frames);
+            }
+        }
+
+        // Releases every hold. Pulses and timed effects run out on their own.
+        public static void ReleaseAll(int frames = -1)
+        {
+            for (int i = 0; i < MaxTracks; i++)
+            {
+                if (tracks[i].Id != 0 && tracks[i].Env.Sustain < 0)
+                    BeginRelease(ref tracks[i], frames);
+            }
+        }
+
+        public static void Retarget(ScreenHandle handle, float value)
+        {
+            if (IsPlaying(handle))
+                tracks[handle.Slot].Target = value;
+        }
+
+        public static void Stop(ScreenHandle handle)
+        {
+            if (IsPlaying(handle))
+                tracks[handle.Slot] = default;
+        }
+
+        public static bool IsPlaying(ScreenHandle handle)
+            => handle.Id != 0 && tracks[handle.Slot].Id == handle.Id;
+
+        private static Track MakeTrack(Channel channel, float value, Env env, Color? color, Entity follow, string tag) => new Track
+        {
+            Chan = channel,
+            Target = value,
+            Env = env,
+            Color = color ?? Color.White,
+            Follow = follow,
+            FollowKey = VisualFX.FollowKeyOf(follow),
+            Tag = tag
+        };
     }
 }

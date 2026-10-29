@@ -1,4 +1,5 @@
 using ParticleLibrary.Core.V3.Particles;
+using ShatteredIllusion.Common.Visuals;
 using System;
 using SystemVector2 = System.Numerics.Vector2;
 
@@ -21,7 +22,7 @@ namespace ShatteredIllusion.Content.Particles
         public override void Update(ref ParticleInfo info)
         {
             info.Position += info.Velocity;
-            info.Velocity *= 0.93f;
+            info.Velocity *= VisualFX.StreakDrag; // Converge solves its launch speed from this
 
             // Keep the streak pointed the right way even as velocity curves/decays.
             if (info.Velocity.LengthSquared() > 0.01f)

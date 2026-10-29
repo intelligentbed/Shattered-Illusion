@@ -97,11 +97,22 @@ namespace ShatteredIllusion
         [DefaultValue(true)]
         public bool ScreenFilters;
 
-        // Scales all screen distortion; lower it if warping feels uncomfortable.
+        // Scales warping, blur and aberration; lower it if screen distortion feels uncomfortable.
         [DefaultValue(1f)]
         [Range(0f, 1f)]
         [Increment(0.1f)]
         [Slider]
         public float ScreenFilterIntensity = 1f;
+
+        // Scales color grading, tints, vignettes and overlays.
+        [DefaultValue(1f)]
+        [Range(0f, 1f)]
+        [Increment(0.1f)]
+        [Slider]
+        public float ScreenColorIntensity = 1f;
+
+        // Cuts glitch, invert and flash-style screen effects to a third.
+        [DefaultValue(false)]
+        public bool ScreenReduceFlashing;
     }
 }

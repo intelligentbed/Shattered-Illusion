@@ -14,6 +14,12 @@ namespace ShatteredIllusion.Common.Visuals.ThreeD
             return VisualFX.Play(def, pos, dir, scale * depthScale, color);
         }
 
+        public static void ScreenRipple(Vector3 position, float radius, int frames = 30, float strength = 1f)
+        {
+            Vector2 pos = ThreeDMath.Project(position, out float s);
+            ScreenFX.Ripple(pos, radius * s, frames, strength * s);
+        }
+
         public static void Ring(Vector3 position, float size, Color color, int duration, float flatten = 1f)
         {
             Vector2 pos = ThreeDMath.Project(position, out float s);
