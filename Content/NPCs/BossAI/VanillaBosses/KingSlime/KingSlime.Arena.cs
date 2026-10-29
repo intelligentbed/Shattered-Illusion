@@ -40,7 +40,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private static bool IsNinjaPhase(AttackPhase phase) =>
             phase == AttackPhase.NinjaWalk || phase == AttackPhase.NinjaStab || phase == AttackPhase.NinjaSlash
-            || phase == AttackPhase.NinjaVanish || phase == AttackPhase.NinjaCounter || phase == AttackPhase.NinjaStunned;
+            || phase == AttackPhase.NinjaVanish || phase == AttackPhase.NinjaCounter || phase == AttackPhase.NinjaStunned
+            || phase == AttackPhase.NinjaLeap || phase == AttackPhase.NinjaGeyser;
 
         private static void ResizeKeepingBottom(NPC npc, int newWidth, int newHeight)
         {
@@ -89,7 +90,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                             Main.rand.NextFloat(-3f, 3f), -Main.rand.NextFloat(1f, 4f), 100, Color.Cyan, 1.5f);
                     }
 
-                    SoundEngine.PlaySound(SoundID.NPCDeath39 with { Pitch = -0.4f }, npc.Center);
+                    KingSlimeSfx.RevertGrow(npc.Center);
 
                     SetStep(npc, RevertRiseStep);
                     timer = 0f;
@@ -214,6 +215,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         }
 
+        // Gilded frame, lit from the top-left: every rail shares one bevel profile (lit side -> shaded side),
+        // so top/left read as raised highlights and bottom/right as shadow. Everything snaps to a 2px world grid.
         public static void DrawArenaBorder(SpriteBatch sb, Vector2 screenPos, KingSlimeInstanceData data)
         {
             float open = data.CrownT;
@@ -225,19 +228,36 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             Vector2 min = data.ArenaMin;
             Vector2 max = data.ArenaMax;
             float time = Main.GameUpdateCount;
+            float width = max.X - min.X;
+            float height = max.Y - min.Y;
+            float perimeter = (width + height) * 2f;
+            float midX = (min.X + max.X) * 0.5f;
+            float pulse = 0.5f + 0.5f * (float)Math.Sin(time * 0.08f);
+            float sx = (float)Math.Floor(screenPos.X);
+            float sy = (float)Math.Floor(screenPos.Y);
 
-            Color outline = new Color(74, 48, 16);
+            Color ink = new Color(54, 33, 12);
+            Color deep = new Color(122, 74, 18);
             Color shade = new Color(176, 120, 28);
             Color gold = new Color(230, 170, 50);
             Color light = new Color(255, 214, 92);
             Color gloss = new Color(255, 244, 176);
+            Color shadow = new Color(16, 8, 0);
+            Color gel = new Color(110, 200, 255);
+            Color gelDark = new Color(56, 120, 214);
+            Color gelLight = new Color(200, 240, 255);
+            Color ruby = new Color(219, 75, 76);
+            Color rubyLight = new Color(255, 168, 160);
+            Color rubyDark = new Color(140, 32, 58);
+
+            float Snap(float v) => (float)Math.Round(v / 2f) * 2f;
 
             void Fill(float x0, float y0, float x1, float y1, Color color, float alpha = 1f)
             {
-                int ix0 = (int)Math.Max(0f, (float)Math.Round((x0 - screenPos.X) / 2f) * 2f);
-                int iy0 = (int)Math.Max(0f, (float)Math.Round((y0 - screenPos.Y) / 2f) * 2f);
-                int ix1 = (int)Math.Min(Main.screenWidth, (float)Math.Round((x1 - screenPos.X) / 2f) * 2f);
-                int iy1 = (int)Math.Min(Main.screenHeight, (float)Math.Round((y1 - screenPos.Y) / 2f) * 2f);
+                int ix0 = (int)Math.Max(0f, Snap(x0) - sx);
+                int iy0 = (int)Math.Max(0f, Snap(y0) - sy);
+                int ix1 = (int)Math.Min(Main.screenWidth, Snap(x1) - sx);
+                int iy1 = (int)Math.Min(Main.screenHeight, Snap(y1) - sy);
 
                 if (ix1 <= ix0 || iy1 <= iy0)
                     return;
@@ -245,84 +265,240 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 sb.Draw(pixel, new Rectangle(ix0, iy0, ix1 - ix0, iy1 - iy0), color * (alpha * open));
             }
 
-            for (int i = 0; i < 7; i++)
+            // ---- 1. Soft drop shadow outside the frame (stronger down/right, away from the light) ----
+            for (int i = 0; i < 5; i++)
             {
-                float a = 0.16f * (1f - i / 7f);
-                float d = 6f + i * 8f;
+                float a = 0.20f * (1f - i / 5f);
+                float d = 8f + i * 4f;
 
-                Fill(min.X + d, min.Y + d, max.X - d + 8f, min.Y + d + 8f, gold, a);
-                Fill(min.X + d, max.Y - d - 8f, max.X - d + 8f, max.Y - d, gold, a * 0.5f);
-                Fill(min.X + d, min.Y + d + 8f, min.X + d + 8f, max.Y - d - 8f, gold, a);
-                Fill(max.X - d, min.Y + d + 8f, max.X - d + 8f, max.Y - d - 8f, gold, a);
+                Fill(min.X - 4f, max.Y + d, max.X + d + 4f, max.Y + d + 4f, shadow, a);
+                Fill(max.X + d, min.Y - 4f, max.X + d + 4f, max.Y + d + 4f, shadow, a);
+                Fill(min.X - 4f, min.Y - d - 4f, max.X + 4f, min.Y - d, shadow, a * 0.35f);
+                Fill(min.X - d - 4f, min.Y - 4f, min.X - d, max.Y + 4f, shadow, a * 0.35f);
             }
 
-            Fill(min.X - 7f, min.Y - 7f, max.X + 7f, min.Y + 7f, outline);
-            Fill(min.X - 7f, max.Y - 7f, max.X + 7f, max.Y + 7f, outline, 0.6f);
-            Fill(min.X - 7f, min.Y - 7f, min.X + 7f, max.Y + 7f, outline);
-            Fill(max.X - 7f, min.Y - 7f, max.X + 7f, max.Y + 7f, outline);
+            // ---- 2. Inner shadow: the frame darkens the arena edge, deepest under the lit (top/left) rails ----
+            for (int i = 0; i < 12; i++)
+            {
+                float t = 1f - i / 12f;
+                float a = 0.30f * t * t;
+                float d = 8f + i * 4f;
 
-            Fill(min.X - 4f, min.Y - 4f, max.X + 4f, min.Y + 4f, gold);
-            Fill(min.X - 4f, max.Y - 4f, max.X + 4f, max.Y + 4f, shade);
-            Fill(min.X - 4f, min.Y - 4f, min.X + 4f, max.Y + 4f, gold);
-            Fill(max.X - 4f, min.Y - 4f, max.X + 4f, max.Y + 4f, shade);
+                Fill(min.X + 8f, min.Y + d, max.X - 8f, min.Y + d + 4f, shadow, a);
+                Fill(min.X + d, min.Y + 8f, min.X + d + 4f, max.Y - 8f, shadow, a);
 
-            Fill(min.X - 4f, min.Y + 2f, max.X + 4f, min.Y + 4f, light);
-            Fill(min.X + 2f, min.Y - 4f, min.X + 4f, max.Y + 4f, light);
-            Fill(max.X - 4f, min.Y - 4f, max.X - 2f, max.Y + 4f, shade);
+                if (i < 6)
+                {
+                    float a2 = 0.16f * t * t;
+
+                    Fill(min.X + 8f, max.Y - d - 4f, max.X - 8f, max.Y - d, shadow, a2);
+                    Fill(max.X - d - 4f, min.Y + 8f, max.X - d, max.Y - 8f, shadow, a2);
+                }
+            }
+
+            // Warm bounce light along the shaded rails, and a dashed inner pinstripe.
+            Fill(min.X + 8f, max.Y - 12f, max.X - 8f, max.Y - 8f, gold, 0.12f);
+            Fill(max.X - 12f, min.Y + 8f, max.X - 8f, max.Y - 8f, gold, 0.12f);
+
+            for (float x = min.X + 24f; x < max.X - 24f; x += 36f)
+            {
+                Fill(x, min.Y + 18f, x + 24f, min.Y + 20f, light, 0.22f);
+                Fill(x, max.Y - 20f, x + 24f, max.Y - 18f, gold, 0.16f);
+            }
+
+            for (float y = min.Y + 24f; y < max.Y - 24f; y += 36f)
+            {
+                Fill(min.X + 18f, y, min.X + 20f, y + 24f, light, 0.22f);
+                Fill(max.X - 20f, y, max.X - 18f, y + 24f, gold, 0.16f);
+            }
+
+            // ---- 3. Rails: ink / highlight / body / body / shade / shade / deep / ink, lit side first ----
+            Color[] profile = { ink, light, gold, gold, shade, shade, deep, ink };
+
+            for (int i = 0; i < profile.Length; i++)
+            {
+                float o = -8f + i * 2f;
+
+                Fill(min.X - 8f, min.Y + o, max.X + 8f, min.Y + o + 2f, profile[i]);
+                Fill(min.X - 8f, max.Y + o, max.X + 8f, max.Y + o + 2f, profile[i]);
+                Fill(min.X + o, min.Y - 8f, min.X + o + 2f, max.Y + 8f, profile[i]);
+                Fill(max.X + o, min.Y - 8f, max.X + o + 2f, max.Y + 8f, profile[i]);
+            }
+
+            // ---- 4. Sheen: two soft glints travel around the perimeter along the lit edge ----
+            float Sheen(float p)
+            {
+                float best = 0f;
+
+                for (int k = 0; k < 2; k++)
+                {
+                    float c = (time * 6f + k * perimeter * 0.5f) % perimeter;
+                    float d = Math.Abs(p - c);
+                    d = Math.Min(d, perimeter - d);
+
+                    float v = Math.Max(0f, 1f - d / 70f);
+                    best = Math.Max(best, v * v);
+                }
+
+                return best;
+            }
+
+            for (float x = min.X; x < max.X; x += 12f)
+            {
+                float top = Sheen(x - min.X + 6f);
+                float bottom = Sheen(width + height + (max.X - x - 6f));
+
+                if (top > 0.05f)
+                {
+                    Fill(x, min.Y - 6f, x + 12f, min.Y - 4f, gloss, top);
+                    Fill(x, min.Y - 4f, x + 12f, min.Y - 2f, light, top * 0.5f);
+                }
+
+                if (bottom > 0.05f)
+                {
+                    Fill(x, max.Y - 6f, x + 12f, max.Y - 4f, gloss, bottom);
+                    Fill(x, max.Y - 4f, x + 12f, max.Y - 2f, light, bottom * 0.5f);
+                }
+            }
+
+            for (float y = min.Y; y < max.Y; y += 12f)
+            {
+                float right = Sheen(width + (y - min.Y) + 6f);
+                float left = Sheen(width * 2f + height + (max.Y - y - 6f));
+
+                if (right > 0.05f)
+                {
+                    Fill(max.X - 6f, y, max.X - 4f, y + 12f, gloss, right);
+                    Fill(max.X - 4f, y, max.X - 2f, y + 12f, light, right * 0.5f);
+                }
+
+                if (left > 0.05f)
+                {
+                    Fill(min.X - 6f, y, min.X - 4f, y + 12f, gloss, left);
+                    Fill(min.X - 4f, y, min.X - 2f, y + 12f, light, left * 0.5f);
+                }
+            }
+
+            // ---- 5. Rivets (same light direction as the rails) ----
+            void Rivet(float cx, float cy)
+            {
+                Fill(cx - 5f, cy - 5f, cx + 5f, cy + 5f, ink);
+                Fill(cx - 4f, cy - 4f, cx + 4f, cy + 4f, gold);
+                Fill(cx - 4f, cy - 4f, cx + 2f, cy - 2f, light);
+                Fill(cx - 4f, cy - 4f, cx - 2f, cy + 2f, light);
+                Fill(cx - 2f, cy + 2f, cx + 4f, cy + 4f, shade);
+                Fill(cx + 2f, cy - 2f, cx + 4f, cy + 4f, shade);
+            }
 
             for (float x = min.X + 96f; x < max.X - 48f; x += 96f)
             {
-                Fill(x - 3f, min.Y + 4f, x + 3f, min.Y + 16f, light, 0.8f);
-                Fill(x - 3f, max.Y - 16f, x + 3f, max.Y - 4f, shade, 0.8f);
+                if (Math.Abs(x - midX) < 70f)
+                    continue;
+
+                Rivet(x, min.Y);
+                Rivet(x, max.Y);
             }
 
             for (float y = min.Y + 96f; y < max.Y - 48f; y += 96f)
             {
-                Fill(min.X + 4f, y - 3f, min.X + 16f, y + 3f, light, 0.8f);
-                Fill(max.X - 16f, y - 3f, max.X - 4f, y + 3f, light, 0.8f);
+                Rivet(min.X, y);
+                Rivet(max.X, y);
             }
 
-            float width = max.X - min.X;
-            float height = max.Y - min.Y;
-            float perimeter = (width + height) * 2f;
+            // ---- 6. Gel drips hanging off the top rail, with the odd falling droplet ----
+            int drips = (int)(width / 210f);
 
-            for (int k = 0; k < 3; k++)
+            for (int i = 0; i < drips; i++)
             {
-                float s = (time * 7f + k * perimeter / 3f) % perimeter;
-                const float len = 110f;
+                float x = Snap(min.X + 130f + i * 210f + (float)Math.Sin(i * 12.9898f) * 40f);
 
-                for (float o = 0f; o < len; o += 10f)
-                {
-                    float p = (s + o) % perimeter;
-                    float fade = 1f - Math.Abs(o - len / 2f) / (len / 2f);
-                    Vector2 pos;
+                if (Math.Abs(x - midX) < 70f)
+                    continue;
 
-                    if (p < width)
-                        pos = new Vector2(min.X + p, min.Y);
-                    else if (p < width + height)
-                        pos = new Vector2(max.X, min.Y + (p - width));
-                    else if (p < width * 2f + height)
-                        pos = new Vector2(max.X - (p - width - height), max.Y);
-                    else
-                        pos = new Vector2(min.X, max.Y - (p - width * 2f - height));
+                float len = Snap(10f + 16f * (0.5f + 0.5f * (float)Math.Sin(time * 0.035f + i * 1.7f)));
+                float y0 = min.Y + 8f;
 
-                    Fill(pos.X - 3f, pos.Y - 3f, pos.X + 3f, pos.Y + 3f, gloss, fade);
-                }
+                Fill(x - 3f, y0, x + 3f, y0 + len, gel, 0.85f);
+                Fill(x - 3f, y0, x - 1f, y0 + len, gelLight, 0.85f);
+                Fill(x + 1f, y0, x + 3f, y0 + len, gelDark, 0.85f);
+
+                Fill(x - 5f, y0 + len - 2f, x + 5f, y0 + len + 4f, gel, 0.85f);
+                Fill(x - 5f, y0 + len - 2f, x - 3f, y0 + len + 2f, gelLight, 0.85f);
+                Fill(x + 3f, y0 + len, x + 5f, y0 + len + 4f, gelDark, 0.85f);
+
+                float fall = (time * 0.9f + i * 31f) % 140f;
+
+                if (fall < 60f)
+                    Fill(x - 2f, y0 + len + 4f + fall, x + 2f, y0 + len + 8f + fall, gelLight, 0.7f * (1f - fall / 60f));
             }
 
-            float midX = (min.X + max.X) * 0.5f;
-            Fill(midX - 48f, min.Y - 11f, midX + 48f, min.Y + 11f, outline);
-            Fill(midX - 44f, min.Y - 8f, midX + 44f, min.Y + 8f, gold);
-            Fill(midX - 44f, min.Y - 8f, midX + 44f, min.Y - 5f, light);
-            Fill(midX - 44f, min.Y + 5f, midX + 44f, min.Y + 8f, shade);
+            // ---- 7. Gems and crown ----
+            void Gem(float cx, float cy, float half)
+            {
+                Fill(cx - half - 6f, cy - half - 6f, cx + half + 6f, cy + half + 6f, ruby, 0.05f + 0.07f * pulse);
+                Fill(cx - half - 3f, cy - half - 3f, cx + half + 3f, cy + half + 3f, ruby, 0.10f + 0.12f * pulse);
 
+                Fill(cx - half - 2f, cy - half - 2f, cx + half + 2f, cy + half + 2f, ink);
+                Fill(cx - half, cy - half, cx + half, cy + half, ruby);
+                Fill(cx - half, cy + half - 2f, cx + half, cy + half, rubyDark);
+                Fill(cx + half - 2f, cy - half, cx + half, cy + half, rubyDark);
+                Fill(cx - half, cy - half, cx + half - 2f, cy - half + 2f, rubyLight, 0.8f);
+                Fill(cx - half, cy - half, cx - half + 2f, cy + half - 2f, rubyLight, 0.8f);
+            }
+
+            void Spike(float cx, float baseY, int rows, float baseWidth)
+            {
+                for (int r = 0; r < rows; r++)
+                {
+                    float w = baseWidth - r * 4f;
+                    float y1 = baseY - r * 6f;
+                    float y0 = y1 - 6f;
+
+                    Fill(cx - w * 0.5f - 2f, y0 - 2f, cx + w * 0.5f + 2f, y1, ink);
+                }
+
+                for (int r = 0; r < rows; r++)
+                {
+                    float w = baseWidth - r * 4f;
+                    float y1 = baseY - r * 6f;
+                    float y0 = y1 - 6f;
+
+                    Fill(cx - w * 0.5f, y0, cx + w * 0.5f, y1, gold);
+                    Fill(cx - w * 0.5f, y0, cx + w * 0.5f, y0 + 2f, light);
+                    Fill(cx - w * 0.5f, y0, cx - w * 0.5f + 2f, y1, light);
+                    Fill(cx + w * 0.5f - 2f, y0, cx + w * 0.5f, y1, shade);
+                }
+
+                Gem(cx, baseY - rows * 6f - 2f, 3f);
+            }
+
+            // Plaque and crown on the top rail.
+            Fill(midX - 50f, min.Y - 12f, midX + 50f, min.Y + 12f, ink);
+            Fill(midX - 46f, min.Y - 10f, midX + 46f, min.Y + 10f, gold);
+            Fill(midX - 46f, min.Y - 10f, midX + 46f, min.Y - 8f, light);
+            Fill(midX - 46f, min.Y - 10f, midX - 44f, min.Y + 10f, light);
+            Fill(midX - 46f, min.Y + 6f, midX + 46f, min.Y + 10f, shade);
+            Fill(midX + 44f, min.Y - 10f, midX + 46f, min.Y + 10f, shade);
+            Fill(midX - 46f, min.Y + 8f, midX + 46f, min.Y + 10f, deep);
+
+            Spike(midX - 32f, min.Y - 10f, 3, 16f);
+            Spike(midX + 32f, min.Y - 10f, 3, 16f);
+            Spike(midX, min.Y - 10f, 4, 22f);
+            Gem(midX, min.Y, 4f);
+
+            // Corner bosses with a ruby set in each.
             foreach (Vector2 corner in new[] { min, new Vector2(max.X, min.Y), new Vector2(min.X, max.Y), max })
             {
-                Fill(corner.X - 14f, corner.Y - 14f, corner.X + 14f, corner.Y + 14f, outline);
-                Fill(corner.X - 10f, corner.Y - 10f, corner.X + 10f, corner.Y + 10f, gold);
-                Fill(corner.X - 10f, corner.Y - 10f, corner.X + 10f, corner.Y - 6f, light);
-                Fill(corner.X - 5f, corner.Y - 5f, corner.X + 5f, corner.Y + 5f, new Color(219, 75, 76));
-                Fill(corner.X - 5f, corner.Y - 5f, corner.X - 1f, corner.Y - 1f, new Color(243, 102, 236));
+                Fill(corner.X - 16f, corner.Y - 16f, corner.X + 16f, corner.Y + 16f, ink);
+                Fill(corner.X - 14f, corner.Y - 14f, corner.X + 14f, corner.Y + 14f, gold);
+                Fill(corner.X - 14f, corner.Y - 14f, corner.X + 14f, corner.Y - 12f, light);
+                Fill(corner.X - 14f, corner.Y - 14f, corner.X - 12f, corner.Y + 14f, light);
+                Fill(corner.X - 14f, corner.Y + 10f, corner.X + 14f, corner.Y + 14f, shade);
+                Fill(corner.X + 10f, corner.Y - 14f, corner.X + 14f, corner.Y + 14f, shade);
+                Fill(corner.X - 14f, corner.Y + 12f, corner.X + 14f, corner.Y + 14f, deep);
+                Fill(corner.X + 12f, corner.Y - 14f, corner.X + 14f, corner.Y + 14f, deep);
+
+                Gem(corner.X, corner.Y, 5f);
             }
         }
 

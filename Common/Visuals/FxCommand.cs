@@ -10,16 +10,35 @@ namespace ShatteredIllusion.Common.Visuals
     {
         public override CommandType Type => CommandType.Chat;
         public override string Command => "fx";
-        public override string Usage => "/fx <parry|landing|impact|phase|charge|stop> [scale]";
+        public override string Usage => "/fx <parry|landing|impact|phase|charge|ripple|aberration|blur|glitch|wobble|invert|grade|stop> [scale]";
 
         public override void Action(CommandCaller caller, string input, string[] args)
         {
             string name = args.Length > 0 ? args[0].ToLowerInvariant() : "";
 
+            float scale = 1f;
+
+            if (args.Length > 1 && !float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
+                scale = 1f;
+
             if (name == "stop")
             {
                 VisualFX.Clear();
+                ScreenFX.Clear();
                 return;
+            }
+
+            Vector2 mouse = Main.MouseWorld;
+
+            switch (name)
+            {
+                case "ripple": ScreenFX.Ripple(mouse, 700f * scale, 40, scale); return;
+                case "aberration": ScreenFX.Aberration(scale, 30); return;
+                case "blur": ScreenFX.ZoomBlur(scale, 25, mouse); return;
+                case "glitch": ScreenFX.Glitch(scale, 40); return;
+                case "wobble": ScreenFX.Wobble(scale, 90); return;
+                case "invert": ScreenFX.Invert(scale, 10); return;
+                case "grade": ScreenFX.Grade(0.2f, 1.15f, new Color(120, 160, 255), 0.35f * scale, 180); return;
             }
 
             FxDef def = name switch
@@ -38,13 +57,8 @@ namespace ShatteredIllusion.Common.Visuals
                 return;
             }
 
-            float scale = 1f;
-
-            if (args.Length > 1 && !float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
-                scale = 1f;
-
             Player player = caller.Player;
-            Vector2 target = Main.MouseWorld;
+            Vector2 target = mouse;
             Vector2 dir = target - player.Center;
 
             if (def == Fx.ChargeUp)

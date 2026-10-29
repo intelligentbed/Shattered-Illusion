@@ -122,10 +122,16 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             if ((prevPhase == AttackPhase.Jump || prevPhase == AttackPhase.BigJump) && phase == AttackPhase.Cooldown)
                 SlimeImpact(npc.Bottom, prevPhase == AttackPhase.BigJump ? 0.45f : 0.28f);
 
+            // Sinking into the floor: a splash where he goes down.
+            if (phase == AttackPhase.Teleport && prevPhase != AttackPhase.Teleport)
+                VisualFX.Play(KingSlimeFx.GroundEmerge, npc.Bottom, scale: 0.7f);
+
+            // Bursting out of the floor at the marked spot.
             if (phase == AttackPhase.Teleport && step == TeleportResurfacingStep)
             {
                 Cinema.Flash(new Color(0, 170, 255), 0.18f);
                 Cinema.ZoomPunch(0.02f);
+                VisualFX.Play(KingSlimeFx.GroundEmerge, npc.Bottom);
             }
 
             if (phase == AttackPhase.HugeJump && step == HugeJumpHoveringStep)
@@ -237,7 +243,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 }
             }
 
-            if (prevPhase == AttackPhase.NinjaStab && phase == AttackPhase.NinjaStunned)
+            if ((prevPhase == AttackPhase.NinjaStab || prevPhase == AttackPhase.NinjaLeap) && phase == AttackPhase.NinjaStunned)
             {
                 Cinema.Flash(new Color(255, 240, 190), 0.75f);
                 Cinema.ZoomPunch(0.12f);
@@ -251,29 +257,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 if (Cinema.Enabled)
                     SoundEngine.PlaySound(SoundID.Item37 with { Pitch = 0.1f, Volume = 0.9f }, npc.Center);
 
-                if (Cinema.ParticlesEnabled)
-                    BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                        position: npc.Center.ToNumerics(),
-                        velocity: SystemVector2.Zero,
-                        rotation: 0f,
-                        scale: new SystemVector2(240f, 240f),
-                        color: new Color(255, 225, 140, 255),
-                        duration: 20
-                    ));
-
-                for (int i = 0; i < (Cinema.ParticlesEnabled ? 16 : 0); i++)
-                {
-                    Vector2 v = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(4f, 9f);
-
-                    BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                        position: npc.Center.ToNumerics(),
-                        velocity: v.ToNumerics(),
-                        rotation: 0f,
-                        scale: new SystemVector2(11f, 11f),
-                        color: new Color(255, 215, 120, 255),
-                        duration: Main.rand.Next(18, 30)
-                    ));
-                }
+                VisualFX.Ring(npc.Center, 240f, new Color(255, 225, 140, 255), 20);
+                VisualFX.Sparks(npc.Center, Vector2.UnitX, MathHelper.Pi, 16, 4f, 9f, new Color(255, 215, 120, 255), 11f, 24);
             }
 
             if (prevPhase == AttackPhase.NinjaStunned && phase == AttackPhase.NinjaWalk)
@@ -289,7 +274,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
 
             if (phase == AttackPhase.NinjaVanish && step == NinjaVanishAppearStep)
+            {
                 Cinema.Flash(new Color(180, 255, 235), 0.15f);
+                VisualFX.Play(KingSlimeFx.GroundEmerge, npc.Bottom, scale: 0.8f);
+            }
 
             if (phase == AttackPhase.TransformToSlime && step == RevertRiseStep)
             {
@@ -304,22 +292,19 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 Cinema.ZoomPunch(0.03f);
                 Cinema.Flash(new Color(200, 240, 255), 0.18f);
 
-                if (Cinema.ParticlesEnabled)
-                    BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                        position: npc.Center.ToNumerics(),
-                        velocity: SystemVector2.Zero,
-                        rotation: 0f,
-                        scale: new SystemVector2(170f, 170f),
-                        color: new Color(150, 225, 255, 255),
-                        duration: 16
-                    ));
+                VisualFX.Play(KingSlimeFx.WeaponBloom, npc.Center);
             }
+
+            // Weapon form begins from the slime: streaks pull into the orb. (Weapon -> weapon skips this, the orb already exists.)
+            if (IsWeaponFormPhase(phase) && prevPhase != phase && step == WeaponMorphStep && !data.WeaponHandoffIn)
+                VisualFX.PlayOn(KingSlimeFx.WeaponGather, npc);
 
             // Weapon -> weapon: the old weapon has melted into the blob and the next one is about to grow out.
             if (IsWeaponFormPhase(prevPhase) && prevStep == WeaponUnmorphStep && IsWeaponFormPhase(phase))
             {
                 Cinema.Flash(new Color(190, 235, 255), 0.2f);
                 Cinema.ZoomPunch(0.02f);
+                VisualFX.Play(KingSlimeFx.WeaponBloom, npc.Center, scale: 0.6f);
             }
 
             // Weapon -> slime: the orb has dropped to the floor and re-formed.

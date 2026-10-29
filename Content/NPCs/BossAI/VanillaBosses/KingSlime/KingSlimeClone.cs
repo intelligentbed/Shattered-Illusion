@@ -1,11 +1,16 @@
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ParticleLibrary.Core.V3.Particles;
+using ParticleLibrary.Utilities;
 using ReLogic.Content;
+using ShatteredIllusion.Common.Visuals;
+using ShatteredIllusion.Content.Particles;
 using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
 using Terraria.ModLoader;
+using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 {
@@ -78,6 +83,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 return;
             }
 
+            if (NPC.ai[2] == 4f)
+            {
+                GeyserAI();
+                return;
+            }
+
             NPC.ai[1]++;
             float timer = NPC.ai[1];
             bool isVertical = NPC.ai[2] == 1f;
@@ -134,6 +145,98 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             NPC.spriteDirection = parent.spriteDirection;
         }
 
+        // Gel geyser (mode 4): a marker shows on the ground for ai[3] ticks, then a column of gel erupts. ai[1] = timer.
+        // localAI[2] = eruption amount (0..1) for drawing.
+        private void GeyserAI()
+        {
+            const float grow = 6f;
+            const float hold = 14f;
+            const float shrink = 8f;
+
+            NPC.ai[1]++;
+            float t = NPC.ai[1];
+            float delay = Math.Max(1f, NPC.ai[3]);
+            float e = 0f;
+
+            if (t >= delay)
+            {
+                float u = t - delay;
+
+                if (u < grow)
+                    e = u / grow;
+                else if (u < grow + hold)
+                    e = 1f;
+                else if (u < grow + hold + shrink)
+                    e = 1f - (u - grow - hold) / shrink;
+                else
+                {
+                    NPC.active = false;
+                    return;
+                }
+            }
+
+            // The base stays planted on the ground while the hitbox grows upward.
+            Vector2 bottom = NPC.Bottom;
+            NPC.width = 54;
+            NPC.height = (int)(16f + 110f * e);
+            NPC.Bottom = bottom;
+            NPC.velocity = Vector2.Zero;
+            NPC.scale = 1f;
+            NPC.localAI[2] = e;
+            NPC.damage = e > 0.3f ? NPC.defDamage : 0;
+            NPC.alpha = e > 0f ? 30 : 255;
+
+            if (Main.dedServ)
+                return;
+
+            if (t < delay)
+            {
+                float tt = MathHelper.Clamp(t / delay, 0f, 1f);
+                Color col = Color.Lerp(new Color(255, 215, 90), Color.White, tt * tt) * (0.3f + 0.6f * tt);
+                Vector2 marker = NPC.Bottom - new Vector2(0f, 3f);
+                float inner = MathHelper.Lerp(14f, 66f, tt);
+
+                BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                    position: marker.ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(66f, 20f),
+                    color: col,
+                    duration: 2
+                ));
+
+                BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                    position: marker.ToNumerics(),
+                    velocity: SystemVector2.Zero,
+                    rotation: 0f,
+                    scale: new SystemVector2(inner, inner * 0.3f),
+                    color: col,
+                    duration: 2
+                ));
+
+                return;
+            }
+
+            if ((int)t == (int)delay)
+            {
+                SoundEngine.PlaySound(SoundID.NPCDeath39 with { Pitch = 0.1f, Volume = 0.7f }, NPC.Bottom);
+                VisualFX.Play(KingSlimeFx.GeyserBurst, NPC.Bottom);
+
+                for (int i = 0; i < 10; i++)
+                {
+                    Dust.NewDustPerfect(NPC.Bottom + new Vector2(Main.rand.NextFloat(-20f, 20f), -4f), DustID.t_Slime,
+                        new Vector2(Main.rand.NextFloat(-2f, 2f), -Main.rand.NextFloat(2f, 6f)), 100, Color.Cyan, 1.5f);
+                }
+            }
+
+            if (e > 0.3f && Main.rand.NextBool(2))
+            {
+                Dust d = Dust.NewDustPerfect(NPC.Top + new Vector2(Main.rand.NextFloat(-18f, 18f), 4f), DustID.t_Slime,
+                    new Vector2(Main.rand.NextFloat(-1.5f, 1.5f), -Main.rand.NextFloat(1f, 3f)), 100, Color.Cyan, 1.3f);
+                d.noGravity = true;
+            }
+        }
+
         private static float EaseOutBack(float x)
         {
             x = MathHelper.Clamp(x, 0f, 1f);
@@ -174,7 +277,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             if (t <= 1f && !Main.dedServ)
             {
-                for (int i = 0; i < 10; i++)
+                VisualFX.Play(KingSlimeFx.EchoSpawn, a);
+
+                for (int i = 0; i < 6; i++)
                 {
                     Dust d = Dust.NewDustPerfect(a + Main.rand.NextVector2Circular(14f, 14f), DustID.t_Slime,
                         Main.rand.NextVector2Circular(2.5f, 2.5f), 100, Color.Cyan, 1.4f);
@@ -203,6 +308,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             {
                 SoundEngine.PlaySound(SoundID.NPCDeath39 with { Pitch = 0.3f, Volume = 0.7f }, pos);
                 KingSlimeOverride.EchoBounceImpact(new Vector2(pos.X, pos.Y + 19f));
+                VisualFX.Play(KingSlimeFx.EchoBounce, new Vector2(pos.X, pos.Y + 19f), new Vector2(side, 0f));
 
                 if (!Main.dedServ)
                 {
@@ -249,6 +355,24 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             Vector2 drawPos = NPC.Center - screenPos;
             SpriteEffects effects = NPC.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
             float opacity = (255 - NPC.alpha) / 255f;
+
+            if (NPC.ai[2] == 4f)
+            {
+                float e = NPC.localAI[2];
+
+                if (e <= 0.02f)
+                    return false;
+
+                // A tall wobbling column of gel, anchored at the ground.
+                float wobble = (float)Math.Sin(Main.GameUpdateCount * 0.5f) * 0.04f;
+                Vector2 columnScale = new Vector2(0.38f + 0.12f * (1f - e) + wobble, (NPC.height + 14f) / texture.Height);
+                Vector2 columnOrigin = new Vector2(texture.Width / 2f, texture.Height);
+                Color tint = Color.Lerp(drawColor, new Color(150, 235, 255), 0.25f);
+
+                spriteBatch.Draw(texture, NPC.Bottom - screenPos + new Vector2(0f, 6f), sourceRectangle, tint, 0f, columnOrigin, columnScale, SpriteEffects.None, 0f);
+
+                return false;
+            }
 
             Vector2 scale = new Vector2(NPC.scale);
             bool echo = NPC.ai[2] == 2f;

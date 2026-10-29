@@ -75,16 +75,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         }
 
         private static void GoldRing(Vector2 pos, float size, int duration)
-        {
-            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                position: pos.ToNumerics(),
-                velocity: SystemVector2.Zero,
-                rotation: 0f,
-                scale: new SystemVector2(size, size),
-                color: new Color(255, 225, 140, 255),
-                duration: duration
-            ));
-        }
+            => VisualFX.Ring(pos, size, new Color(255, 225, 140, 255), duration);
 
         // =================================================================
         //  INTRO
@@ -288,6 +279,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 || phase == AttackPhase.NinjaSlash
                 || phase == AttackPhase.NinjaVanish
                 || phase == AttackPhase.NinjaCounter
+                || phase == AttackPhase.NinjaLeap
+                || phase == AttackPhase.NinjaGeyser
                 || phase == AttackPhase.NinjaStunned
                 || (phase == AttackPhase.TransformToNinja && CurrentStep(npc) == TransformRiseStep);
 
@@ -473,19 +466,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     GoldRing(rest, 240f, 18);
                     GoldRing(rest, 420f, 30);
 
-                    for (int i = 0; i < 24; i++)
-                    {
-                        Vector2 v = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(4f, 12f);
-
-                        BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                            position: rest.ToNumerics(),
-                            velocity: v.ToNumerics(),
-                            rotation: 0f,
-                            scale: new SystemVector2(11f, 11f),
-                            color: new Color(255, 215, 120, 255),
-                            duration: Main.rand.Next(20, 34)
-                        ));
-                    }
+                    VisualFX.Sparks(rest, Vector2.UnitX, MathHelper.Pi, 24, 4f, 12f, new Color(255, 215, 120, 255), 11f, 27);
                 }
 
                 if (cam)

@@ -52,6 +52,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         // Ninja walk-cycle phase. Advances with ground speed so the legs match the movement.
         public float WalkClock;
 
+        // Obstacle handling while walking (jump cooldown, and how long he's been wedged against something).
+        public int NinjaJumpCooldown;
+        public int NinjaStuck;
+
+        // Shadow Dive: hover height (Y) for the leap.
+        public Vector2 NinjaLeapPoint;
+
         // Smoothed floor-impact X for the Echo Dive telegraph (tracks the player, then locks).
         public float EchoTargetX;
 

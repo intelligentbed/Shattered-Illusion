@@ -40,6 +40,8 @@ namespace ShatteredIllusion.Common.Visuals
                 Cinema.Shake(c.Pos, c.Dir, 6f * c.Scale, 7f, 9);
                 Cinema.ZoomPunch(0.015f * c.Scale);
                 Cinema.Flash(new Color(255, 230, 160), 0.07f);
+                ScreenFX.Ripple(c.Pos, 260f * c.Scale, 18, 0.6f);
+                ScreenFX.Aberration(0.5f * c.Scale, 8);
             });
 
         // pos = feet, scale = power (1 = normal slam, 1.5+ adds the wide second ring).
@@ -51,6 +53,7 @@ namespace ShatteredIllusion.Common.Visuals
                 Cinema.Flash(c.Hot, 0.22f * c.Scale);
                 Cinema.Shake(c.Pos, Vector2.UnitY, 8f * c.Scale, 14f, 8 + (int)(14 * c.Scale));
                 SoundEngine.PlaySound(HeavyImpact, c.Pos);
+                ScreenFX.Ripple(c.Pos, 520f * c.Scale, 28, 0.8f * c.Scale);
             })
             .Extra(0, static c =>
             {
@@ -89,6 +92,9 @@ namespace ShatteredIllusion.Common.Visuals
                 Cinema.ZoomPunch(0.06f * c.Scale);
                 Cinema.Flash(c.Hot, 0.5f);
                 SoundEngine.PlaySound(BigBlast, c.Pos);
+                ScreenFX.Ripple(c.Pos, 900f * c.Scale, 40, 1.2f);
+                ScreenFX.Aberration(1f, 22);
+                ScreenFX.ZoomBlur(0.6f, 14, c.Pos);
             })
             .Extra(PhaseBurstFrame, static c =>
             {

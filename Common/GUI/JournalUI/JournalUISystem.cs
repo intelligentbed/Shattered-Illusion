@@ -11,6 +11,8 @@ using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.UI;
+using ReLogic.Content;
+using ReLogic.Graphics;
 
 namespace ShatteredIllusion.Common.GUI.JournalUI
 {
@@ -23,6 +25,7 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
         {
             if (!Main.dedServ)
             {
+                JournalRegistry.Build();
                 JournalState = new JournalUIState();
                 JournalState.Activate();
                 _journalInterface = new UserInterface();
@@ -34,10 +37,45 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
         {
             JournalState = null;
             _journalInterface = null;
+            JournalRegistry.Clear();
+            JournalToast.Clear();
             if (!Main.dedServ)
             {
                 JournalGfx.Dispose();
             }
+        }
+
+        // Localization is loaded by now: log the exact key of anything the journal expects but can't find.
+        public override void PostSetupContent()
+        {
+            if (Main.dedServ)
+            {
+                return;
+            }
+
+            foreach (JournalChapter chapter in JournalRegistry.Chapters)
+            {
+                string chapterKey = $"{JournalText.Root}.Chapters.{chapter.Id}.Title";
+                if (!Terraria.Localization.Language.Exists(chapterKey))
+                {
+                    JournalBuilder.Warn($"Missing localization key: {chapterKey}");
+                }
+
+                foreach (JournalPage page in chapter.Pages)
+                {
+                    string bodyKey = $"{JournalText.Root}.Chapters.{chapter.Id}.Pages.{page.Id}.Body";
+                    if (!Terraria.Localization.Language.Exists(bodyKey))
+                    {
+                        JournalBuilder.Warn($"Missing localization key: {bodyKey}");
+                    }
+                }
+            }
+        }
+
+        public override void OnWorldLoad()
+        {
+            // Unlock polling waits a moment after this so synced world flags (boss kills etc.) have arrived.
+            JournalPlayer.WorldEnterTick = Main.GameUpdateCount;
         }
 
         public override void UpdateUI(GameTime gameTime)
@@ -48,6 +86,8 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             }
 
             HandleToggleInput();
+
+            JournalToast.Update();
 
             if (Main.playerInventory || JournalState.IsOpen)
             {
@@ -82,6 +122,19 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
         public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
         {
+            int mouseTextIndex = layers.FindIndex(layer => layer.Name.Equals("Vanilla: Mouse Text"));
+            if (mouseTextIndex != -1)
+            {
+                layers.Insert(mouseTextIndex, new LegacyGameInterfaceLayer(
+                    "ShatteredIllusion: Journal Toast",
+                    delegate
+                    {
+                        JournalToast.Draw(Main.spriteBatch);
+                        return true;
+                    },
+                    InterfaceScaleType.UI));
+            }
+
             int inventoryLayerIndex = layers.FindIndex(layer => layer.Name.Equals("Vanilla: Inventory"));
             if (inventoryLayerIndex != -1)
             {
@@ -414,6 +467,96 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             {
                 spriteBatch.Draw(pixel, new Rectangle(full.X, full.Y, full.Width, barHeight), Color.Black);
                 spriteBatch.Draw(pixel, new Rectangle(full.X, full.Bottom - barHeight, full.Width, barHeight), Color.Black);
+            }
+        }
+    }
+}
+namespace ShatteredIllusion.Common.GUI.JournalUI
+{
+    /// <summary>A small "Journal updated" banner that slides in near the top of the screen when something unlocks.</summary>
+    internal static class JournalToast
+    {
+        private const int Lifetime = 300;   // ticks
+        private const int FadeTicks = 24;
+
+        private sealed class Entry
+        {
+            public string Text;
+            public int Age;
+        }
+
+        private static readonly List<Entry> Entries = new List<Entry>();
+        private static Asset<Texture2D> _icon;
+
+        public static void Push(string text)
+        {
+            if (Main.dedServ)
+            {
+                return;
+            }
+
+            Entries.Add(new Entry { Text = text });
+            SoundEngine.PlaySound(SoundID.Item4 with { Volume = 0.5f, Pitch = 0.4f });
+        }
+
+        public static void Clear() => Entries.Clear();
+
+        public static void Update()
+        {
+            for (int i = Entries.Count - 1; i >= 0; i--)
+            {
+                if (++Entries[i].Age >= Lifetime)
+                {
+                    Entries.RemoveAt(i);
+                }
+            }
+        }
+
+        public static void Draw(SpriteBatch sb)
+        {
+            if (Entries.Count == 0)
+            {
+                return;
+            }
+
+            JournalGfx.EnsureBuilt();
+            _icon ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/UI/Journal_Closed");
+
+            DynamicSpriteFont font = FontAssets.MouseText.Value;
+            float uiWidth = Main.screenWidth / Main.UIScale;
+            float y = 96f;
+
+            foreach (Entry entry in Entries)
+            {
+                float appear = Math.Min(1f, entry.Age / (float)FadeTicks);
+                float vanish = Math.Min(1f, (Lifetime - entry.Age) / (float)FadeTicks);
+                float alpha = Math.Min(JournalGfx.EaseOutCubic(appear), vanish);
+                float slide = (1f - JournalGfx.EaseOutCubic(appear)) * -24f;
+                float pulse = 0.5f + 0.5f * (float)Math.Sin(entry.Age * 0.2f);
+
+                Vector2 textSize = font.MeasureString(entry.Text) * 0.9f;
+                float width = textSize.X + 78f;
+                float height = 44f;
+                Vector2 topLeft = new Vector2((uiWidth - width) / 2f, y + slide);
+                Rectangle box = new Rectangle((int)topLeft.X, (int)topLeft.Y, (int)width, (int)height);
+
+                // Soft warm halo, dark plate, thin gold rule.
+                sb.Draw(JournalGfx.Soft, new Rectangle(box.X - 40, box.Y - 30, box.Width + 80, box.Height + 60),
+                    new Color(255, 190, 110) * (0.25f * (0.7f + 0.3f * pulse) * alpha));
+                sb.Draw(TextureAssets.MagicPixel.Value, box, new Color(26, 10, 18) * (0.88f * alpha));
+                sb.Draw(TextureAssets.MagicPixel.Value, new Rectangle(box.X, box.Bottom - 2, box.Width, 2), new Color(255, 206, 120) * (0.9f * alpha));
+
+                if (_icon.IsLoaded)
+                {
+                    Texture2D icon = _icon.Value;
+                    float iconScale = 30f / icon.Height;
+                    sb.Draw(icon, new Vector2(box.X + 28f, box.Center.Y), null, Color.White * alpha, 0f, icon.Size() / 2f, iconScale, SpriteEffects.None, 0f);
+                }
+
+                Utils.DrawBorderString(sb, entry.Text, new Vector2(box.X + 54f, box.Center.Y - textSize.Y / 2f + 2f),
+                    Color.Lerp(new Color(255, 226, 170), Color.White, pulse * 0.4f) * alpha, 0.9f);
+
+                y += height + 8f;
             }
         }
     }

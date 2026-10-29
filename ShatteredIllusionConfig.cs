@@ -92,5 +92,16 @@ namespace ShatteredIllusion
         [Increment(0.25f)]
         [Slider]
         public float EffectDensity = 1f;
+
+        // Fullscreen shader effects (ripples, aberration, blur, glitch, color grading).
+        [DefaultValue(true)]
+        public bool ScreenFilters;
+
+        // Scales all screen distortion; lower it if warping feels uncomfortable.
+        [DefaultValue(1f)]
+        [Range(0f, 1f)]
+        [Increment(0.1f)]
+        [Slider]
+        public float ScreenFilterIntensity = 1f;
     }
 }

@@ -260,6 +260,39 @@ Items: {
 			Hitting a burning enemy throws embers outward
 			'''
 	}
+
+	SproutMace: {
+		DisplayName: Sprout Mace
+		Tooltip: Hits plant sprouts that bloom and burst
+	}
+
+	MosslogLauncher: {
+		DisplayName: Mosslog Launcher
+		Tooltip:
+			'''
+			Lobs a mossy log that bounces up to 3 times
+			Uses no ammo
+			'''
+	}
+
+	BonehookSickle: {
+		DisplayName: Bonehook Sickle
+		Tooltip: Every 3rd swing throws a piercing crescent
+	}
+
+	HoarfrostStaff: {
+		DisplayName: Hoarfrost Staff
+		Tooltip:
+			'''
+			Frost crystals lodge in enemies and pulse chilling frost
+			Only 2 crystals can be planted at once
+			'''
+	}
+
+	Thornrang: {
+		DisplayName: Thornrang
+		Tooltip: Drops thorn seeds as it flies
+	}
 }
 
 Buffs: {
@@ -325,6 +358,13 @@ Projectiles: {
 	CinderDartProjectile.DisplayName: Cinder Dart
 	ThreeDTestSprite.DisplayName: Three D Test Sprite
 	ThreeDTestWall.DisplayName: Three D Test Wall
+	SproutBloom.DisplayName: Sprout Bloom
+	MosslogProjectile.DisplayName: Mosslog
+	ReapingCrescent.DisplayName: Reaping Crescent
+	HoarfrostCrystal.DisplayName: Hoarfrost Crystal
+	HoarfrostPulse.DisplayName: Hoarfrost Pulse
+	ThornrangProjectile.DisplayName: Thornrang Projectile
+	ThornSeed.DisplayName: Thorn Seed
 }
 
 Keybinds: {
@@ -438,6 +478,16 @@ Configs: {
 		EffectDensity: {
 			Tooltip: ""
 			Label: Effect Density
+		}
+
+		ScreenFilterIntensity: {
+			Tooltip: ""
+			Label: Screen Filter Intensity
+		}
+
+		ScreenFilters: {
+			Tooltip: ""
+			Label: Screen Filters
 		}
 	}
 
