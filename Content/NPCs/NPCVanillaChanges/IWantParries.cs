@@ -9,7 +9,7 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.NPCs
+namespace ShatteredIllusion.Content.NPCs.NPCVanillaChanges
 {
     internal interface IWantParries
     {
