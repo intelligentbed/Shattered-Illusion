@@ -489,6 +489,21 @@ Configs: {
 			Tooltip: ""
 			Label: Screen Filters
 		}
+
+		ScreenColorIntensity: {
+			Label: Screen Color Intensity
+			Tooltip: ""
+		}
+
+		ScreenReduceFlashing: {
+			Label: Screen Reduce Flashing
+			Tooltip: ""
+		}
+
+		JournalNotifications: {
+			Tooltip: ""
+			Label: Journal Notifications
+		}
 	}
 
 	HorizontalPosition: {

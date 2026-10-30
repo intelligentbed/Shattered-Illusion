@@ -28,6 +28,9 @@ namespace ShatteredIllusion
         [DefaultValue(HorizontalPosition.Left)]
         public HorizontalPosition MenuButtonPosition;
 
+        [DefaultValue(true)]
+        public bool JournalNotifications;
+
         [Header("BossCinematics")]
 
         // Master switch for the cinematic layer used by boss fights. Off = fights play without any added letterbox, zoom, flashes, hit-stop or extra particles.

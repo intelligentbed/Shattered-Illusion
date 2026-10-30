@@ -19,8 +19,7 @@ namespace ShatteredIllusion.Core.OverrideSystem
 
         private const BindingFlags HookLookupFlags =
             BindingFlags.Public |
-            BindingFlags.Instance |
-            BindingFlags.DeclaredOnly;
+            BindingFlags.Instance;
 
         public static void Load()
         {
@@ -58,26 +57,40 @@ namespace ShatteredIllusion.Core.OverrideSystem
                 bool hasModifyNPCLoot =
                     OverridesMethod(type, nameof(NPCBehaviorOverride.ModifyNPCLoot));
 
-                int npcType = instance.NPCOverrideType;
+                int[] npcTypes = (instance.NPCOverrideTypes ?? Array.Empty<int>())
+                    .Distinct()
+                    .ToArray();
 
-                if (npcType < 0 || npcType >= _overridesByNPCType.Length)
+                if (npcTypes.Length == 0)
                 {
-                    throw new IndexOutOfRangeException(
-                        $"{type.Name}.NPCOverrideType ({npcType}) " +
-                        $"is not a valid NPC type index.");
+                    throw new InvalidOperationException(
+                        $"{type.Name} does not specify any NPC types. " +
+                        $"Override NPCOverrideType or NPCOverrideTypes.");
                 }
 
-                if (_overridesByNPCType[npcType] is not null)
+                // Validate everything before registering anything, so a bad
+                // entry can't leave this override half-registered.
+                foreach (int npcType in npcTypes)
                 {
-                    NPCBehaviorOverrideContainer existing =
-                        _overridesByNPCType[npcType]!;
+                    if (npcType < 0 || npcType >= _overridesByNPCType.Length)
+                    {
+                        throw new IndexOutOfRangeException(
+                            $"{type.Name} lists NPC type {npcType}, " +
+                            $"which is not a valid NPC type index.");
+                    }
 
-                    throw new InvalidOperationException(
-                        $"Multiple NPCBehaviorOverride classes are registered " +
-                        $"for NPC type {npcType}. " +
-                        $"Existing override: " +
-                        $"{existing.BehaviorOverride.GetType().FullName}. " +
-                        $"Conflicting override: {type.FullName}.");
+                    if (_overridesByNPCType[npcType] is not null)
+                    {
+                        NPCBehaviorOverrideContainer existing =
+                            _overridesByNPCType[npcType]!;
+
+                        throw new InvalidOperationException(
+                            $"Multiple NPCBehaviorOverride classes are registered " +
+                            $"for NPC type {npcType}. " +
+                            $"Existing override: " +
+                            $"{existing.BehaviorOverride.GetType().FullName}. " +
+                            $"Conflicting override: {type.FullName}.");
+                    }
                 }
 
                 var container = new NPCBehaviorOverrideContainer(
@@ -90,7 +103,11 @@ namespace ShatteredIllusion.Core.OverrideSystem
 
                 instance.Load();
 
-                _overridesByNPCType[npcType] = container;
+                // One shared container (and instance) for every listed type.
+                foreach (int npcType in npcTypes)
+                {
+                    _overridesByNPCType[npcType] = container;
+                }
             }
         }
 
