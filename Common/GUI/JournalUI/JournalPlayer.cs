@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -258,10 +258,11 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
             if (!silent)
             {
+                JournalPage page = JournalRegistry.Pages.FirstOrDefault(pg => !pg.IsPadding && pg.Locks.Length > 0 && pg.Locks[pg.Locks.Length - 1].Id == unlock.Id);
                 JournalChapter chapter = JournalRegistry.ChaptersUsing(unlock.Id).FirstOrDefault();
-                JournalToast.Push(chapter != null
-                    ? JournalText.Ui("UpdatedChapter", JournalText.ChapterTitle(chapter))
-                    : JournalText.Ui("Updated"));
+                JournalToast.Push(page != null
+                    ? JournalText.PageTitle(page) ?? JournalText.ChapterTitle(page.Chapter)
+                    : chapter != null ? JournalText.ChapterTitle(chapter) : null);
             }
 
             RecomputeNews();

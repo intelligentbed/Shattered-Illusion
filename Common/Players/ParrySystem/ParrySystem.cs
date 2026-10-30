@@ -4,7 +4,6 @@ using System.IO;
 using Microsoft.Xna.Framework;
 using ShatteredIllusion.Common.Visuals;
 using ShatteredIllusion.Content.Buffs.StatBuffs;
-using ShatteredIllusion.Content.NPCs;
 using ShatteredIllusion.Content.Particles;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
@@ -19,6 +18,7 @@ using Terraria.ID;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
 using SystemVector2 = System.Numerics.Vector2;
+using ShatteredIllusion.Content.NPCs.NPCVanillaChanges;
 
 namespace ShatteredIllusion.Common.Players.ParrySystem
 {
