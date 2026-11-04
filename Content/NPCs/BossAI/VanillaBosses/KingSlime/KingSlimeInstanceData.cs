@@ -35,6 +35,44 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         public bool HitStopActive;
         public Vector2 HitStopVelocity;
 
+        public bool ArenaActive;
+        public float ArenaCenterX;
+        public float ArenaFloorY;
+        public Vector2 ArenaMin;
+        public Vector2 ArenaMax;
+        public Vector2 ArenaTargetMin;
+        public Vector2 ArenaTargetMax;
+        public float CrownT;
+        public Vector2 WeaponFrom;
+        public Vector2 WeaponAnchor;
+        public float WeaponMorph;
+        public int WeaponSide;
+        public int NinjaClock;
+
+        // Ninja walk-cycle phase. Advances with ground speed so the legs match the movement.
+        public float WalkClock;
+
+        // Obstacle handling while walking (jump cooldown, and how long he's been wedged against something).
+        public int NinjaJumpCooldown;
+        public int NinjaStuck;
+
+        // Shadow Dive: hover height (Y) for the leap.
+        public Vector2 NinjaLeapPoint;
+
+        // Smoothed floor-impact X for the Echo Dive telegraph (tracks the player, then locks).
+        public float EchoTargetX;
+
+        // Weapon -> weapon transformation: the first weapon melts into the goo blob and the next one
+        // grows straight out of it instead of dropping to the floor in between.
+        public bool WeaponHandoff;
+        public bool WeaponHandoffIn;
+
+        public int NinjaComboDone;
+        public int NinjaComboTotal;
+        public bool NinjaFlicker;
+        public bool NinjaSingleSlash;
+        public int NinjaCounterLife;
+
         public int IntroBeats;
         public int DeathBeats;
         public bool AllowDeath;

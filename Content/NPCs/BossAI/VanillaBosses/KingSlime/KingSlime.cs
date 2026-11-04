@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ShatteredIllusion.Common.Cutscenes;
 using ShatteredIllusion.Common.Players.ParrySystem;
+using ShatteredIllusion.Common.Visuals;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Content.Particles;
 using ParticleLibrary.Core.V3.Particles;
@@ -35,7 +36,21 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             TransformToNinja,
             NinjaWalk,
             NinjaStab,
+            NinjaSlash,
+            NinjaVanish,
+            NinjaCounter,
             NinjaStunned,
+            NinjaLeap,
+            NinjaGeyser,
+
+            TransformToSlime,
+            EchoDive,
+            CrownSummon,
+            WeaponSword,
+            WeaponSpear,
+            WeaponHammer,
+            WeaponBow,
+            WeaponStunned,
 
             Despawn,
 
@@ -63,6 +78,58 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             AttackPhase.HugeJump,
         };
         //Why is it so long? because this should last around 30 secs for the ninja phase to start 
+
+        #region Ninja phase
+
+        private enum NinjaAttack
+        {
+            Stab,
+            ChainDash,
+            Slash,
+            Vanish,
+            Flicker,
+            Counter,
+            Leap,
+            Geyser,
+        }
+
+        private static readonly NinjaAttack[] NinjaAttackSequence =
+        {
+            NinjaAttack.Stab,
+            NinjaAttack.Geyser,
+            NinjaAttack.Slash,
+            NinjaAttack.Leap,
+            NinjaAttack.Counter,
+            NinjaAttack.ChainDash,
+            NinjaAttack.Vanish,
+            NinjaAttack.Geyser,
+            NinjaAttack.Flicker,
+            NinjaAttack.Leap,
+        };
+
+        #endregion
+
+        #region Arena phase
+
+        private static readonly AttackPhase[] ArenaSequence =
+        {
+            AttackPhase.Jump,
+            AttackPhase.WeaponSpear,
+            AttackPhase.EchoDive,
+            AttackPhase.WeaponBow,
+            AttackPhase.BigJump,
+            AttackPhase.WeaponSword,
+            AttackPhase.CrownSummon,
+            AttackPhase.HugeJump,
+            AttackPhase.WeaponHammer,
+            AttackPhase.SplitAttack,
+            AttackPhase.Teleport,
+            AttackPhase.WeaponSpear,
+            AttackPhase.WeaponBow,
+            AttackPhase.WeaponHammer,
+        };
+
+        #endregion
 
         private const float ForceDespawnRange = 3000f;
         private const int ForceDespawnDelay = 60;
@@ -113,6 +180,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private const int TeleportSubmergingStep = 0;
         private const int TeleportResurfacingStep = 1;
+        private const int TeleportHiddenStep = 2; // underground; the landing spot is marked on the floor
+
+        private const float TeleportHiddenDuration = 32f;
+        private const float TeleportHiddenLockTime = 12f;
+        private const float TeleportResurfaceDuration = 30f;
+        private const float TeleportLandPoint = 0.78f; // fraction of the resurface where he comes back down
+        private const float TeleportHopHeight = 90f;
 
         private const int HugeJumpLiftoffStep = 0;
         private const int HugeJumpHoveringStep = 1;
@@ -126,7 +200,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
         private const int TransformRiseStep = 1;
 
         private const float TransformShrinkDuration = 24f;
-        private const float TransformRiseDuration = 30f;
+        // Longer than it used to be (30) so the pop-out and hop are readable. Also drives the slime re-forming on revert.
+        private const float TransformRiseDuration = 44f;
 
 
         //This covers his base size and the size lost to minions, but not the extra size added by SplitAttack 
@@ -358,11 +433,64 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     DoNinjaStab(npc, target);
                     break;
 
+                case AttackPhase.NinjaSlash:
+                    DoNinjaSlash(npc, target);
+                    break;
+
+                case AttackPhase.NinjaVanish:
+                    DoNinjaVanish(npc, target);
+                    break;
+
+                case AttackPhase.NinjaCounter:
+                    DoNinjaCounter(npc, target);
+                    break;
+
+                case AttackPhase.TransformToSlime:
+                    DoRevert(npc, target);
+                    break;
+
+                case AttackPhase.EchoDive:
+                    DoEchoDive(npc, target);
+                    break;
+
+                case AttackPhase.CrownSummon:
+                    DoCrownSummon(npc);
+                    break;
+
+                case AttackPhase.WeaponSword:
+                    DoWeaponSword(npc, target);
+                    break;
+
+                case AttackPhase.WeaponSpear:
+                    DoWeaponSpear(npc, target);
+                    break;
+
+                case AttackPhase.WeaponHammer:
+                    DoWeaponHammer(npc, target);
+                    break;
+
+                case AttackPhase.WeaponBow:
+                    DoWeaponBow(npc, target);
+                    break;
+
+                case AttackPhase.WeaponStunned:
+                    DoWeaponStunned(npc);
+                    break;
+
                 case AttackPhase.NinjaStunned:
                     DoNinjaStunned(npc);
                     break;
+
+                case AttackPhase.NinjaLeap:
+                    DoNinjaLeap(npc, target);
+                    break;
+
+                case AttackPhase.NinjaGeyser:
+                    DoNinjaGeyser(npc, target);
+                    break;
             }
 
+            ArenaTick(npc, data, target);
             CinematicTick(npc, data);
 
             return false;
@@ -411,23 +539,32 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             if (timer >= cooldownTime)
             {
-                bool finishedFullLoop = SequenceIndex(npc) == AttackSequence.Length - 1;
+                bool arena = IsArena(npc);
+                AttackPhase[] sequence = arena ? ArenaSequence : AttackSequence;
+                bool finishedFullLoop = SequenceIndex(npc) == sequence.Length - 1;
 
                 if (finishedFullLoop)
                 {
-                    EnterTransform(npc);
+                    if (arena)
+                        ExitArena(npc);
+                    else
+                        EnterTransform(npc);
+
                     return;
                 }
 
-                int nextSequenceIndex = (SequenceIndex(npc) + 1) % AttackSequence.Length;
+                int nextSequenceIndex = (SequenceIndex(npc) + 1) % sequence.Length;
                 npc.ai[Slot_SequenceIndex] = nextSequenceIndex;
 
-                AttackPhase nextPhase = AttackSequence[nextSequenceIndex];
+                AttackPhase nextPhase = sequence[nextSequenceIndex];
                 SetPhase(npc, nextPhase);
 
                 // Decide this split's orientation
                 if (nextPhase == AttackPhase.SplitAttack && IsAuthority)
                     SetSplitVertical(npc, Main.rand.NextBool(2));
+
+                if (arena)
+                    SetArenaTarget(npc, nextPhase);
 
                 timer = 0f;
                 SetStep(npc, 0);
@@ -478,7 +615,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                             Main.rand.NextFloat(-2f, 2f), -Main.rand.NextFloat(1f, 3f), 150, Color.White, 1.5f);
                     }
 
-                    SoundEngine.PlaySound(SoundID.NPCDeath39 with { Pitch = -0.2f }, npc.Center);
+                    KingSlimeSfx.TransformSquash(npc.Center);
 
                     timer = 0f;
                     SetStep(npc, TransformRiseStep);
@@ -491,6 +628,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
             else if (step == TransformRiseStep)
             {
+                // The burst: lands exactly as the ninja leaves the goo and starts to hop.
+                float burstAt = TransformRiseDuration * 0.3f;
+
+                if (timer >= burstAt && timer - 1f < burstAt)
+                {
+                    KingSlimeSfx.Emerge(npc.Center, true);
+
+                    if (!Main.dedServ)
+                        VisualFX.Play(KingSlimeFx.GroundEmerge, npc.Bottom);
+                }
+
                 if (timer >= TransformRiseDuration)
                 {
                     npc.dontTakeDamage = false;
@@ -498,6 +646,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
                     SetPhase(npc, AttackPhase.NinjaWalk);
                     npc.ai[Slot_Timer] = 0f;
+                    npc.ai[Slot_SequenceIndex] = 0f;
+                    npc.GetGlobalNPC<KingSlimeInstanceData>().NinjaClock = 0;
                     SetStep(npc, 0);
 
                     if (IsAuthority)
@@ -508,6 +658,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
         private void EnterDespawn(NPC npc)
         {
+            SetSlashHitbox(npc, false);
+            npc.GetGlobalNPC<KingSlimeInstanceData>().ArenaActive = false;
+            npc.GetGlobalNPC<KingSlimeInstanceData>().CrownT = 0f;
             SetPhase(npc, AttackPhase.Despawn);
             SetStep(npc, 0);
             npc.ai[Slot_Timer] = 0f;
@@ -607,10 +760,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         }
                     }
 
-                    SoundEngine.PlaySound(
-                        SoundID.NPCHit1 with { Pitch = -0.4f },
-                        npc.Center
-                    );
+                    KingSlimeSfx.JumpLaunch(npc.Center, isBigJump);
 
                     SetStep(npc, JumpAirborneStep);
                     timer = 0f;
@@ -627,14 +777,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 if (timer > 10f && HasLanded(npc))
                 {
 
-                    SoundEngine.PlaySound(
-                        SoundID.Item1 with
-                        {
-                            Pitch = -0.3f,
-                            Volume = 0.8f
-                        },
-                        npc.Center
-                    );
+                    KingSlimeSfx.JumpLand(npc.Center, isBigJump);
 
                     for (int i = 0; i < 10; i++)
                     {
@@ -663,8 +806,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
+        // Where the hop lifts him above the ground while he pops back out (visual only; the hitbox stays on the floor).
+        private static float TeleportHopLift(NPC npc)
+        {
+            if (CurrentPhase(npc) != AttackPhase.Teleport || CurrentStep(npc) != TeleportResurfacingStep)
+                return 0f;
+
+            float h = MathHelper.Clamp(npc.ai[Slot_Timer] / (TeleportResurfaceDuration * TeleportLandPoint), 0f, 1f);
+            return (float)Math.Sin(Math.PI * h) * TeleportHopHeight;
+        }
+
+        // Teleport: he sinks into the floor (squashes flat, splashes), a ring on the floor marks where he will come
+        // up, then he bursts out of it with a hop, stretches on the way up and squashes when he lands.
         private void DoTeleport(NPC npc, Player player)
         {
+            KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
             npc.velocity *= 0.7f;
 
             ref float timer = ref npc.ai[Slot_Timer];
@@ -680,6 +837,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
                 npc.scale = MathHelper.Max(BaseScale * 0.2f, npc.scale - 0.05f);
 
+                // Flatten into the floor.
+                data.SquishOffset = MathHelper.Lerp(data.SquishOffset, -0.32f, 0.3f);
+                data.SquishSpringVel = 0f;
+
+                if (timer <= 1f)
+                    KingSlimeSfx.Submerge(npc.Center, false);
+
                 for (int i = 0; i < 2; i++)
                 {
                     Dust d = Dust.NewDustPerfect(
@@ -692,6 +856,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     );
                     d.noGravity = true;
                 }
+
+                // Gel pooling under him as he goes down.
+                EmergePuddle(npc.Bottom, MathHelper.Clamp(timer / 17f, 0f, 1f), 150f);
 
                 if (npc.alpha >= 255)
                 {
@@ -709,12 +876,94 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                         Vector2 desiredCenter = player.Center + new Vector2(offsetX, offsetY);
 
                         // Make sure he actually land on solid ground 
-                        npc.Center = TryFindGroundedTeleportPosition(desiredCenter, npc.height, out Vector2 groundedCenter)
+                        Vector2 spot = TryFindGroundedTeleportPosition(desiredCenter, npc.height, out Vector2 groundedCenter)
                             ? groundedCenter
                             : desiredCenter;
 
+                        // He stays hidden where he sank; the spot is just marked until he comes up.
+                        SetSlamTargetPos(npc, spot);
                         npc.netUpdate = true;
                     }
+
+                    SetStep(npc, TeleportHiddenStep);
+                    timer = 0f;
+                }
+            }
+            else if (step == TeleportHiddenStep)
+            {
+                npc.noGravity = true;
+                npc.noTileCollide = true;
+                npc.velocity = Vector2.Zero;
+                npc.alpha = 255;
+
+                Vector2 spot = SlamTargetPos(npc);
+                float t = MathHelper.Clamp(timer / TeleportHiddenDuration, 0f, 1f);
+                bool locked = timer >= TeleportHiddenDuration - TeleportHiddenLockTime;
+
+                if (spot != Vector2.Zero)
+                {
+                    Vector2 floor = spot + new Vector2(0f, npc.height * 0.5f);
+
+                    // The moment the spot locks, bubble a warning there so it can be heard as well as seen.
+                    if (locked && timer - 1f < TeleportHiddenDuration - TeleportHiddenLockTime)
+                        KingSlimeSfx.AmbushWarning(floor);
+
+                    if (!Main.dedServ)
+                    {
+                        const float size = 130f;
+                        Color c = locked ? Color.White : new Color(0, 190, 255);
+
+                        BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                            position: (floor - new Vector2(0f, 3f)).ToNumerics(),
+                            velocity: SystemVector2.Zero,
+                            rotation: 0f,
+                            scale: new SystemVector2(size, size * 0.3f),
+                            color: c * (0.3f + 0.4f * t),
+                            duration: 2
+                        ));
+
+                        float inner = MathHelper.Lerp(size * 0.2f, size, t);
+
+                        BossParticleSystem.GroundMarkers.Create(new ParticleInfo(
+                            position: (floor - new Vector2(0f, 3f)).ToNumerics(),
+                            velocity: SystemVector2.Zero,
+                            rotation: 0f,
+                            scale: new SystemVector2(inner, inner * 0.3f),
+                            color: c * (0.4f + 0.5f * t),
+                            duration: 2
+                        ));
+
+                        // Gel bubbling up from the spot.
+                        if (Main.rand.NextBool(locked ? 1 : 3))
+                        {
+                            Dust d = Dust.NewDustPerfect(
+                                floor + new Vector2(Main.rand.NextFloat(-size * 0.4f, size * 0.4f), -2f),
+                                DustID.t_Slime,
+                                new Vector2(0f, -Main.rand.NextFloat(0.8f, 2.5f)),
+                                120,
+                                Color.Cyan,
+                                Main.rand.NextFloat(1.0f, 1.5f));
+                            d.noGravity = true;
+                        }
+                    }
+                }
+
+                if (timer >= TeleportHiddenDuration)
+                {
+                    if (IsAuthority && spot != Vector2.Zero)
+                    {
+                        npc.Center = spot;
+                        npc.netUpdate = true;
+                    }
+
+                    SetSlamTargetPos(npc, Vector2.Zero);
+                    npc.scale = EffectiveBaseScale(npc);
+
+                    // Start flat, so the jump out of the floor reads as a spring.
+                    data.SquishOffset = -0.35f;
+                    data.SquishSpringVel = 0f;
+
+                    KingSlimeSfx.Emerge(npc.Center, false);
 
                     SetStep(npc, TeleportResurfacingStep);
                     timer = 0f;
@@ -722,41 +971,67 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
             else if (step == TeleportResurfacingStep)
             {
-                npc.alpha -= 20;
+                npc.noGravity = true;
+                npc.velocity = Vector2.Zero;
+                npc.alpha = (int)MathHelper.Lerp(255, SlimeAlpha, MathHelper.Clamp(timer / 6f, 0f, 1f));
+                npc.scale = EffectiveBaseScale(npc);
 
-                // Extend back out to normal size (and slightly overshoot TO MAKE HIM LOOK TUFF) as he reappears
-                float targetMaterializeScale = EffectiveBaseScale(npc);
-                npc.scale = MathHelper.Lerp(npc.scale, targetMaterializeScale, 0.15f);
+                float landAt = TeleportResurfaceDuration * TeleportLandPoint;
 
-                if (timer <= 12f)
+                if (timer < landAt)
+                {
+                    // Coil, then stretch tall as he leaves the floor.
+                    float u = MathHelper.Clamp(timer / 6f, 0f, 1f);
+                    data.SquishOffset = MathHelper.Lerp(-0.35f, 0.33f, u * u);
+                    data.SquishSpringVel = 0f;
+                }
+
+                if (timer <= 8f)
                 {
                     for (int i = 0; i < 3; i++)
                     {
                         Dust d = Dust.NewDustPerfect(
-                            npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.5f, 25f),
-                            DustID.BlueCrystalShard,
-                            new Vector2(Main.rand.NextFloat(-3f, 3f), Main.rand.NextFloat(-5f, -1f)),
+                            npc.Bottom + Main.rand.NextVector2Circular(npc.width * 0.5f, 10f),
+                            DustID.t_Slime,
+                            new Vector2(Main.rand.NextFloat(-3f, 3f), Main.rand.NextFloat(-6f, -2f)),
                             100,
-                            Color.DeepSkyBlue,
+                            Color.Cyan,
                             Main.rand.NextFloat(1.4f, 2.0f)
                         );
-                        d.noGravity = true;
+                        d.noGravity = false;
                     }
                 }
 
-                if (npc.alpha <= SlimeAlpha)
+                EmergePuddle(npc.Bottom, MathHelper.Clamp(timer / TeleportResurfaceDuration, 0f, 1f), 170f);
+
+                // Back down: land with a squash and let the jelly spring settle.
+                if (timer >= landAt && timer - 1f < landAt)
+                {
+                    data.SquishOffset = -0.35f;
+                    data.SquishSpringVel = 0f;
+                    KingSlimeSfx.TeleportLand(npc.Center);
+
+                    if (!Main.dedServ)
+                    {
+                        VisualFX.Ring(npc.Bottom - new Vector2(0f, 3f), 190f, new Color(120, 235, 255, 255), 16, 0.3f);
+
+                        for (int i = 0; i < 10; i++)
+                        {
+                            Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime,
+                                Main.rand.NextFloat(-5f, 5f), -Main.rand.NextFloat(1f, 4f), 100, Color.Cyan, 1.5f);
+                        }
+                    }
+                }
+
+                if (timer >= TeleportResurfaceDuration)
                 {
                     npc.alpha = SlimeAlpha;
                     npc.scale = EffectiveBaseScale(npc);
                     npc.noTileCollide = false;
+                    npc.noGravity = false;
 
                     if (IsAuthority)
                         npc.netUpdate = true;
-
-                    SoundEngine.PlaySound(
-                        SoundID.Item8 with { Pitch = -0.2f },
-                        npc.Center
-                    );
 
                     if (!Main.dedServ)
                     {
@@ -785,35 +1060,81 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             npc.alpha = SlimeAlpha;
             npc.scale = EffectiveBaseScale(npc);
 
+            KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
+
             ref float timer = ref npc.ai[Slot_Timer];
             int step = CurrentStep(npc);
 
             if (step == HugeJumpLiftoffStep)
             {
-                npc.noGravity = true;
-                npc.noTileCollide = true;
+                // Anticipation: he crouches (squashes flat, gel gathering at his base) before the launch,
+                // instead of just shooting upward. Then the launch stretches him tall.
+                const float crouchDuration = 22f;
 
-                if (IsAuthority)
+                npc.noGravity = false;
+                npc.noTileCollide = false;
+                npc.velocity.X *= 0.6f;
+
+                float c = MathHelper.Clamp(timer / crouchDuration, 0f, 1f);
+                data.SquishOffset = MathHelper.Lerp(data.SquishOffset, -0.1f - 0.25f * c, 0.35f);
+                data.SquishSpringVel = 0f;
+
+                if (timer <= 1f)
+                    KingSlimeSfx.HugeWindup(npc.Center);
+
+                if (!Main.dedServ && Main.rand.NextBool(2))
                 {
-                    float xDir =
-                        Math.Sign(player.Center.X - npc.Center.X);
-
-                    if (xDir == 0)
-                        xDir = 1;
-
-                    npc.velocity =
-                        new Vector2(xDir * 4f, -16f);
-
-                    npc.netUpdate = true;
+                    Dust d = Dust.NewDustPerfect(
+                        npc.Bottom + new Vector2(Main.rand.NextFloat(-npc.width * 0.5f, npc.width * 0.5f), -2f),
+                        DustID.t_Slime,
+                        new Vector2(Main.rand.NextFloat(-1f, 1f) * (1f + c), -Main.rand.NextFloat(0.5f, 2f)),
+                        120,
+                        Color.Cyan,
+                        Main.rand.NextFloat(1.1f, 1.6f));
+                    d.noGravity = true;
                 }
 
-                SoundEngine.PlaySound(
-                    SoundID.NPCHit19 with { Pitch = -0.5f },
-                    npc.Center
-                );
+                if (timer >= crouchDuration)
+                {
+                    npc.noGravity = true;
+                    npc.noTileCollide = true;
 
-                SetStep(npc, HugeJumpHoveringStep);
-                timer = 0f;
+                    if (IsAuthority)
+                    {
+                        float xDir =
+                            Math.Sign(player.Center.X - npc.Center.X);
+
+                        if (xDir == 0)
+                            xDir = 1;
+
+                        npc.velocity =
+                            new Vector2(xDir * 4f, -16f);
+
+                        npc.netUpdate = true;
+                    }
+
+                    // Spring tall and blast gel out of the floor he just left.
+                    data.SquishOffset = 0.35f;
+                    data.SquishSpringVel = 0f;
+
+                    KingSlimeSfx.HugeLiftoff(npc.Center);
+
+                    if (!Main.dedServ)
+                    {
+                        VisualFX.Play(KingSlimeFx.HugeLaunch, npc.Bottom);
+
+                        for (int i = 0; i < 18; i++)
+                        {
+                            Dust.NewDust(npc.position, npc.width, npc.height, DustID.t_Slime,
+                                Main.rand.NextFloat(-6f, 6f), Main.rand.NextFloat(-1f, 3f), 100, Color.Cyan, 1.6f);
+                        }
+                    }
+
+                    ScreenShake(npc, 5f, 10, 10f);
+
+                    SetStep(npc, HugeJumpHoveringStep);
+                    timer = 0f;
+                }
             }
             else if (step == HugeJumpHoveringStep)
             {
@@ -834,6 +1155,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     (targetY - npc.Center.Y) * 0.1f,
                     0.2f
                 );
+
+                // Last stretch of the hover: gel streaks pull into him and he compresses like a spring.
+                if ((int)timer == (int)(hoverDuration - 24f) && !Main.dedServ)
+                    VisualFX.PlayOn(KingSlimeFx.HugeCharge, npc);
+
+                if (timer >= hoverDuration - 24f)
+                {
+                    float charge = MathHelper.Clamp((timer - (hoverDuration - 24f)) / 24f, 0f, 1f);
+                    data.SquishOffset = MathHelper.Lerp(data.SquishOffset, -0.05f - 0.2f * charge, 0.25f);
+                    data.SquishSpringVel = 0f;
+                }
 
                 // Lock in the landing position used by the visual telegraph.
                 SetSlamTargetPos(npc, new Vector2(
@@ -858,17 +1190,17 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
                 if (timer > 5f && HasLanded(npc))
                 {
-                    // yo this sound sounds so yunky i love it
-                    SoundEngine.PlaySound(
-                        SoundID.NPCDeath1 with
-                        {
-                            Pitch = -0.7f,
-                            Volume = 1.2f
-                        },
-                        npc.Center
-                    );
+                    // (the original NPCDeath1 "yunky" sound is kept as the core of this - it's layered with a low thud and a splash now)
+                    KingSlimeSfx.HugeSlam(npc.Center);
 
                     ScreenShake(npc, 10f, 20, 16f);
+
+                    // Hard squash on impact; the jelly spring then wobbles him back to shape.
+                    data.SquishOffset = -0.35f;
+                    data.SquishSpringVel = 0.04f;
+
+                    if (!Main.dedServ)
+                        VisualFX.Play(KingSlimeFx.HugeImpact, npc.Bottom);
 
                     for (int i = 0; i < 30; i++)
                     {
@@ -916,6 +1248,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     EnterCooldown(npc);
                     return;
                 }
+
+                // Stretched long while he drops so the dive reads as speed.
+                data.SquishOffset = MathHelper.Lerp(data.SquishOffset, 0.35f, 0.4f);
+                data.SquishSpringVel = 0f;
 
                 npc.velocity.X = 0f;
                 npc.velocity.Y = 26f;
@@ -998,28 +1334,31 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                     }
 
                     // Split-axis telegraph 
-                    bool splitVerticalTelegraph = SplitVertical(npc);
-                    Vector2 axis = splitVerticalTelegraph ? Vector2.UnitY : Vector2.UnitX;
-                    float maxReach = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
-                    float reach = MathHelper.Lerp(40f, maxReach, windupT);
-                    const float segmentSpacing = 26f;
-
-                    // Evenly spaced dashes that extend outward as the windup builds. Respawned every tick
-                    // (duration 2) so the line is steady instead of flickering at random spots.
-                    foreach (float sign in SplitTelegraphSigns)
+                    for (int pass = 0; pass < (IsArena(npc) ? 2 : 1); pass++)
                     {
-                        for (float d = segmentSpacing; d <= reach; d += segmentSpacing)
-                        {
-                            float fade = MathHelper.Clamp(1.2f - d / maxReach, 0.35f, 1f);
+                        bool splitVerticalTelegraph = SplitVertical(npc) ^ (pass == 1);
+                        Vector2 axis = splitVerticalTelegraph ? Vector2.UnitY : Vector2.UnitX;
+                        float maxReach = Main.masterMode ? 280f : (Main.expertMode ? 240f : 200f);
+                        float reach = MathHelper.Lerp(40f, maxReach, windupT);
+                        const float segmentSpacing = 26f;
 
-                            BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
-                                position: (npc.Center + axis * (sign * d)).ToNumerics(),
-                                velocity: SystemVector2.Zero,
-                                rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
-                                scale: new SystemVector2(24f, 8f),
-                                color: new Color(0, 180, 255, 255) * (fade * (0.4f + 0.5f * windupT)),
-                                duration: 2
-                            ));
+                        // Evenly spaced dashes that extend outward as the windup builds. Respawned every tick
+                        // (duration 2) so the line is steady instead of flickering at random spots.
+                        foreach (float sign in SplitTelegraphSigns)
+                        {
+                            for (float d = segmentSpacing; d <= reach; d += segmentSpacing)
+                            {
+                                float fade = MathHelper.Clamp(1.2f - d / maxReach, 0.35f, 1f);
+
+                                BossParticleSystem.TelegraphSegments.Create(new ParticleInfo(
+                                    position: (npc.Center + axis * (sign * d)).ToNumerics(),
+                                    velocity: SystemVector2.Zero,
+                                    rotation: splitVerticalTelegraph ? MathHelper.PiOver2 : 0f,
+                                    scale: new SystemVector2(24f, 8f),
+                                    color: new Color(0, 180, 255, 255) * (fade * (0.4f + 0.5f * windupT)),
+                                    duration: 2
+                                ));
+                            }
                         }
                     }
 
@@ -1069,6 +1408,23 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                             ai2: splitVertical ? 1f : 0f,
                             ai3: 1f
                         );
+
+                        if (IsArena(npc))
+                        {
+                            foreach (float extraSide in SplitTelegraphSigns)
+                            {
+                                NPC.NewNPC(
+                                    npc.GetSource_FromAI(),
+                                    (int)splitAnchor.X,
+                                    (int)splitAnchor.Y,
+                                    ModContent.NPCType<KingSlimeClone>(),
+                                    ai0: npc.whoAmI,
+                                    ai1: 0f,
+                                    ai2: splitVertical ? 0f : 1f,
+                                    ai3: extraSide
+                                );
+                            }
+                        }
 
                         SoundEngine.PlaySound(SoundID.Item8 with { Pitch = -0.6f, Volume = 1.3f }, npc.Center);
                     }
@@ -1120,7 +1476,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                             ));
                         }
 
-                        SpawnMassMinions(npc);
+                        SpawnMassMinions(npc, IsArena(npc) ? 2 : 0);
 
                         npc.netUpdate = true;
                     }
@@ -1198,16 +1554,16 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
         }
 
-        private void SpawnMassMinions(NPC npc)
+        private void SpawnMassMinions(NPC npc, int bonus = 0, Vector2? origin = null)
         {
             npc.GetGlobalNPC<KingSlimeInstanceData>().ActiveMinionCountTick = uint.MaxValue;
 
-            int minionCount = Main.masterMode ? 3 : (Main.expertMode ? 2 : 1);
+            int minionCount = (Main.masterMode ? 3 : (Main.expertMode ? 2 : 1)) + bonus;
 
             for (int i = 0; i < minionCount; i++)
             {
                 Vector2 spawnOffset = Main.rand.NextVector2CircularEdge(1f, 1f) * (npc.width * 0.4f);
-                Vector2 spawnPosition = npc.Center + spawnOffset;
+                Vector2 spawnPosition = (origin ?? npc.Center) + spawnOffset;
 
                 int index = NPC.NewNPC(
                     npc.GetSource_FromAI(),
@@ -1277,15 +1633,25 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             KingSlimeInstanceData data = npc.GetGlobalNPC<KingSlimeInstanceData>();
 
+            if (data.CrownT > 0f && CurrentPhase(npc) != AttackPhase.Death)
+                DrawArenaBorder(spriteBatch, screenPos, data);
+
             AttackPhase currentPhase = CurrentPhase(npc);
             int currentStep = CurrentStep(npc);
             float timer = npc.ai[Slot_Timer];
 
             bool isNinjaForm = currentPhase == AttackPhase.NinjaWalk
                 || currentPhase == AttackPhase.NinjaStab
+                || currentPhase == AttackPhase.NinjaSlash
+                || currentPhase == AttackPhase.NinjaVanish
+                || currentPhase == AttackPhase.NinjaCounter
+                || currentPhase == AttackPhase.NinjaLeap
+                || currentPhase == AttackPhase.NinjaGeyser
                 || currentPhase == AttackPhase.NinjaStunned;
             bool isRising = currentPhase == AttackPhase.TransformToNinja && currentStep == TransformRiseStep;
             bool isShrinking = currentPhase == AttackPhase.TransformToNinja && currentStep == TransformShrinkStep;
+            bool isSinking = currentPhase == AttackPhase.TransformToSlime && currentStep == RevertSinkStep;
+            bool isGrowing = currentPhase == AttackPhase.TransformToSlime && currentStep == RevertRiseStep;
 
             if (currentPhase == AttackPhase.Death && DeathIsNinja(npc))
             {
@@ -1298,7 +1664,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             if (intro.Active && !intro.BodyVisible)
                 return false;
 
-            if (isNinjaForm || isRising)
+            if (isNinjaForm || isRising || isSinking)
             {
                 DrawNinja(npc, spriteBatch, screenPos, drawColor);
                 return false;
@@ -1309,19 +1675,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
 
             float shrinkSquish = isShrinking
                 ? MathHelper.Clamp(timer / TransformShrinkDuration, 0f, 1f)
-                : 0f;
+                : isGrowing ? 1f - MathHelper.Clamp(timer / TransformRiseDuration, 0f, 1f) : 0f;
 
             float squishY = 1f + totalSquish - shrinkSquish;
             float squishX = 1f - totalSquish * 0.6f + shrinkSquish * 0.9f;
 
             Vector2 jellyScale = new Vector2(npc.scale * squishX, npc.scale * squishY);
 
+            // Teleport: the hop out of the floor is drawn as a lift (the hitbox stays on the ground).
+            float teleportLift = TeleportHopLift(npc);
+
             // A little sway that grows with how hard he's currently jiggling (i laugh writing this)
             float wobbleRotation = (float)Math.Sin(data.WobbleClock * 0.08f) * 0.025f * (1f + Math.Abs(data.SquishOffset) * 3f);
 
             var bodyDraw = new DrawData(
                 kingSlimeTexture,
-                npc.Bottom - screenPos + new Vector2(0f, 2f + intro.BodyOffsetY),
+                npc.Bottom - screenPos + new Vector2(0f, 2f + intro.BodyOffsetY - teleportLift),
                 frame,
                 npc.GetAlpha(drawColor),
                 npc.rotation + wobbleRotation,
@@ -1331,7 +1700,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 0f
             );
 
-            bodyDraw.Draw(spriteBatch);
+            if (IsWeaponFormPhase(currentPhase))
+                DrawWeaponForm(npc, spriteBatch, kingSlimeTexture, frame, screenPos, drawColor, data);
+            else
+                bodyDraw.Draw(spriteBatch);
 
             Texture2D crownTexture = (crownAsset ??= ModContent.Request<Texture2D>(
                 "ShatteredIllusion/Assets/ExtraTextures/Resprites/Extra_39"
@@ -1351,7 +1723,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 _ => 0f,
             };
 
-            center.Y += npc.gfxOffY + yOffset * npc.scale * squishY;
+            center.Y += npc.gfxOffY + yOffset * npc.scale * squishY - teleportLift;
 
             if (currentPhase == AttackPhase.SplitAttack && currentStep == SplitAttackSettlingStep)
             {
@@ -1360,6 +1732,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
             }
 
             float crownRotation = 0f;
+
+            if (currentPhase != AttackPhase.Death && data.CrownT > 0f)
+            {
+                float ease = data.CrownT * data.CrownT * (3f - 2f * data.CrownT);
+                Vector2 roofSeat = new Vector2((data.ArenaMin.X + data.ArenaMax.X) * 0.5f, data.ArenaMin.Y - 8f - crownTexture.Height * npc.scale * 0.5f);
+                center = Vector2.Lerp(center, roofSeat, ease);
+                crownRotation = MathHelper.TwoPi * ease;
+            }
 
             if (currentPhase == AttackPhase.Death)
             {
@@ -1376,9 +1756,154 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime
                 crownRotation = intro.CrownRotation;
             }
 
-            spriteBatch.Draw(crownTexture, center - screenPos, null, Color.White, crownRotation, crownTexture.Size() / 2f, npc.scale, spriteEffects, 0f);
+            // The crown follows the body's fade while he teleports (otherwise it floats around with nothing under it).
+            Color crownColor = currentPhase == AttackPhase.Teleport ? Color.White * npc.Opacity : Color.White;
+
+            spriteBatch.Draw(crownTexture, center - screenPos, null, crownColor, crownRotation, crownTexture.Size() / 2f, npc.scale, spriteEffects, 0f);
 
             return false;
+        }
+    }
+
+    // Every King Slime sound lives here so the whole fight can be mixed from one file.
+    //
+    // Why this exists: the old calls were single vanilla sounds at one fixed pitch, so every move sounded the same,
+    // repeated hits stacked into mush, and a heavy slam sounded about as big as a tiny hop. Now:
+    //   * each moment is 2-3 layers (a wet "body", a low "weight", and a "snap" on top for the important ones)
+    //   * every layer has PitchVariance so repeats don't machine-gun
+    //   * MaxInstances caps stacking (the Roar and Item1 swings were the worst offenders)
+    //   * the telegraph for the ambush re-emerge is audible, so you can hear WHERE he is coming up
+    //
+    // Tuning: Volume is the main knob. Heavier = lower pitch + more "weight" layer.
+    public static class KingSlimeSfx
+    {
+        // ---- layer helpers ----
+        private static SoundStyle Wet(float pitch, float volume) =>
+            SoundID.Splash with { Pitch = pitch, Volume = volume, PitchVariance = 0.12f, MaxInstances = 3, SoundLimitBehavior = SoundLimitBehavior.IgnoreNew };
+
+        private static SoundStyle WetLight(float pitch, float volume) =>
+            SoundID.SplashWeak with { Pitch = pitch, Volume = volume, PitchVariance = 0.15f, MaxInstances = 3, SoundLimitBehavior = SoundLimitBehavior.IgnoreNew };
+
+        private static SoundStyle Squelch(float pitch, float volume) =>
+            SoundID.NPCHit1 with { Pitch = pitch, Volume = volume, PitchVariance = 0.1f, MaxInstances = 3, SoundLimitBehavior = SoundLimitBehavior.IgnoreNew };
+
+        private static SoundStyle Weight(float pitch, float volume) =>
+            SoundID.Item14 with { Pitch = pitch, Volume = volume, PitchVariance = 0.05f, MaxInstances = 2, SoundLimitBehavior = SoundLimitBehavior.ReplaceOldest };
+
+        private static SoundStyle Whoosh(float pitch, float volume) =>
+            SoundID.Item1 with { Pitch = pitch, Volume = volume, PitchVariance = 0.1f, MaxInstances = 3, SoundLimitBehavior = SoundLimitBehavior.IgnoreNew };
+
+        private static SoundStyle Shimmer(float pitch, float volume) =>
+            SoundID.Item8 with { Pitch = pitch, Volume = volume, PitchVariance = 0.05f, MaxInstances = 2, SoundLimitBehavior = SoundLimitBehavior.ReplaceOldest };
+
+        private static void Play(SoundStyle style, Vector2 pos) => SoundEngine.PlaySound(style, pos);
+
+        // ---- slime form ----
+
+        // Crouch before a hop / launch off the floor.
+        public static void JumpLaunch(Vector2 pos, bool big)
+        {
+            Play(Squelch(big ? -0.5f : -0.3f, 0.8f), pos);
+            Play(WetLight(big ? -0.1f : 0.2f, 0.7f), pos);
+        }
+
+        // Landing from a normal / big jump.
+        public static void JumpLand(Vector2 pos, bool big)
+        {
+            Play(Wet(big ? -0.35f : -0.1f, big ? 0.95f : 0.75f), pos);
+            Play(Weight(big ? -0.85f : -0.95f, big ? 0.45f : 0.25f), pos);
+        }
+
+        // Huge jump crouch: he squashes down and winds up before launching.
+        public static void HugeWindup(Vector2 pos)
+        {
+            Play(Squelch(-0.7f, 0.9f), pos);
+            Play(WetLight(-0.4f, 0.7f), pos);
+        }
+
+        // Huge jump takeoff.
+        public static void HugeLiftoff(Vector2 pos)
+        {
+            Play(Squelch(-0.6f, 1f), pos);
+            Play(Wet(-0.2f, 0.8f), pos);
+            Play(Whoosh(-0.5f, 0.6f), pos);
+        }
+
+        // Huge jump impact: the big one.
+        public static void HugeSlam(Vector2 pos)
+        {
+            Play(SoundID.NPCDeath1 with { Pitch = -0.7f, Volume = 1.1f, MaxInstances = 2, SoundLimitBehavior = SoundLimitBehavior.ReplaceOldest }, pos);
+            Play(Weight(-0.7f, 0.9f), pos);
+            Play(Wet(-0.5f, 1f), pos);
+        }
+
+        // ---- ninja: transform / revert ----
+
+        // Slime has shrunk down to ninja size and is about to burst out.
+        public static void TransformSquash(Vector2 pos)
+        {
+            Play(Wet(-0.3f, 0.9f), pos);
+            Play(SoundID.NPCDeath39 with { Pitch = -0.2f, Volume = 0.8f, MaxInstances = 2 }, pos);
+        }
+
+        // Ninja bursts out of the goo (transform rise and the vanish re-appear). `big` = the transform, which is the showpiece.
+        public static void Emerge(Vector2 pos, bool big)
+        {
+            // wet burst + sharp upward "pop" + a bright snap so the reveal reads even off-screen
+            Play(Wet(big ? 0.0f : 0.15f, big ? 1f : 0.85f), pos);
+            Play(Squelch(big ? 0.1f : 0.3f, 0.6f), pos);
+            Play(Whoosh(big ? 0.3f : 0.55f, 0.55f), pos);
+            Play(Shimmer(big ? 0.5f : 0.7f, big ? 0.7f : 0.45f), pos);
+        }
+
+        // Teleport: he lands back on the ground after popping out of the floor.
+        public static void TeleportLand(Vector2 pos)
+        {
+            Play(Wet(0.0f, 0.8f), pos);
+            Play(Weight(-0.9f, 0.35f), pos);
+            Play(Shimmer(0.2f, 0.5f), pos);
+        }
+
+        // Ninja melts into the goo.
+        public static void Submerge(Vector2 pos, bool quick)
+        {
+            Play(Wet(-0.25f, quick ? 0.6f : 0.8f), pos);
+            Play(Shimmer(0.3f, quick ? 0.35f : 0.5f), pos);
+        }
+
+        // Ambush spot has locked: a bubbling warning at the spot he's about to come up. Audible, not just visual.
+        public static void AmbushWarning(Vector2 spot)
+        {
+            Play(WetLight(0.45f, 0.8f), spot);
+            Play(Shimmer(0.9f, 0.3f), spot);
+        }
+
+        // Slime form re-forms from the ninja (revert).
+        public static void RevertGrow(Vector2 pos)
+        {
+            Play(Wet(-0.4f, 1f), pos);
+            Play(SoundID.NPCDeath39 with { Pitch = -0.4f, Volume = 0.8f, MaxInstances = 2 }, pos);
+        }
+
+        // ---- ninja: attacks ----
+
+        // Blade swing / dash. pitch up = faster, lighter move.
+        public static void Swing(Vector2 pos, float pitch, float volume) =>
+            Play(Whoosh(pitch, volume), pos);
+
+        // Shadow dive impact.
+        public static void DiveImpact(Vector2 pos)
+        {
+            Play(Wet(-0.4f, 0.95f), pos);
+            Play(Weight(-0.75f, 0.7f), pos);
+            Play(SoundID.NPCDeath39 with { Pitch = -0.3f, Volume = 0.7f, MaxInstances = 2 }, pos);
+        }
+
+        // Gel geysers erupt where you were standing.
+        public static void GeyserCall(Vector2 pos)
+        {
+            Play(Shimmer(-0.2f, 0.8f), pos);
+            Play(WetLight(-0.2f, 0.7f), pos);
         }
     }
 }

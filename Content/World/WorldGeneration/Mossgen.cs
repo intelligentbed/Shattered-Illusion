@@ -11,8 +11,9 @@ namespace ShatteredIllusion.World.WorldGeneration
 {
     public class MossWorldGen : ModSystem
     {
-        // 1 in N dirt tiles inside the cavern layer starts a moss vein. Lower = more moss.
-        private const int CavernVeinChance = 200;
+        // How many moss veins get seeded under each tree. Raise these for more moss.
+        private const int MinTreeVeins = 14;
+        private const int MaxTreeVeins = 26;
 
         // Chance (1 in N) for each tile inside a vein's ellipse to be skipped, for a ragged edge.
         private const int SkipChance = 4;
@@ -64,54 +65,9 @@ namespace ShatteredIllusion.World.WorldGeneration
 
             ushort mossType = (ushort)ModContent.TileType<MossBlock>();
 
-            int cavernTiles = GenerateCavernMoss(progress, mossType);
             int treeTiles = GenerateTreeMoss(progress, mossType);
 
-            Mod.Logger.Info(
-                $"[MossGen] Placed {cavernTiles} moss tiles in the caverns " +
-                $"and {treeTiles} under living trees.");
-        }
-
-        /// <summary>
-        /// Seeds moss veins on dirt in the cavern layer.
-        /// </summary>
-        private int GenerateCavernMoss(GenerationProgress progress, ushort mossType)
-        {
-            int placed = 0;
-
-            int minX = 20;
-            int maxX = Main.maxTilesX - 20;
-            int minY = (int)Main.rockLayer;
-
-            // The underworld starts roughly 200 tiles above the bottom of the world.
-            int maxY = Main.maxTilesY - 200;
-
-            for (int x = minX; x < maxX; x++)
-            {
-                progress.Set((x - minX) / (float)(maxX - minX) * 0.5f);
-
-                for (int y = minY; y < maxY; y++)
-                {
-                    Tile tile = Main.tile[x, y];
-
-                    if (!tile.HasTile || tile.TileType != TileID.Dirt)
-                        continue;
-
-                    if (!WorldGen.genRand.NextBool(CavernVeinChance))
-                        continue;
-
-                    placed += PlaceMossVein(
-                        x,
-                        y,
-                        WorldGen.genRand.Next(2, 5),
-                        WorldGen.genRand.Next(2, 5),
-                        minY,
-                        maxY,
-                        mossType);
-                }
-            }
-
-            return placed;
+            Mod.Logger.Info($"[MossGen] Placed {treeTiles} moss tiles under living trees.");
         }
 
         /// <summary>
@@ -125,7 +81,7 @@ namespace ShatteredIllusion.World.WorldGeneration
 
             for (int i = 20; i < Main.maxTilesX - 20; i++)
             {
-                progress.Set(0.5f + i / (float)Main.maxTilesX * 0.5f);
+                progress.Set(i / (float)Main.maxTilesX);
 
                 // Only one pass per tree, not one per trunk column.
                 if (i - lastTreeX < TreeColumnSpacing)
@@ -178,18 +134,18 @@ namespace ShatteredIllusion.World.WorldGeneration
 
                 lastTreeX = i;
 
-                int treeVeinCount = WorldGen.genRand.Next(3, 7);
+                int treeVeinCount = WorldGen.genRand.Next(MinTreeVeins, MaxTreeVeins + 1);
 
                 for (int vein = 0; vein < treeVeinCount; vein++)
                 {
-                    int centerX = i + WorldGen.genRand.Next(-8, 9);
-                    int centerY = groundY + WorldGen.genRand.Next(0, 12);
+                    int centerX = i + WorldGen.genRand.Next(-14, 15);
+                    int centerY = groundY + WorldGen.genRand.Next(0, 20);
 
                     placed += PlaceMossVein(
                         centerX,
                         centerY,
-                        WorldGen.genRand.Next(2, 5),
-                        WorldGen.genRand.Next(2, 5),
+                        WorldGen.genRand.Next(3, 7),
+                        WorldGen.genRand.Next(3, 7),
                         0,
                         Main.maxTilesY - 20,
                         mossType);

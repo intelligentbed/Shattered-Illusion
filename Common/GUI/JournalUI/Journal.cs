@@ -1,6 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using ReLogic.Content;
+using ReLogic.Graphics;
+using ShatteredIllusion.Common.Visuals;
 using System;
 using System.Collections.Generic;
 using Terraria;
@@ -12,6 +15,7 @@ using Terraria.UI;
 
 namespace ShatteredIllusion.Common.GUI.JournalUI
 {
+    /// <summary>The inventory-side journal button. Position is set by JournalUIState (unchanged).</summary>
     internal class Journal : UIElement
     {
         private const string ClosedTexturePath = "ShatteredIllusion/Assets/UI/Journal_Closed";
@@ -22,6 +26,10 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
         private bool _isOpenVisual;
         private bool _isHovered;
+        private float _hover;
+        private float _openGlow;
+        private float _newsPulse;
+        private bool _hasNews;
 
         public event Action Clicked;
 
@@ -63,401 +71,68 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
 
         protected override void DrawSelf(SpriteBatch spriteBatch)
         {
+            JournalGfx.EnsureBuilt();
+
+            _hover = MathHelper.Lerp(_hover, _isHovered ? 1f : 0f, 0.2f);
+            _openGlow = MathHelper.Lerp(_openGlow, _isOpenVisual ? 1f : 0f, 0.15f);
+
             Texture2D texture = (_isOpenVisual ? _openTexture : _closedTexture).Value;
             CalculatedStyle dimensions = GetDimensions();
+            float time = Main.GlobalTimeWrappedHourly;
 
-            Color drawColor = _isHovered ? Color.White : Color.White * 0.85f;
+            // Keep the top-left anchored exactly where it always was; scale/rotate around the sprite's center.
+            Vector2 origin = texture.Size() / 2f;
+            Vector2 position = dimensions.Position() + origin;
+            position.Y += (float)Math.Sin(time * 2f) * 1.5f * (1f - _hover); // gentle idle bob
 
-            spriteBatch.Draw(
-                texture,
-                dimensions.Position(),
-                null,
-                drawColor,
-                0f,
-                Vector2.Zero,
-                1f,
-                SpriteEffects.None,
-                0f
-            );
+            // Warm halo that breathes on hover and stays lit while the book is open.
+            float glow = Math.Max(_hover * 0.55f, _openGlow * 0.4f);
+            if (glow > 0.01f)
+            {
+                float breathe = 0.8f + 0.2f * (float)Math.Sin(time * 3f);
+                int size = (int)(texture.Width * 2.4f);
+                spriteBatch.Draw(
+                    JournalGfx.Soft,
+                    new Rectangle((int)position.X - size / 2, (int)position.Y - size / 2, size, size),
+                    new Color(255, 176, 96) * (glow * breathe));
+            }
+
+            // Gold beacon while something has unlocked that the player hasn't watched open yet.
+            _hasNews = !_isOpenVisual && Main.LocalPlayer.GetModPlayer<JournalPlayer>().HasNews;
+            _newsPulse = MathHelper.Lerp(_newsPulse, _hasNews ? 1f : 0f, 0.1f);
+            if (_newsPulse > 0.01f)
+            {
+                float beat = 0.5f + 0.5f * (float)Math.Sin(time * 4f);
+                int halo = (int)(texture.Width * (2.0f + 0.5f * beat));
+                spriteBatch.Draw(JournalGfx.Soft,
+                    new Rectangle((int)position.X - halo / 2, (int)position.Y - halo / 2, halo, halo),
+                    new Color(255, 205, 110) * (_newsPulse * (0.35f + 0.3f * beat)));
+
+                float ringSize = texture.Width * (1.1f + 0.9f * ((time * 0.8f) % 1f));
+                spriteBatch.Draw(JournalGfx.Ring, position, null,
+                    new Color(255, 215, 130) * (_newsPulse * (1f - (time * 0.8f) % 1f) * 0.8f),
+                    0f, JournalGfx.Ring.Size() / 2f, ringSize / JournalGfx.Ring.Width, SpriteEffects.None, 0f);
+            }
+
+            float scale = 1f + 0.1f * _hover;
+            float rotation = (float)Math.Sin(time * 9f) * 0.04f * _hover;
+            Color drawColor = Color.White * (0.85f + 0.15f * _hover);
+
+            spriteBatch.Draw(texture, position, null, drawColor, rotation, origin, scale, SpriteEffects.None, 0f);
+
+            if (_newsPulse > 0.01f)
+            {
+                // Small bright pip on the corner.
+                Vector2 pip = position + new Vector2(texture.Width * 0.34f, -texture.Height * 0.34f);
+                int pipSize = (int)(14f * (0.9f + 0.2f * (float)Math.Sin(time * 6f)));
+                spriteBatch.Draw(JournalGfx.Soft, new Rectangle((int)pip.X - pipSize, (int)pip.Y - pipSize, pipSize * 2, pipSize * 2), new Color(255, 232, 160) * _newsPulse);
+                spriteBatch.Draw(JournalGfx.Soft, new Rectangle((int)pip.X - 4, (int)pip.Y - 4, 8, 8), Color.White * _newsPulse);
+            }
 
             if (_isHovered)
             {
-                Main.hoverItemName = "Journal";
-            }
-        }
-    }
-
-    internal class JournalPanel : UIElement
-    {
-        private const string TexturePath = "ShatteredIllusion/Assets/UI/Journal_UI";
-
-        // TODO: ACTUALLY MAKE THE SYMBOL IMAGE 
-        private const string SymbolTexturePath = "ShatteredIllusion/Assets/UI/Journal_Symbol";
-
-        private static readonly SoundStyle PageTurnSound = new SoundStyle("ShatteredIllusion/Sounds/Journal/JournalPageTurn");
-
-        private const float Scale = 1.75f;
-        private const float TextureWidth = 466f;
-        private const float TextureHeight = 344f;
-        private const float PageTextScale = 0.8f;
-        private const float PageLineHeight = 22f;
-        private const int MaxCharactersPerLine = 40;
-        private static readonly Color PageTextColor = new Color(176, 92, 62);
-
-        private const int CoverPageIndex = -1; //-1 indicates the cover spread 
-
-        // TODO: replace with a real title/emblem caption.
-        private const string BookTitle = "          BOOK NAME HERE";
-        private const string SymbolLabel = "          SYMBOL HERE";
-
-        private static readonly string[] Pages =
-        {
-            "HELLO\n\nCURRENTLY THERE IS A 40 CHARACTER LIMIT PERLINE SO IM TRYING TO TEST THAT.",
-            "How to read\n\nClick the right page to turn forward. Click the left page to turn back. but this is currently that that well implemented.",
-            "Entry I\n\nI like Fargo's Sata mode.",
-            "Entry II\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
-            "Entry III\n\n;iouahfbli;uhsdfgliuhsdfgliuhdfg",
-            "Entry IV\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
-            "Entry V\n\npioajgf[iopsjdfg[oisjdfgpoiuj",
-            "Entry VI\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
-            "Entry VII\n\nsgoijsdhg;oijsdfg;oisjdfg",
-            "Entry VIII\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
-            "Entry IX\n\nauahsdgliauhsflaisdfhasdff",
-            "Entry X\n\nHELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.",
-            "Credits\n\nIn memory of those who have contributed to the journal.\n\n Project Lead : Pickle",
-            "Credits\n\nIn memory of those who have contributed to the journal.\n\n Artist : Tomato",
-        };
-
-        // TODO: add one entry per topic for the left-page index of that spread.
-        private static readonly TocEntry[] TableOfContents =
-        {
-            new TocEntry("How to read", 0),
-            new TocEntry("Entry I", 2),
-            new TocEntry("Entry II", 2),
-            new TocEntry("Entry III", 4),
-            new TocEntry("Entry IV", 4),
-            new TocEntry("Entry V", 6),
-            new TocEntry("Entry VI", 6),
-            new TocEntry("Entry VII", 8),
-            new TocEntry("Entry VIII", 8),
-            new TocEntry("Entry IX", 10),
-            new TocEntry("Entry X", 10),
-            new TocEntry("Credits", 12),
-        };
-        //Note: The table of contents does things in double, so the left page index of the spread is used for the target page index.
-        private Asset<Texture2D> _texture;
-        private Asset<Texture2D> _symbolTexture;
-        private bool _isOpen;
-        private int _leftPageIndex = CoverPageIndex;
-        private bool _isTurningForward;
-
-        private static readonly Dictionary<string, string[]> WrappedPageCache = new Dictionary<string, string[]>();
-        private static string[]? _tocLabels;
-        private int _cachedPageNumbersIndex = -1;
-        private string _cachedPageNumbers = string.Empty;
-
-        private readonly List<Rectangle> _tocEntryBounds = new List<Rectangle>();
-
-        public JournalPanel()
-        {
-            Width.Set(TextureWidth * Scale, 0f);
-            Height.Set(TextureHeight * Scale, 0f);
-        }
-
-        public override void OnInitialize()
-        {
-            _texture = ModContent.Request<Texture2D>(TexturePath);
-
-            try
-            {
-                _symbolTexture = ModContent.Request<Texture2D>(SymbolTexturePath);
-            }
-            catch
-            {
-                _symbolTexture = null;
-            }
-        }
-
-        public void SetOpen(bool isOpen)
-        {
-            _isOpen = isOpen;
-            if (isOpen)
-            {
-                _leftPageIndex = CoverPageIndex;
-            }
-        }
-
-        public override bool ContainsPoint(Vector2 point)
-        {
-            return _isOpen && base.ContainsPoint(point);
-        }
-
-        public override void LeftClick(UIMouseEvent evt)
-        {
-            base.LeftClick(evt);
-
-            if (_leftPageIndex == CoverPageIndex && TryHandleTocClick(evt.MousePosition))
-            {
-                return;
-            }
-
-            float centerX = GetDimensions().X + GetDimensions().Width / 2f;
-            if (evt.MousePosition.X < centerX)
-            {
-                TurnBackward();
-            }
-            else
-            {
-                TurnForward();
-            }
-        }
-
-        public override void MouseOver(UIMouseEvent evt)
-        {
-            base.MouseOver(evt);
-            _isTurningForward = evt.MousePosition.X >= GetDimensions().X + GetDimensions().Width / 2f;
-        }
-
-        private bool TryHandleTocClick(Vector2 mousePosition)
-        {
-            Point mousePoint = new Point((int)mousePosition.X, (int)mousePosition.Y);
-
-            for (int i = 0; i < _tocEntryBounds.Count && i < TableOfContents.Length; i++)
-            {
-                if (_tocEntryBounds[i].Contains(mousePoint))
-                {
-                    NavigateToSpread(TableOfContents[i].TargetPageIndex);
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private void NavigateToSpread(int targetPageIndex)
-        {
-            if (Pages.Length < 2)
-            {
-                return;
-            }
-
-            int target = targetPageIndex - (targetPageIndex % 2);
-            int maxStart = Pages.Length % 2 == 0 ? Pages.Length - 2 : Pages.Length - 1;
-            target = Math.Clamp(target, 0, maxStart);
-
-            _leftPageIndex = target;
-            SoundEngine.PlaySound(PageTurnSound);
-        }
-
-        private void TurnForward()
-        {
-            if (_leftPageIndex == CoverPageIndex)
-            {
-                if (Pages.Length == 0)
-                {
-                    return;
-                }
-
-                _leftPageIndex = 0;
-                SoundEngine.PlaySound(PageTurnSound);
-                return;
-            }
-
-            if (_leftPageIndex + 2 >= Pages.Length)
-            {
-                return;
-            }
-
-            _leftPageIndex += 2;
-            SoundEngine.PlaySound(PageTurnSound);
-        }
-
-        private void TurnBackward()
-        {
-            if (_leftPageIndex == CoverPageIndex)
-            {
-                return;
-            }
-
-            if (_leftPageIndex == 0)
-            {
-                _leftPageIndex = CoverPageIndex;
-                SoundEngine.PlaySound(PageTurnSound);
-                return;
-            }
-
-            _leftPageIndex -= 2;
-            SoundEngine.PlaySound(PageTurnSound);
-        }
-
-        protected override void DrawSelf(SpriteBatch spriteBatch)
-        {
-            if (!_isOpen)
-            {
-                return;
-            }
-
-            CalculatedStyle dimensions = GetDimensions();
-            spriteBatch.Draw(
-                _texture.Value,
-                dimensions.Position(),
-                null,
-                Color.White,
-                0f,
-                Vector2.Zero,
-                Scale,
-                SpriteEffects.None,
-                0f);
-
-            if (_leftPageIndex == CoverPageIndex)
-            {
-                DrawCoverSpread(spriteBatch, dimensions);
-            }
-            else
-            {
-                _tocEntryBounds.Clear();
-
-                DrawPage(spriteBatch, Pages[_leftPageIndex], dimensions.X + 28f * Scale, dimensions.Y + 52f * Scale);
-                DrawPage(spriteBatch, Pages[_leftPageIndex + 1], dimensions.X + 253f * Scale, dimensions.Y + 52f * Scale);
-
-                if (_cachedPageNumbersIndex != _leftPageIndex)
-                {
-                    _cachedPageNumbers = $"{_leftPageIndex + 1} - {_leftPageIndex + 2} / {Pages.Length}";
-                    _cachedPageNumbersIndex = _leftPageIndex;
-                }
-
-                string pageNumbers = _cachedPageNumbers;
-                Utils.DrawBorderString(
-                    spriteBatch,
-                    pageNumbers,
-                    new Vector2(dimensions.X + 190f * Scale, dimensions.Y + 294f * Scale),
-                    PageTextColor,
-                    0.55f);
-            }
-
-            if (IsMouseHovering)
-            {
-                Main.hoverItemName = _leftPageIndex == CoverPageIndex
-                    ? "Table of contents"
-                    : (_isTurningForward ? "Next pages" : "Previous pages");
-            }
-        }
-
-        private void DrawCoverSpread(SpriteBatch spriteBatch, CalculatedStyle dimensions)
-        {
-            float leftX = dimensions.X + 28f * Scale;
-            float rightX = dimensions.X + 253f * Scale;
-            float topY = dimensions.Y + 40f * Scale;
-
-            // Left page: title, symbol image, symbol caption and more maybe 
-            Utils.DrawBorderString(spriteBatch, BookTitle, new Vector2(leftX, topY), PageTextColor, 1f);
-
-            float symbolSize = 90f * Scale;
-            Vector2 symbolPos = new Vector2(leftX, topY + 40f * Scale);
-
-            if (_symbolTexture != null && _symbolTexture.IsLoaded)
-            {
-                spriteBatch.Draw(
-                    _symbolTexture.Value,
-                    new Rectangle((int)symbolPos.X, (int)symbolPos.Y, (int)symbolSize, (int)symbolSize),
-                    Color.White);
-            }
-
-            Utils.DrawBorderString(
-                spriteBatch,
-                SymbolLabel,
-                new Vector2(leftX, symbolPos.Y + symbolSize + 10f),
-                PageTextColor,
-                PageTextScale);
-
-            // Right page: table of contents
-            Utils.DrawBorderString(spriteBatch, "TABLE OF CONTENTS", new Vector2(rightX, topY), PageTextColor, 0.9f);
-
-            _tocEntryBounds.Clear();
-            float entryY = topY + 40f * Scale;
-
-            if (_tocLabels == null)
-            {
-                _tocLabels = new string[TableOfContents.Length];
-                for (int i = 0; i < TableOfContents.Length; i++)
-                    _tocLabels[i] = $"- {TableOfContents[i].Label}";
-            }
-
-            for (int i = 0; i < TableOfContents.Length; i++)
-            {
-                string label = _tocLabels[i];
-                Utils.DrawBorderString(spriteBatch, label, new Vector2(rightX, entryY), PageTextColor, PageTextScale);
-
-                var bounds = new Rectangle((int)rightX, (int)entryY, (int)(180f * Scale), (int)PageLineHeight);
-                _tocEntryBounds.Add(bounds);
-
-                entryY += PageLineHeight;
-            }
-        }
-
-        private static void DrawPage(SpriteBatch spriteBatch, string pageText, float x, float y)
-        {
-            if (!WrappedPageCache.TryGetValue(pageText, out string[]? lines))
-            {
-                lines = WrapText(pageText).ToArray();
-                WrappedPageCache[pageText] = lines;
-            }
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                Utils.DrawBorderString(
-                    spriteBatch,
-                    lines[i],
-                    new Vector2(x, y + i * PageLineHeight),
-                    PageTextColor,
-                    PageTextScale);
-            }
-        }
-
-        private static List<string> WrapText(string pageText)
-        {
-            List<string> lines = new List<string>();
-            foreach (string paragraph in pageText.Split('\n'))
-            {
-                if (string.IsNullOrWhiteSpace(paragraph))
-                {
-                    lines.Add(string.Empty);
-                    continue;
-                }
-
-                string line = string.Empty;
-                foreach (string word in paragraph.Split(' '))
-                {
-                    string candidate = string.IsNullOrEmpty(line) ? word : $"{line} {word}";
-                    if (candidate.Length > MaxCharactersPerLine && !string.IsNullOrEmpty(line))
-                    {
-                        lines.Add(line);
-                        line = word;
-                    }
-                    else
-                    {
-                        line = candidate;
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(line))
-                {
-                    lines.Add(line);
-                }
-            }
-
-            return lines;
-        }
-
-        private readonly struct TocEntry
-        {
-            public readonly string Label;
-            public readonly int TargetPageIndex;
-
-            public TocEntry(string label, int targetPageIndex)
-            {
-                Label = label;
-                TargetPageIndex = targetPageIndex;
+                Main.hoverItemName = _hasNews ? JournalText.Ui("JournalNews") : JournalText.Ui("Journal");
+                Main.LocalPlayer.mouseInterface = true;
             }
         }
     }

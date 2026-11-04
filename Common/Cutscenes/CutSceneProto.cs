@@ -60,7 +60,7 @@ namespace ShatteredIllusion.Common.Cutscenes
                     ShakeStart = 120,
                     ShakeDuration = 60,
                     ShakeMagnitude = 4,
-                    Sound = new SoundStyle("ShatteredIllusion/Sounds/BarkFart"),
+                    Sound = new SoundStyle("ShatteredIllusion/Sounds/Silence"), //im sorry barkfart but im showcasing right now so bye bye
                     SoundStart = 60,
                     SoundDuration = 120
                 };

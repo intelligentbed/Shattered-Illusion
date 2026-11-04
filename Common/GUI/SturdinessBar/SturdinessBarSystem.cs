@@ -18,10 +18,16 @@ namespace ShatteredIllusion.Common.GUI.SturdinessBar
             SturdinessBarUI.UnloadTextures();
         }
 
+        public override void PostUpdateEverything()
+        {
+            if (!Main.gameMenu)
+                SturdinessBarUI.Tick(Main.LocalPlayer);
+        }
+
         public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
         {
             int index = layers.FindIndex(l => l.Name.Equals("Vanilla: Resource Bars"));
-            if (index != -1)    
+            if (index != -1)
             {
                 layers.Insert(index, new LegacyGameInterfaceLayer(
                     "ShatteredIllusion: Sturdiness Bar",

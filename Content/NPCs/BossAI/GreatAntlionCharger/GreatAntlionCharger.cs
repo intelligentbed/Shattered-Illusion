@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using ReLogic.Utilities;
+using ShatteredIllusion.Common.Visuals;
 using ShatteredIllusion.Content.Items.TreasureBags;
 using ShatteredIllusion.Common.Players.ParrySystem;
 using System;
@@ -82,6 +83,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         }
 
         private int DashStuckTimer;
+        private Vector2 spitAimDir;
+        private float burrowSurfaceY;
+        private const int DeathTicks = 170;
+
+        // he digs in for the first bit of the transition then bursts out here
+        private float TransitionBoom => Cinema.Enabled ? 45f : 30f;
 
 
         private int DespawnTimer;
@@ -113,7 +120,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             Phase2BurrowDive,
             Burrow,
             Spit,
-            Cooldown
+            Cooldown,
+            Death
         }
         public AttackPhase CurrentState
         {
@@ -165,6 +173,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             Main.npcFrameCount[Type] = MainFrameCount;
             NPCID.Sets.MPAllowedEnemies[Type] = true;
+            NPCID.Sets.TrailCacheLength[Type] = 12;
+            NPCID.Sets.TrailingMode[Type] = 0;
+            Cinema.Watch(Type);
         }
 
         public override void SetDefaults()
@@ -227,6 +238,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             }
 
             NPC.netUpdate = true;
+
+            AntlionFX.Impact(NPC.Bottom, 1.2f);
         }
 
         public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment)
@@ -258,6 +271,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 sound?.Stop();
 
             DownedSystem.SetDownedGreatAntlionCharger();
+
+            ScreenShake(10f, 24);
+            AntlionFX.Impact(NPC.Center, 3.2f, false);
+            AntlionFX.Embers(NPC.Center, 40, 4f, 14f, new Color(255, 170, 90), 14f);
         }
 
         public override void Load()
@@ -320,6 +337,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
+            DrawDiveArc(spriteBatch);
+            DrawBurrowFX(spriteBatch);
+            DrawTransitionFX(spriteBatch);
+
             if (CurrentState == AttackPhase.WaitingForCutscene || NPC.alpha >= 255)
             {
                 return false;
@@ -334,14 +355,27 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             //red = parryable
             Color tintColor = IsParryable ? new Color(255, 120, 120) : Color.White;
+
+            if (CurrentState == AttackPhase.Death)
+                tintColor = Color.Lerp(Color.White, new Color(255, 110, 80), 0.5f + 0.5f * (float)Math.Sin(Timer * (0.5f + Timer / 100f)));
             Color finalDrawColor = NPC.GetAlpha(drawColor).MultiplyRGB(tintColor);
 
-            if (TryDrawParryTexture(spriteBatch, screenPos, finalDrawColor)) return false;
-            if (TryDrawPopTexture(spriteBatch, screenPos, finalDrawColor)) return false;
-            if (TryDrawSpitTexture(spriteBatch, screenPos, finalDrawColor)) return false;
-            if (TryDrawBurrowTexture(spriteBatch, screenPos, finalDrawColor)) return false;
+            DrawAura(spriteBatch);
+            DrawAfterimages(spriteBatch, screenPos);
 
-            DrawMainTexture(spriteBatch, screenPos, finalDrawColor);
+            bool drewSpecial =
+                TryDrawParryTexture(spriteBatch, screenPos, finalDrawColor) ||
+                TryDrawPopTexture(spriteBatch, screenPos, finalDrawColor) ||
+                TryDrawSpitTexture(spriteBatch, screenPos, finalDrawColor) ||
+                TryDrawBurrowTexture(spriteBatch, screenPos, finalDrawColor);
+
+            if (!drewSpecial)
+            {
+                DrawMainTexture(spriteBatch, screenPos, finalDrawColor);
+                DrawEyeGlow(spriteBatch);
+            }
+
+            DrawSpitAim(spriteBatch);
             return false;
         }
 
@@ -351,7 +385,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private bool TryDrawParryTexture(SpriteBatch spriteBatch, Vector2 screenPos, Color finalDrawColor)
         {
             // Triggered if recently parried/stunned via negative timers in Cooldown.
-            bool isParryDrawing = CurrentState == AttackPhase.Cooldown && Timer < 0f;
+            bool isParryDrawing = (CurrentState == AttackPhase.Cooldown && Timer < 0f) || CurrentState == AttackPhase.Death;
             if (!isParryDrawing || parryTexture == null || !parryTexture.IsLoaded)
             {
                 return false;
@@ -404,8 +438,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             bool isPhase1Burrowing = CurrentState == AttackPhase.Burrow && Timer <= BurrowDigTime;
             bool isPhase2Burrowing = CurrentState == AttackPhase.Phase2BurrowDive && Timer <= 45f;
+            bool isTransitionDig = Phase2Transitioning && Timer <= TransitionBoom - 10f;
 
-            if ((!isPhase1Burrowing && !isPhase2Burrowing) || burrowTexture == null || !burrowTexture.IsLoaded)
+            if ((!isPhase1Burrowing && !isPhase2Burrowing && !isTransitionDig) || burrowTexture == null || !burrowTexture.IsLoaded)
             {
                 return false;
             }
@@ -443,9 +478,273 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             );
         }
 
+        // glowing ridge while he tunnels, cracks + light column when he's about to come up
+        private void DrawBurrowFX(SpriteBatch spriteBatch)
+        {
+            if (!Cinema.Enabled || CurrentState != AttackPhase.Burrow || IsZero(burrowSurfaceY))
+                return;
+
+            Vector2 ground = new Vector2(NPC.Center.X, burrowSurfaceY);
+            float flicker = 0.8f + 0.2f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 24f);
+
+            if (Timer > BurrowDigTime && Timer < BurrowPursuitEnd)
+            {
+                float speed = MathHelper.Clamp(Math.Abs(NPC.velocity.X) / 16f, 0f, 1f);
+
+                AntlionFX.Glow(spriteBatch, ground, new Color(235, 175, 100) * (0.5f * flicker), new Vector2(260f + 180f * speed, 50f));
+                AntlionFX.Glow(spriteBatch, ground + new Vector2(0f, -6f), new Color(255, 220, 160) * 0.35f, new Vector2(110f + 90f * speed, 20f));
+            }
+            else if (Timer >= BurrowPursuitEnd && Timer < BurrowTelegraphEnd)
+            {
+                float warn = (Timer - BurrowPursuitEnd) / (BurrowTelegraphEnd - BurrowPursuitEnd);
+
+                for (int i = 0; i < 6; i++)
+                {
+                    float side = i % 2 == 0 ? 0f : MathHelper.Pi;
+                    float angle = side + (i / 2 - 1) * 0.06f * (side == 0f ? 1f : -1f);
+                    float length = (90f + 50f * (i / 2)) * warn * 2.2f;
+
+                    AntlionFX.Beam(spriteBatch, ground, angle, length, MathHelper.Lerp(3f, 8f, warn), new Color(255, 120, 60) * (0.6f * warn * flicker));
+                }
+
+                AntlionFX.Glow(spriteBatch, ground + new Vector2(0f, -150f * warn), new Color(255, 170, 90) * (0.5f * warn * flicker), new Vector2(70f + 60f * warn, 120f + 380f * warn));
+                AntlionFX.Glow(spriteBatch, ground, new Color(255, 90, 50) * (0.8f * warn * flicker), new Vector2(120f + 160f * warn, 30f + 20f * warn));
+            }
+            else if (Timer >= BurrowTelegraphEnd && Timer < BurrowTelegraphEnd + 25f)
+            {
+                float fade = 1f - (Timer - BurrowTelegraphEnd) / 25f;
+
+                AntlionFX.Glow(spriteBatch, ground + new Vector2(0f, -330f * fade), new Color(255, 215, 150) * (0.8f * fade), new Vector2(170f, 700f));
+                AntlionFX.Glow(spriteBatch, ground, new Color(255, 190, 120) * (0.8f * fade), new Vector2(420f, 70f));
+            }
+        }
+
+        // cracks spreading along the ground while he charges, light column when it goes off
+        private void DrawTransitionFX(SpriteBatch spriteBatch)
+        {
+            if (!Cinema.Enabled || !Phase2Transitioning)
+                return;
+
+            float boom = TransitionBoom;
+            Vector2 ground = new Vector2(NPC.Center.X, burrowSurfaceY);
+            float flicker = 0.8f + 0.2f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 26f);
+            float charge = MathHelper.Clamp(Timer / boom, 0f, 1f);
+            float fade = Timer < boom ? 1f : 1f - MathHelper.Clamp((Timer - boom) / 40f, 0f, 1f);
+
+            for (int i = 0; i < 8; i++)
+            {
+                float angle = i % 2 == 0 ? 0f : MathHelper.Pi;
+                angle += (i / 2 - 1.5f) * 0.05f * (angle == 0f ? 1f : -1f);
+                float length = (180f + 70f * (i / 2)) * charge * 2.4f;
+
+                AntlionFX.Beam(spriteBatch, ground, angle, length, MathHelper.Lerp(3f, 10f, charge), new Color(255, 110, 55) * (0.7f * fade * flicker));
+            }
+
+            AntlionFX.Glow(spriteBatch, ground, new Color(255, 90, 50) * (0.8f * fade * flicker), new Vector2(160f + 420f * charge, 40f + 30f * charge));
+
+            if (Timer < boom)
+                AntlionFX.Glow(spriteBatch, ground + new Vector2(0f, -150f * charge), new Color(255, 170, 90) * (0.5f * charge * flicker), new Vector2(70f + 60f * charge, 120f + 380f * charge));
+            else
+            {
+                AntlionFX.Glow(spriteBatch, ground + new Vector2(0f, -450f * fade), new Color(255, 215, 160) * (0.9f * fade), new Vector2(240f, 900f));
+                AntlionFX.Glow(spriteBatch, NPC.Center, new Color(255, 230, 190) * (0.7f * fade), new Vector2(700f, 700f) * (1.4f - 0.4f * fade));
+            }
+        }
+
+        private void SpawnRubble(int count)
+        {
+            if (Main.netMode == NetmodeID.MultiplayerClient)
+                return;
+
+            for (int i = 0; i < count; i++)
+            {
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    new Vector2(NPC.Center.X + Main.rand.NextFloat(-500f, 500f), NPC.Center.Y - 500f),
+                    new Vector2(Main.rand.NextFloat(-2f, 2f), Main.rand.NextFloat(2f, 5f)),
+                    ModContent.ProjectileType<FallingRubble>(),
+                    DifficultyValue(15, 30, 15),
+                    2f,
+                    Main.myPlayer
+                );
+            }
+        }
+
+        private bool IsAirborneDive => CurrentState == AttackPhase.Phase2BurrowDive && Timer >= 111f;
+
+        // red haze behind him, builds during the phase 2 transition and stays low after
+        private void DrawAura(SpriteBatch spriteBatch)
+        {
+            if (!Cinema.Enabled)
+                return;
+
+            float strength;
+
+            if (CurrentState == AttackPhase.Death)
+                strength = 0.6f + 1.6f * Timer / DeathTicks;
+            else if (Phase2Transitioning)
+                strength = Timer < 45f ? Timer / 45f * 1.4f : MathHelper.Lerp(1.4f, 0.45f, MathHelper.Clamp((Timer - 45f) / 55f, 0f, 1f));
+            else if (Phase2)
+                strength = 0.45f + 0.1f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 3f);
+            else
+                return;
+
+            AntlionFX.Glow(spriteBatch, NPC.Center, new Color(255, 80, 50) * (0.35f * strength), new Vector2(460f, 220f));
+        }
+
+        private void DrawAfterimages(SpriteBatch spriteBatch, Vector2 screenPos)
+        {
+            if (!Cinema.Enabled)
+                return;
+
+            bool dashing = CurrentState == AttackPhase.Dash && Timer >= 19f;
+
+            if (!dashing && CurrentState != AttackPhase.Launch && !IsAirborneDive)
+                return;
+
+            Texture2D texture = TextureAssets.Npc[NPC.type].Value;
+            Vector2 origin = new Vector2(texture.Width / 2f, NPC.frame.Height / 2f);
+            Vector2 offset = new Vector2(0f, NPC.gfxOffY + GetGroundAlignedOffset(NPC.frame.Height));
+
+            for (int i = 2; i < NPC.oldPos.Length; i += 2)
+            {
+                if (NPC.oldPos[i] == Vector2.Zero || Vector2.DistanceSquared(NPC.oldPos[i], NPC.position) < 36f)
+                    continue;
+
+                float fade = 1f - i / (float)NPC.oldPos.Length;
+                Vector2 drawPos = NPC.oldPos[i] + NPC.Size / 2f - screenPos + offset;
+
+                spriteBatch.Draw(texture, drawPos, NPC.frame, new Color(255, 170, 90, 0) * (fade * 0.45f), NPC.rotation, origin, NPC.scale * SpriteVisualScale, CurrentSpriteEffects, 0f);
+            }
+        }
+
+        private void DrawEyeGlow(SpriteBatch spriteBatch)
+        {
+            if (!Cinema.Enabled)
+                return;
+
+            Vector2 eye = NPC.Center + (new Vector2(NPC.spriteDirection * 88f, -2f) * NPC.scale).RotatedBy(NPC.rotation);
+
+            float pulse = 0.75f + 0.25f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 6f);
+            float intensity = Phase2 ? 1.25f : 0.8f;
+            float flareSize = 0f;
+
+            if (CurrentState == AttackPhase.Dash)
+            {
+                float windup = Timer <= 18f ? Timer / 18f : 0f;
+                intensity += 0.5f + windup;
+                flareSize = Timer <= 18f ? 30f + 130f * windup : 55f;
+            }
+            else if (Phase2Transitioning)
+            {
+                float charge = Timer < 45f ? Timer / 45f : MathHelper.Clamp(1f - (Timer - 45f) / 40f, 0f, 1f);
+                intensity += 1.2f * charge;
+                flareSize = 220f * charge;
+            }
+
+            AntlionFX.Glow(spriteBatch, eye, new Color(255, 40, 30) * (0.7f * pulse * intensity), new Vector2(54f, 54f));
+
+            if (flareSize > 1f)
+                AntlionFX.Flare(spriteBatch, eye, new Color(255, 130, 100) * (0.8f * pulse), flareSize, Main.GlobalTimeWrappedHourly * 0.6f);
+        }
+
+        // same numbers as the real jump so what you see is what you get
+        private void DrawDiveArc(SpriteBatch spriteBatch)
+        {
+            if (CurrentState != AttackPhase.Phase2BurrowDive || Timer < 56f || Timer >= 111f || IsZero(Phase2DiveGroundY) || !ModContent.GetInstance<ShatteredIllusionConfig>().SlamTelegraph)
+                return;
+
+            const float arcHeight = 500f;
+            const int beads = 30;
+
+            float reveal = MathHelper.Clamp((Timer - 56f) / 20f, 0f, 1f);
+            float urgency = MathHelper.Clamp((Timer - 56f) / 55f, 0f, 1f);
+
+            Vector2 start = NPC.Center;
+            Vector2 end = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
+
+            for (int i = 0; i <= beads; i++)
+            {
+                float t = i / (float)beads;
+
+                if (t > reveal)
+                    break;
+
+                Vector2 pos = new Vector2(
+                    MathHelper.Lerp(start.X, end.X, t),
+                    MathHelper.Lerp(start.Y, end.Y, t) - arcHeight * 4f * t * (1f - t)
+                );
+
+                float wave = (float)Math.Pow(0.5f + 0.5f * Math.Sin(t * 14f - Main.GlobalTimeWrappedHourly * 9f), 3.0);
+                float size = 26f + 30f * wave;
+
+                AntlionFX.Glow(spriteBatch, pos, new Color(255, 150, 70) * ((0.35f + 0.5f * wave) * (0.5f + 0.5f * urgency)), new Vector2(size, size));
+            }
+
+            float pulse = 0.6f + 0.4f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * (6f + 10f * urgency));
+            Vector2 landing = new Vector2(end.X, Phase2DiveGroundY);
+
+            AntlionFX.Glow(spriteBatch, landing, new Color(255, 70, 40) * (0.9f * pulse * reveal), new Vector2(380f, 70f));
+            AntlionFX.Glow(spriteBatch, landing, new Color(255, 200, 140) * (0.7f * pulse * reveal), new Vector2(190f, 34f));
+        }
+
+        private void DrawSpitAim(SpriteBatch spriteBatch)
+        {
+            if (!Cinema.Enabled || CurrentState != AttackPhase.Spit || Timer > SpitFireTiming || spitAimDir == Vector2.Zero)
+                return;
+
+            float progress = Timer / SpitFireTiming;
+            Vector2 mouth = NPC.Center + new Vector2(NPC.spriteDirection * (NPC.width / 2f + MouthForwardOffset + MouthSidewaysOffset), MouthVerticalOffset);
+
+            int shotCount = DifficultyValue(1, 3, 5);
+            float spread = DifficultyValue(0f, 0.18f, 0.22f);
+            float width = MathHelper.Lerp(3f, 12f, progress * progress);
+
+            for (int i = 0; i < shotCount; i++)
+            {
+                Vector2 dir = shotCount > 1 ? spitAimDir.RotatedBy((i - (shotCount - 1) / 2f) * spread) : spitAimDir;
+                float rotation = dir.ToRotation();
+
+                AntlionFX.Beam(spriteBatch, mouth, rotation, 350f, width, new Color(255, 150, 80) * MathHelper.Lerp(0.15f, 0.8f, progress));
+                AntlionFX.Beam(spriteBatch, mouth, rotation, 350f, width * 0.35f, new Color(255, 225, 180) * (progress * 0.8f));
+            }
+        }
+
+        // sand blowing across the screen the whole fight
+        private void DoAmbientStorm()
+        {
+            if (Main.dedServ)
+                return;
+
+            AntlionFX.Mood(Phase2 ? 1f : 0.55f);
+
+            if (Main.GameUpdateCount % (Phase2 ? 2 : 3) != 0 || Vector2.Distance(Main.LocalPlayer.Center, NPC.Center) > 2200f)
+                return;
+
+            Vector2 pos = Main.screenPosition + new Vector2(Main.rand.NextFloat(-80f, Main.screenWidth * 0.6f), Main.rand.NextFloat(0f, Main.screenHeight));
+            Vector2 vel = new Vector2(Main.rand.NextFloat(16f, 26f), Main.rand.NextFloat(-1f, 1.5f));
+            Color color = new Color(230, 190, 130) * Main.rand.NextFloat(0.25f, 0.5f);
+
+            AntlionFX.Streak(pos, vel, new Vector2(Main.rand.NextFloat(30f, 70f), Main.rand.NextFloat(2f, 4f)), color, 45);
+        }
+
+        private void BackStreaks(int count)
+        {
+            if (Main.dedServ || Math.Abs(NPC.velocity.X) < 2f)
+                return;
+
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 pos = NPC.Center + new Vector2(-Math.Sign(NPC.velocity.X) * NPC.width * 0.4f, Main.rand.NextFloat(-NPC.height * 0.5f, NPC.height * 0.5f));
+                Vector2 vel = new Vector2(-NPC.velocity.X * Main.rand.NextFloat(0.2f, 0.45f), Main.rand.NextFloat(-0.8f, 0.8f));
+
+                AntlionFX.Streak(pos, vel, new Vector2(Main.rand.NextFloat(34f, 70f), Main.rand.NextFloat(3f, 5f)), new Color(255, 205, 140), 18);
+            }
+        }
+
         public override bool CanHitPlayer(Player target, ref int cooldownSlot)
         {
-            if (IsHidden)
+            if (IsHidden || CurrentState == AttackPhase.Death)
             {
                 return false;
             }
@@ -486,6 +785,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
         private bool TryFindParryFrame()
         {
+            if (CurrentState == AttackPhase.Death)
+            {
+                if (parryTexture == null) parryTexture = ModContent.Request<Texture2D>(ParryTexturePath);
+                if (parryTexture == null || !parryTexture.IsLoaded)
+                {
+                    return false;
+                }
+
+                // collapses over the first bit then stays down
+                NPC.frame.Width = parryTexture.Width();
+                NPC.frame.Height = parryFrameHeight;
+                NPC.frame.X = 0;
+                NPC.frame.Y = Math.Min((int)(Timer / 14f), ParryFrameCount - 1) * parryFrameHeight;
+                return true;
+            }
+
             if (CurrentState != AttackPhase.Cooldown || Timer >= 0f)
             {
                 return false;
@@ -537,8 +852,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             bool phase2DiveAnimation = CurrentState == AttackPhase.Phase2BurrowDive && Timer <= 45f;
             bool normalBurrowAnimation = CurrentState == AttackPhase.Burrow && Timer <= BurrowDigTime;
+            bool transitionDigAnimation = Phase2Transitioning && Timer <= TransitionBoom - 10f;
 
-            if (!phase2DiveAnimation && !normalBurrowAnimation)
+            if (!phase2DiveAnimation && !normalBurrowAnimation && !transitionDigAnimation)
             {
                 return false;
             }
@@ -549,7 +865,7 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 return false;
             }
 
-            float animationTime = phase2DiveAnimation ? 45f : BurrowDigTime;
+            float animationTime = transitionDigAnimation ? TransitionBoom - 10f : phase2DiveAnimation ? 45f : BurrowDigTime;
             float animationProgress = MathHelper.Clamp(Timer / animationTime, 0f, 1f);
             int frame = Math.Min((int)(animationProgress * BurrowFrameCount), BurrowFrameCount - 1);
 
@@ -693,6 +1009,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.color = Color.White;
             IsParryable = false;
+            NPC.rotation = 0f;
+            DoAmbientStorm();
+
+            if (CurrentState == AttackPhase.Death)
+            {
+                HandleDeath();
+                return;
+            }
 
             if (NPC.alpha < 255)
             {
@@ -828,6 +1152,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 launchRoarPlayed = true;
             }
 
+            if (TimerAt(1f))
+            {
+                AntlionFX.Impact(NPC.Bottom, 0.7f);
+            }
+
+            if (Timer <= 40f)
+                BackStreaks(2);
+
             // Don't let this idiot launch himself into the depths of Terraria
             NPC.velocity.X *= 0.96f;
 
@@ -886,9 +1218,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     }
                 }
 
+                AntlionFX.ZoomHold(NPC.Center, 0.04f * Timer / 18f);
+
                 if (TimerAt(18f))
                 {
                     SoundEngine.PlaySound(Roar1, NPC.Center);
+                    AntlionFX.Flash(NPC.Center, new Color(255, 120, 90), 0.18f);
+                    AntlionFX.Ring(NPC.Center, new Vector2(200f, 200f), new Color(255, 120, 90), 14);
                 }
 
                 return;
@@ -909,6 +1245,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 NPC.direction = (int)directionX;
                 NPC.netUpdate = true;
             }
+
+            if (TimerAt(19f))
+            {
+                AntlionFX.Impact(NPC.Bottom, 0.6f);
+            }
+
+            if (Timer <= 45f)
+                BackStreaks(2);
 
             IsParryable = true;
 
@@ -1028,6 +1372,21 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 {
                     ScreenShake(2f, 5);
                     SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+                    AntlionFX.ZoomPunch(NPC.Center, 0.04f);
+                }
+
+                if (Timer % 10 == 0)
+                    AntlionFX.Ring(NPC.Bottom, new Vector2(150f, 40f), new Color(235, 200, 140), 18);
+
+                if (Timer % 3 == 0)
+                {
+                    AntlionFX.Streak(
+                        NPC.Bottom + new Vector2(Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f), 0f),
+                        new Vector2(Main.rand.NextFloat(-4f, 4f), -Main.rand.NextFloat(4f, 9f)),
+                        new Vector2(Main.rand.NextFloat(18f, 36f), 3f),
+                        new Color(255, 205, 140),
+                        18
+                    );
                 }
             }
 
@@ -1093,6 +1452,38 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 );
 
                 d.scale = Main.rand.NextFloat(1.5f, 2.8f);
+
+                burrowSurfaceY = GetGroundY(NPC.Center);
+                Vector2 surface = new Vector2(NPC.Center.X, burrowSurfaceY);
+
+                if (Timer % 9 == 0)
+                    AntlionFX.Ring(surface, new Vector2(170f, 44f), new Color(235, 200, 140), 20);
+
+                if (Timer % 14 == 0 && Vector2.Distance(target.Center, NPC.Center) < 900f)
+                    ScreenShake(1.5f, 8);
+
+                if (Cinema.Enabled)
+                {
+                    // furrow: sand kicked up in front, falls back down behind him
+                    for (int i = 0; i < 2; i++)
+                    {
+                        Dust furrow = Dust.NewDustPerfect(
+                            surface + new Vector2(Main.rand.NextFloat(-50f, 50f), 0f),
+                            DustID.Sand,
+                            new Vector2(-NPC.velocity.X * Main.rand.NextFloat(0.1f, 0.35f), -Main.rand.NextFloat(3f, 8f))
+                        );
+
+                        furrow.scale = Main.rand.NextFloat(1.4f, 2.4f);
+                    }
+                }
+
+                AntlionFX.Streak(
+                    surface + new Vector2(Main.rand.NextFloat(-40f, 40f), 0f),
+                    new Vector2(-NPC.velocity.X * 0.35f + Main.rand.NextFloat(-1.5f, 1.5f), -Main.rand.NextFloat(3f, 7f)),
+                    new Vector2(Main.rand.NextFloat(16f, 32f), 3f),
+                    new Color(255, 205, 140),
+                    20
+                );
             }
 
             //sandtelegraph
@@ -1135,6 +1526,16 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     d.scale = Main.rand.NextFloat(2f, 3.5f);
                     d.noGravity = true;
                 }
+
+                // pulses get faster the closer he is to coming up
+                burrowSurfaceY = telegraphPos.Y;
+                float warn = (Timer - BurrowPursuitEnd) / (BurrowTelegraphEnd - BurrowPursuitEnd);
+                int beat = (int)MathHelper.Lerp(10f, 3f, warn);
+
+                if (Timer % Math.Max(1, beat) == 0)
+                    AntlionFX.Ring(telegraphPos, new Vector2(MathHelper.Lerp(110f, 260f, warn), MathHelper.Lerp(34f, 70f, warn)), new Color(255, 110, 70), 18);
+
+                AntlionFX.ZoomHold(NPC.Center, 0.05f * warn);
             }
             // Erupt upward out of the ground
             else
@@ -1175,6 +1576,22 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                     SoundEngine.PlaySound(Roar2, NPC.Center);
 
+
+                    AntlionFX.Impact(new Vector2(NPC.Center.X, actualGroundY), 1.6f);
+                    burrowSurfaceY = actualGroundY;
+
+                    for (int i = 0; i < 14; i++)
+                    {
+                        Vector2 sprayDir = (-MathHelper.PiOver2 + Main.rand.NextFloat(-0.6f, 0.6f)).ToRotationVector2();
+
+                        AntlionFX.Streak(
+                            new Vector2(NPC.Center.X + Main.rand.NextFloat(-40f, 40f), actualGroundY),
+                            sprayDir * Main.rand.NextFloat(10f, 22f),
+                            new Vector2(Main.rand.NextFloat(40f, 90f), 4f),
+                            new Color(255, 205, 140),
+                            22
+                        );
+                    }
 
                     for (int i = 0; i < 35; i++)
                     {
@@ -1281,34 +1698,39 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
             if (Timer <= 90f)
             {
                 Vector2 baseDir = SafeNormalize(target.Center - mouthPosition);
+                spitAimDir = baseDir;
+                AntlionFX.ZoomHold(NPC.Center, 0.03f * Timer / 90f);
 
-                int shotCount = DifficultyValue(1, 3, 5);
-                float spread = DifficultyValue(0f, 0.18f, 0.22f);
-
-                if (Timer % 2 == 0)
+                if (!Cinema.Enabled)
                 {
-                    for (int i = 0; i < shotCount; i++)
+                    int shotCount = DifficultyValue(1, 3, 5);
+                    float spread = DifficultyValue(0f, 0.18f, 0.22f);
+
+                    if (Timer % 2 == 0)
                     {
-                        Vector2 shotDir = baseDir;
-
-                        if (shotCount > 1)
+                        for (int i = 0; i < shotCount; i++)
                         {
-                            float offset = (i - (shotCount - 1) / 2f) * spread;
-                            shotDir = baseDir.RotatedBy(offset);
-                        }
+                            Vector2 shotDir = baseDir;
 
-                        for (int d = 1; d <= 10; d++)
-                        {
-                            Vector2 dustPos = mouthPosition + shotDir * (d * 35f);
+                            if (shotCount > 1)
+                            {
+                                float offset = (i - (shotCount - 1) / 2f) * spread;
+                                shotDir = baseDir.RotatedBy(offset);
+                            }
 
-                            Dust lineDust = Dust.NewDustPerfect(
-                                dustPos,
-                                DustID.SandstormInABottle,
-                                Vector2.Zero
-                            );
+                            for (int d = 1; d <= 10; d++)
+                            {
+                                Vector2 dustPos = mouthPosition + shotDir * (d * 35f);
 
-                            lineDust.scale = 0.9f;
-                            lineDust.noGravity = true;
+                                Dust lineDust = Dust.NewDustPerfect(
+                                    dustPos,
+                                    DustID.SandstormInABottle,
+                                    Vector2.Zero
+                                );
+
+                                lineDust.scale = 0.9f;
+                                lineDust.noGravity = true;
+                            }
                         }
                     }
                 }
@@ -1366,6 +1788,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
 
                 SoundEngine.PlaySound(SoundID.DD2_OgreSpit, mouthPosition);
+                ScreenShake(2f, 4);
+                AntlionFX.ZoomPunch(NPC.Center, 0.025f);
+                AntlionFX.Ring(mouthPosition, new Vector2(120f, 120f), new Color(255, 190, 110), 14);
+                AntlionFX.Embers(mouthPosition, 8, 2f, 6f, new Color(255, 190, 110), 8f, direction * 3f);
 
                 for (int i = 0; i < 15; i++)
                 {
@@ -1391,6 +1817,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         private void HandlePhase2BurrowDive(Player target)
         {
             Timer++;
+
+            if (Timer >= 56f)
+                AntlionFX.Bars(NPC.Center, 3);
 
             // BURROW DOWN FOR PHASE 2 
             if (Timer <= 55f)
@@ -1425,6 +1854,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 if (TimerAt(1f))
                 {
                     SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
+                    AntlionFX.ZoomPunch(NPC.Center, 0.05f);
+                    AntlionFX.Ring(NPC.Bottom, new Vector2(220f, 60f), new Color(235, 200, 140), 22);
                 }
             }
 
@@ -1485,8 +1916,13 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     }
                 }
 
+                if (ModContent.GetInstance<ShatteredIllusionConfig>().SlamTelegraph)
+                {
+                    if (Timer % 12 == 0 && !IsZero(Phase2DiveGroundY))
+                        AntlionFX.Ring(new Vector2(Phase2DiveLandingX, Phase2DiveGroundY), new Vector2(320f, 70f), new Color(255, 90, 60), 22);
+                }
                 // telegraph for the jump
-                if (Timer % 2 == 0)
+                else if (Timer % 2 == 0)
                 {
                     Vector2 diveOrigin = NPC.Center;
                     Vector2 landingPoint = new Vector2(Phase2DiveLandingX, Phase2DiveGroundY - NPC.height / 2f);
@@ -1553,6 +1989,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                     dust.noGravity = true;
                 }
 
+                AntlionFX.ZoomHold(NPC.Center, 0.07f * Math.Max(0f, Timer - 76f) / 14f);
+
+                if (Timer % 4 == 0)
+                    AntlionFX.Ring(NPC.Bottom, new Vector2(200f, 50f), new Color(235, 200, 140), 16);
+
                 if (TimerAt(76f))
                 {
                     SoundEngine.PlaySound(
@@ -1569,10 +2010,12 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 NPC.alpha = 0;
                 NPC.noTileCollide = true;
                 NPC.velocity = Vector2.Zero;
+                AntlionFX.ZoomHold(NPC.Center, 0.07f);
 
                 if (TimerAt(91f))
                 {
                     ScreenShake(3f, 6);
+                    AntlionFX.Impact(NPC.Bottom, 1.3f);
                     Phase2DiveLaunchX = NPC.Center.X;
                     Phase2DiveLaunchY = NPC.Center.Y;
 
@@ -1602,6 +2045,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                 if (TimerAt(111f))
                 {
+                    AntlionFX.Impact(NPC.Center, 1.2f, false);
+
                     // Launch burst dust thingy
                     for (int i = 0; i < 30; i++)
                     {
@@ -1666,6 +2111,20 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
                     NPC.Center = new Vector2(newX, newY);
 
+                    float dxdt = (Phase2DiveLandingX - Phase2DiveLaunchX) / airTime;
+                    float dydt = (landingY - Phase2DiveLaunchY) / airTime - arcHeight * 4f * (1f - 2f * progress) / airTime;
+
+                    NPC.rotation = (float)Math.Atan2(dydt, Math.Abs(dxdt)) * NPC.direction * 0.8f;
+                    AntlionFX.ZoomHold(NPC.Center, 0.03f);
+
+                    AntlionFX.Streak(
+                        NPC.Center - new Vector2(dxdt, dydt) * 2f + Main.rand.NextVector2Circular(30f, 20f),
+                        new Vector2(-dxdt, -dydt) * 0.4f,
+                        new Vector2(Main.rand.NextFloat(50f, 90f), 5f),
+                        new Color(255, 190, 120),
+                        16
+                    );
+
                     // Sand trail while flying
                     if (Main.rand.NextBool(2))
                     {
@@ -1695,6 +2154,9 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                             SoundID.Item14,
                             NPC.Center
                         );
+
+                        NPC.rotation = 0f;
+                        AntlionFX.Impact(NPC.Bottom, 2.2f);
 
                         for (int i = 0; i < 50; i++)
                         {
@@ -1752,10 +2214,119 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         }
 
 
+        // dies in a delay so the animation can play, ai/timer sync it for everyone
+        public override bool CheckDead()
+        {
+            if (CurrentState == AttackPhase.Death)
+                return Timer >= DeathTicks;
+
+            CurrentState = AttackPhase.Death;
+            Timer = 0;
+            NPC.life = 1;
+            NPC.dontTakeDamage = true;
+            NPC.velocity.X = 0f;
+            IsParryable = false;
+            NPC.netUpdate = true;
+
+            return false;
+        }
+
+        private void HandleDeath()
+        {
+            Timer++;
+
+            NPC.dontTakeDamage = true;
+            NPC.noTileCollide = false;
+            NPC.velocity.X *= 0.8f;
+            NPC.life = Math.Max(NPC.life, 1);
+
+            const float sandOutStart = 110f;
+            float t = Timer / DeathTicks;
+
+            if (TimerAt(1f))
+            {
+                if (SoundEngine.TryGetActiveSound(rumbleSoundSlot, out ActiveSound? sound))
+                    sound?.Stop();
+
+                SoundEngine.PlaySound(Roar2, NPC.Center);
+                ScreenShake(8f, 20);
+                AntlionFX.Impact(NPC.Center, 1.5f, false);
+            }
+
+            if (TimerAt(60f))
+                SoundEngine.PlaySound(Roar1, NPC.Center);
+
+            if (TimerAt(sandOutStart))
+            {
+                SoundEngine.PlaySound(Roar3, NPC.Center);
+                ScreenShake(6f, 16);
+                AntlionFX.Flash(NPC.Center, new Color(255, 200, 150), 0.4f);
+            }
+
+            if (Cinema.DeathCameraEnabled)
+            {
+                AntlionFX.Bars(NPC.Center, 3);
+                AntlionFX.ZoomHold(NPC.Center, 0.16f * MathHelper.Clamp(Timer / 60f, 0f, 1f));
+            }
+
+            // shaking harder the closer it gets
+            NPC.position.X += Main.rand.NextFloat(-1f, 1f) * (1f + 3f * t);
+
+            if (Timer % 4 == 0)
+            {
+                Vector2 point = NPC.Center + new Vector2(Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f), Main.rand.NextFloat(-NPC.height / 2f, NPC.height / 2f));
+
+                AntlionFX.Ring(point, new Vector2(90f, 90f), new Color(255, 150, 90), 16);
+                AntlionFX.Embers(point, 3, 2f, 6f, new Color(255, 170, 100), 9f, new Vector2(0f, -2f));
+                SoundEngine.PlaySound(SoundID.Item14 with { Volume = 0.4f, Pitch = -0.3f + 0.6f * t }, point);
+            }
+
+            if (Timer % 24 == 0 && Timer < sandOutStart)
+            {
+                ScreenShake(3f + 3f * t, 10);
+                AntlionFX.Impact(NPC.Center + Main.rand.NextVector2Circular(60f, 25f), 0.5f + t, false);
+            }
+
+            // turns into sand
+            if (Timer >= sandOutStart)
+            {
+                float fade = (Timer - sandOutStart) / (DeathTicks - sandOutStart);
+                NPC.alpha = (int)(255f * MathHelper.Clamp(fade, 0f, 1f));
+
+                for (int i = 0; i < 4; i++)
+                {
+                    Dust d = Dust.NewDustPerfect(
+                        NPC.Center + new Vector2(Main.rand.NextFloat(-NPC.width / 2f, NPC.width / 2f), Main.rand.NextFloat(-NPC.height / 2f, NPC.height / 2f)),
+                        DustID.Sand,
+                        new Vector2(Main.rand.NextFloat(-2f, 4f), -Main.rand.NextFloat(2f, 7f))
+                    );
+
+                    d.scale = Main.rand.NextFloat(1.6f, 3f);
+                    d.noGravity = true;
+                }
+
+                AntlionFX.Streak(
+                    NPC.Center + Main.rand.NextVector2Circular(NPC.width / 2f, NPC.height / 2f),
+                    new Vector2(Main.rand.NextFloat(6f, 16f), -Main.rand.NextFloat(2f, 8f)),
+                    new Vector2(Main.rand.NextFloat(40f, 80f), 4f),
+                    new Color(255, 205, 140),
+                    24
+                );
+            }
+
+            if (Timer >= DeathTicks && Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                NPC.dontTakeDamage = false;
+                NPC.life = 0;
+                NPC.checkDead();
+            }
+        }
+
         private void StartPhase2()
         {
             Phase2 = true;
             Phase2Transitioning = true;
+            burrowSurfaceY = GetGroundY(NPC.Center);
 
             Timer = 0;
             AttackSequenceIndex = 0;
@@ -1771,6 +2342,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             SoundEngine.PlaySound(Roar2, NPC.Center);
             ScreenShake(7f, 18);
+            AntlionFX.ZoomPunch(NPC.Center, 0.08f);
+            AntlionFX.Flash(NPC.Center, new Color(255, 120, 90), 0.45f);
 
             for (int i = 0; i < 60; i++)
             {
@@ -1820,11 +2393,36 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             Timer++;
 
-            NPC.velocity.X *= 0.85f;
-            NPC.velocity.Y = 0f;
+            bool movie = Cinema.Enabled;
+            float boom = TransitionBoom;
+            float transitionEnd = movie ? 100f : 60f;
 
-            NPC.noTileCollide = false;
-            NPC.alpha = 0;
+            NPC.velocity.X *= 0.85f;
+            NPC.dontTakeDamage = true;
+
+            // digs in, then gets thrown out of the ground on the boom
+            if (Timer < boom)
+            {
+                float digProgress = MathHelper.Clamp(Timer / (boom - 10f), 0f, 1f);
+
+                NPC.velocity.Y = 0f;
+                NPC.noTileCollide = true;
+                NPC.alpha = (int)MathHelper.Lerp(0f, 255f, digProgress * digProgress * (3f - 2f * digProgress));
+            }
+            else
+            {
+                NPC.alpha = 0;
+
+                if (NPC.velocity.Y < 0f)
+                {
+                    NPC.noTileCollide = true;
+                    NPC.velocity.Y += 0.5f;
+                }
+                else
+                {
+                    NPC.noTileCollide = false;
+                }
+            }
 
             float flashPulse = (float)Math.Sin(Timer * 0.6f) * 0.5f + 0.5f;
             NPC.color = Color.Lerp(Color.White, new Color(255, 90, 90), flashPulse);
@@ -1834,7 +2432,50 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
 
             NPC.position.X += Main.rand.NextFloat(-1.5f, 1.5f);
 
-            int dustCount = Timer < 30f ? 6 : 10;
+            if (movie)
+            {
+                AntlionFX.Bars(NPC.Center, 3);
+
+                if (TimerAt(1f))
+                    Cinema.Vignette(0.6f);
+            }
+
+            if (movie && Timer < 45f)
+            {
+                AntlionFX.ZoomHold(NPC.Center, 0.14f * Timer / 45f);
+
+                // sand spiraling in
+                for (int i = 0; i < 3; i++)
+                {
+                    Vector2 offset = Main.rand.NextVector2CircularEdge(1f, 1f) * Main.rand.NextFloat(200f, 400f);
+                    Vector2 swirl = new Vector2(-offset.Y, offset.X).SafeNormalize(Vector2.Zero) * (4f + 6f * Timer / 45f);
+
+                    AntlionFX.Streak(NPC.Center + offset, -offset * 0.05f + swirl, new Vector2(Main.rand.NextFloat(30f, 60f), 4f), new Color(255, 190, 120), 16);
+                }
+
+                if (Timer % 2 == 0)
+                {
+                    AntlionFX.Streak(
+                        NPC.Bottom + new Vector2(Main.rand.NextFloat(-160f, 160f), 0f),
+                        new Vector2(0f, -Main.rand.NextFloat(4f, 10f)),
+                        new Vector2(Main.rand.NextFloat(14f, 26f), 3f),
+                        new Color(255, 150, 90),
+                        24
+                    );
+                }
+
+                if (Timer % 10 == 0)
+                    AntlionFX.Ring(NPC.Center, new Vector2(140f, 140f) * (0.6f + Timer / 45f), new Color(255, 110, 80), 16);
+            }
+            else if (movie)
+            {
+                AntlionFX.ZoomHold(NPC.Center, 0.14f * MathHelper.Clamp(1f - (Timer - 45f) / 40f, 0f, 1f));
+
+                if (TimerAt(52f) || TimerAt(59f))
+                    AntlionFX.Ring(NPC.Center, new Vector2(600f, 600f), new Color(255, 150, 100), 30);
+            }
+
+            int dustCount = Timer < boom ? 6 : 10;
 
             for (int i = 0; i < dustCount; i++)
             {
@@ -1862,10 +2503,32 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 ScreenShake(3f, 8);
             }
 
-            if (TimerAt(30f))
+            if (TimerAt(boom))
             {
+                NPC.Center = new Vector2(NPC.Center.X, burrowSurfaceY - 30f);
+                NPC.velocity = new Vector2(0f, -15f);
+                NPC.noTileCollide = true;
+                SpawnRubble(DifficultyValue(6, 8, 12));
+                NPC.netUpdate = true;
+
+                for (int i = 0; i < 14; i++)
+                {
+                    Vector2 sprayDir = (-MathHelper.PiOver2 + Main.rand.NextFloat(-0.6f, 0.6f)).ToRotationVector2();
+
+                    AntlionFX.Streak(
+                        new Vector2(NPC.Center.X + Main.rand.NextFloat(-40f, 40f), burrowSurfaceY),
+                        sprayDir * Main.rand.NextFloat(10f, 22f),
+                        new Vector2(Main.rand.NextFloat(40f, 90f), 4f),
+                        new Color(255, 205, 140),
+                        22
+                    );
+                }
+
                 SoundEngine.PlaySound(SoundID.Item14, NPC.Center);
-                ScreenShake(6f, 14);
+                SoundEngine.PlaySound(Roar3, NPC.Center);
+                Cinema.Title("Great Antlion Charger", "Enraged", 90);
+                ScreenShake(10f, 20);
+                AntlionFX.Impact(NPC.Center, 2.6f, false);
 
                 for (int i = 0; i < 45; i++)
                 {
@@ -1880,12 +2543,14 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
                 }
             }
 
-            if (Timer >= 60f)
+            if (Timer >= transitionEnd)
             {
                 Timer = 0;
                 AttackSequenceIndex = 0;
                 CurrentState = AttackPhase.Burrow;
                 Phase2Transitioning = false;
+                NPC.dontTakeDamage = false;
+                Cinema.Vignette(0f);
                 NPC.netUpdate = true;
             }
         }
@@ -1894,6 +2559,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger
         {
             float knockbackDir = NPC.Center.X < player.Center.X ? -1f : 1f;
             NPC.velocity = new Vector2(knockbackDir * 10f, -4f);
+
+            AntlionFX.Impact(NPC.Center, 0.8f, false, AntlionFX.ParryStyle);
 
             CurrentState = AttackPhase.Cooldown;
 

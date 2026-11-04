@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using ShatteredIllusion.Common.GUI.SturdinessBar;
 using Terraria.ModLoader.Config;
 
@@ -28,9 +28,12 @@ namespace ShatteredIllusion
         [DefaultValue(HorizontalPosition.Left)]
         public HorizontalPosition MenuButtonPosition;
 
-        [Header("Cinematics")]
+        [DefaultValue(true)]
+        public bool JournalNotifications;
 
-        // Master switch. Off = boss fights play exactly like the base version (no letterbox, zoom, flashes, hit-stop, extra particles).
+        [Header("BossCinematics")]
+
+        // Master switch for the cinematic layer used by boss fights. Off = fights play without any added letterbox, zoom, flashes, hit-stop or extra particles.
         [DefaultValue(true)]
         public bool Cinematics;
 
@@ -40,13 +43,13 @@ namespace ShatteredIllusion
         [DefaultValue(true)]
         public bool CameraZoom;
 
-        [DefaultValue(false)]
+        [DefaultValue(true)]
         public bool Vignette;
 
         [DefaultValue(true)]
         public bool TitleCard;
 
-        // Singleplayer only; the freeze-frames on slams, the transformation and the parry.
+        // Singleplayer only; brief freeze-frames on big impacts and key moments.
         [DefaultValue(true)]
         public bool HitStop;
 
@@ -54,16 +57,16 @@ namespace ShatteredIllusion
         [DefaultValue(true)]
         public bool ImpactParticles;
 
-        // The growing ground ring that shows where the huge jump lands.
+        // Ground rings / markers that show where big attacks will land.
         // Independent of the master switch because it is a gameplay readability aid.
         [DefaultValue(true)]
         public bool SlamTelegraph;
 
-        // Visual-only entrance during the boss spawn cutscene (e.g. King Slime drops from the sky and the crown lands on his head).
+        // Visual-only boss entrances during the spawn cutscene (e.g. King Slime dropping in).
         [DefaultValue(true)]
         public bool IntroEntrance;
 
-        // Camera, bars, flashes and freeze-frames of the death scene. The ~2.5s death delay itself always
+        // Camera, bars, flashes and freeze-frames of boss death scenes. The death delay itself always
         // happens (it is gameplay), so every player in a multiplayer session sees the same thing.
         [DefaultValue(true)]
         public bool DeathSequence;
@@ -85,5 +88,34 @@ namespace ShatteredIllusion
         [Increment(0.1f)]
         [Slider]
         public float ShakeIntensity = 1f;
+
+        // Scales how many sparks and streaks effects spawn. Rings, flashes and telegraphs are never reduced.
+        [DefaultValue(1f)]
+        [Range(0.25f, 1f)]
+        [Increment(0.25f)]
+        [Slider]
+        public float EffectDensity = 1f;
+
+        // Fullscreen shader effects (ripples, aberration, blur, glitch, color grading).
+        [DefaultValue(true)]
+        public bool ScreenFilters;
+
+        // Scales warping, blur and aberration; lower it if screen distortion feels uncomfortable.
+        [DefaultValue(1f)]
+        [Range(0f, 1f)]
+        [Increment(0.1f)]
+        [Slider]
+        public float ScreenFilterIntensity = 1f;
+
+        // Scales color grading, tints, vignettes and overlays.
+        [DefaultValue(1f)]
+        [Range(0f, 1f)]
+        [Increment(0.1f)]
+        [Slider]
+        public float ScreenColorIntensity = 1f;
+
+        // Cuts glitch, invert and flash-style screen effects to a third.
+        [DefaultValue(false)]
+        public bool ScreenReduceFlashing;
     }
 }

@@ -9,9 +9,24 @@ namespace ShatteredIllusion.Core.OverrideSystem
     public abstract class NPCBehaviorOverride
     {
         /// <summary>
-        /// The NPC type this override applies to.
+        /// A single NPC type this override applies to.
+        /// Override this OR <see cref="NPCOverrideTypes"/>, not both.
+        /// Existing single-NPC overrides keep working unchanged.
         /// </summary>
-        public abstract int NPCOverrideType { get; }
+        public virtual int NPCOverrideType => -1;
+
+        /// <summary>
+        /// Every NPC type this override applies to.
+        /// Override this to share one behavior across many NPCs, e.g.
+        /// <c>new[] { NPCID.EyeofCthulhu, ModContent.NPCType&lt;MyBoss&gt;() }</c>.
+        /// By default this wraps <see cref="NPCOverrideType"/>.
+        ///
+        /// The same override instance receives every hook call for all of
+        /// these types, so check <c>npc.type</c> if the NPCs need to behave
+        /// differently.
+        /// </summary>
+        public virtual int[] NPCOverrideTypes =>
+            NPCOverrideType >= 0 ? new[] { NPCOverrideType } : System.Array.Empty<int>();
 
         /// <summary>
         /// Called once when the override is registered during mod loading.

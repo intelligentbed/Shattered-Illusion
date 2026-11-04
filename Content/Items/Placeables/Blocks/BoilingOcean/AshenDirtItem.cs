@@ -12,6 +12,7 @@ namespace ShatteredIllusion.Content.Items.Placeables.Blocks.BoilingOcean
             Item.height = 16;
             Item.useTime = 10;
             Item.useAnimation = 15;
+            Item.maxStack = 9999;
             Item.useStyle = Terraria.ID.ItemUseStyleID.Swing;
             Item.consumable = true;
             Item.value = 0;

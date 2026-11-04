@@ -72,6 +72,17 @@ Items: {
 		DisplayName: EverJade Charm
 	}
 
+	ChaCrown: {
+		DisplayName: Cha Crown
+		Tooltip:
+			'''
+			Each throw uses the next gem in the crown
+			Ruby: heavy hit with huge knockback
+			Emerald: bounces between up to 3 enemies
+			Sapphire: hovers and spins, slowing and pulling in enemies
+			'''
+	}
+
 	LivingWandProto: {
 		DisplayName: Living Wand Proto
 		Tooltip: ""
@@ -189,6 +200,99 @@ Items: {
 		Tooltip: ""
 		DisplayName: Ashen Dirt Item
 	}
+
+	DeleteThisLater: {
+		Tooltip: ""
+		DisplayName: Delete This Later
+	}
+
+	MandibleStaff: {
+		DisplayName: Mandible Staff
+		Tooltip:
+			'''
+			Conjures antlion jaws at your cursor
+			The jaws pull enemies in, then snap shut
+			'''
+	}
+
+	MycelialMaul: {
+		DisplayName: Mycelial Maul
+		Tooltip:
+			'''
+			Hits release lingering poison spore clouds
+			Poisoned enemies take 20% more damage
+			'''
+	}
+
+	FrostBlaster: {
+		DisplayName: Tundra Blaster
+		Tooltip:
+			'''
+			Turns bullets into frost bolts that inflict Frostburn
+			Every 4th shot is an icicle that lodges in enemies, then shatters
+			'''
+	}
+
+	LivingWoodBow: {
+		DisplayName: Living Wood Bow
+		Tooltip:
+			'''
+			Wooden arrows sprout into three mid-flight
+			Arrows that hit first burst into leaves
+			'''
+	}
+
+	BluebellStaff: {
+		DisplayName: Bluebell Staff
+		Tooltip:
+			'''
+			Summons a bluebell bloom that throws homing petals
+			Blooms link with threads that cut through enemies
+			Three or more form a ring around the target
+			'''
+	}
+
+	CinderBlowpipe: {
+		DisplayName: Cinder Blowpipe
+		Tooltip:
+			'''
+			Darts set enemies on fire
+			Hitting a burning enemy throws embers outward
+			'''
+	}
+
+	SproutMace: {
+		DisplayName: Sprout Mace
+		Tooltip: Hits plant sprouts that bloom and burst
+	}
+
+	MosslogLauncher: {
+		DisplayName: Mosslog Launcher
+		Tooltip:
+			'''
+			Lobs a mossy log that bounces up to 3 times
+			Uses no ammo
+			'''
+	}
+
+	BonehookSickle: {
+		DisplayName: Bonehook Sickle
+		Tooltip: Every 3rd swing throws a piercing crescent
+	}
+
+	HoarfrostStaff: {
+		DisplayName: Hoarfrost Staff
+		Tooltip:
+			'''
+			Frost crystals lodge in enemies and pulse chilling frost
+			Only 2 crystals can be planted at once
+			'''
+	}
+
+	Thornrang: {
+		DisplayName: Thornrang
+		Tooltip: Drops thorn seeds as it flies
+	}
 }
 
 Buffs: {
@@ -216,6 +320,11 @@ Buffs: {
 		DisplayName: Bleeding
 		Description: Mods.ShatteredIllusion.Buffs.Bleeding.Description
 	}
+
+	BluebellBuff: {
+		DisplayName: Bluebell
+		Description: The bluebells will fight for you
+	}
 }
 
 Tiles: {
@@ -239,6 +348,23 @@ Projectiles: {
 	MandibleShooterBullet.DisplayName: Mandible Shooter Bullet
 	StarryProjectile.DisplayName: Starry Projectile
 	LivingWandProtoProjectile.DisplayName: Living Wand Proto Projectile
+	ChaCrownProjectile.DisplayName: Cha Crown Projectile
+	FrostBoltProjectile.DisplayName: Frost Bolt Projectile
+	SporeCloud.DisplayName: Spore Cloud
+	MandibleJaws.DisplayName: Mandible Jaws
+	LeafArrowProjectile.DisplayName: Leaf Arrow
+	BluebellMinion.DisplayName: Bluebell
+	BluebellPetal.DisplayName: Bluebell Petal
+	CinderDartProjectile.DisplayName: Cinder Dart
+	ThreeDTestSprite.DisplayName: Three D Test Sprite
+	ThreeDTestWall.DisplayName: Three D Test Wall
+	SproutBloom.DisplayName: Sprout Bloom
+	MosslogProjectile.DisplayName: Mosslog
+	ReapingCrescent.DisplayName: Reaping Crescent
+	HoarfrostCrystal.DisplayName: Hoarfrost Crystal
+	HoarfrostPulse.DisplayName: Hoarfrost Pulse
+	ThornrangProjectile.DisplayName: Thornrang Projectile
+	ThornSeed.DisplayName: Thorn Seed
 }
 
 Keybinds: {
@@ -261,6 +387,7 @@ Configs: {
 			SturdinessBar: Sturdiness Bar Header
 			Client: Client
 			Cinematics: Cinematics
+			BossCinematics: Boss Cinematics Header
 		}
 
 		SturdinessBarLocked: {
@@ -347,6 +474,36 @@ Configs: {
 			Label: Added Screen Shake Intensity
 			Tooltip: Scales the extra camera shake from the cinematic layer. The fight's original shake is unaffected.
 		}
+
+		EffectDensity: {
+			Tooltip: ""
+			Label: Effect Density
+		}
+
+		ScreenFilterIntensity: {
+			Tooltip: ""
+			Label: Screen Filter Intensity
+		}
+
+		ScreenFilters: {
+			Tooltip: ""
+			Label: Screen Filters
+		}
+
+		ScreenColorIntensity: {
+			Label: Screen Color Intensity
+			Tooltip: ""
+		}
+
+		ScreenReduceFlashing: {
+			Label: Screen Reduce Flashing
+			Tooltip: ""
+		}
+
+		JournalNotifications: {
+			Tooltip: ""
+			Label: Journal Notifications
+		}
 	}
 
 	HorizontalPosition: {
@@ -386,7 +543,18 @@ Cutscenes: {
 		'''
 	KingSlime.Title:
 		'''
-		The Vicious Monarch      
+		The Congealing Mass      
 		           --King Slime--
 		'''
+}
+
+MainMenu: {
+	Buttons: {
+		SinglePlayer: Single Player
+		Multiplayer: Multiplayer
+		Achievements: Achievements
+		Settings: Settings
+		Workshop: Workshop
+		Exit: Exit
+	}
 }

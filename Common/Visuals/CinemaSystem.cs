@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework.Graphics;
+using ShatteredIllusion.Common.Cutscenes;
 using Terraria;
 using Terraria.Graphics;
 using Terraria.ModLoader;
@@ -22,5 +23,11 @@ namespace ShatteredIllusion.Common.Visuals
         public override void PostDrawInterface(SpriteBatch spriteBatch) => Cinema.DrawOverlay(spriteBatch);
 
         public override void OnWorldUnload() => Cinema.HardReset();
+
+        public override void Unload()
+        {
+            Cinema.DisposeVignette();
+            CutsceneTitleRenderer.Unload();
+        }
     }
 }

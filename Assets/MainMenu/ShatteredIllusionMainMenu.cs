@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
@@ -33,8 +34,11 @@ namespace ShatteredIllusion.Assets.MainMenu
         private const float IntroLogoScaleEnd = 1f;
         private const float FrameStep = 1f / 60f;
 
+        private const float MaxIntroDeltaTime = 0.1f;
+
         private static bool _introPlayed;
         private static float _introTimer;
+        private static long _lastIntroTimestamp;
 
         private const float LogoBaseScale = 0.85f;
         private const float LogoPaddingX = 80f;
@@ -71,7 +75,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             }
             catch (Exception ex)
             {
-                ModContent.GetInstance<ShatteredIllusionMenuHooks>()?.Mod?.Logger.Warn($"Menu backdrop/logo draw failed: {ex}");
+                Mod.Logger.Warn($"Menu backdrop/logo draw failed: {ex}");
 
                 SpriteBatchUtil.Restart(spriteBatch, ReturnBlendState, ReturnSamplerState);
             }
@@ -79,6 +83,7 @@ namespace ShatteredIllusion.Assets.MainMenu
             return false;
         }
 
+        // Advances the intro by real elapsed time so it lasts the same at any frame rate.
         private static void AdvanceIntroTimer()
         {
             if (_introPlayed)
@@ -87,7 +92,13 @@ namespace ShatteredIllusion.Assets.MainMenu
                 return;
             }
 
-            _introTimer += FrameStep;
+            long now = Stopwatch.GetTimestamp();
+            float deltaTime = _lastIntroTimestamp == 0
+                ? FrameStep
+                : (float)(now - _lastIntroTimestamp) / Stopwatch.Frequency;
+            _lastIntroTimestamp = now;
+
+            _introTimer += MathHelper.Clamp(deltaTime, 0f, MaxIntroDeltaTime);
 
             if (_introTimer >= IntroDuration)
             {
@@ -105,36 +116,42 @@ namespace ShatteredIllusion.Assets.MainMenu
             return 1f - inv * inv * inv;
         }
 
+        // The backdrop and vignette are drawn in raw pixels using the real back buffer size, so
+        // they cover the whole window at any resolution, aspect ratio or UI scale. The logo
+        // and buttons use UI space.
         private static void DrawBackdrop(SpriteBatch spriteBatch)
         {
             Texture2D background = (backgroundAsset ??= ModContent.Request<Texture2D>("ShatteredIllusion/Assets/MainMenu/Background")).Value;
 
-            float widthRatio = (float)Main.screenWidth / background.Width;
-            float heightRatio = (float)Main.screenHeight / background.Height;
-            float scale = MathHelper.Max(widthRatio, heightRatio);
+            if (background.Width <= 0 || background.Height <= 0)
+                return;
 
-            Vector2 size = new(background.Width * scale, background.Height * scale);
-            Vector2 position = new((Main.screenWidth - size.X) * 0.5f, (Main.screenHeight - size.Y) * 0.5f);
+            Rectangle screen = SpriteBatchUtil.ScreenBounds;
 
-            SpriteBatchUtil.Restart(spriteBatch, BlendState.AlphaBlend, SamplerState.PointClamp);
+            // Scale to cover, then crop the overflow evenly. Sizes round up so no edge pixel is left bare.
+            float scale = MathHelper.Max(
+                screen.Width / (float)background.Width,
+                screen.Height / (float)background.Height);
 
-            spriteBatch.Draw(
-                background,
-                position,
-                null,
-                Color.White,
-                0f,
-                Vector2.Zero,
-                scale,
-                SpriteEffects.None,
-                0f);
+            int width = (int)MathF.Ceiling(background.Width * scale);
+            int height = (int)MathF.Ceiling(background.Height * scale);
+
+            Rectangle destination = new(
+                (screen.Width - width) / 2,
+                (screen.Height - height) / 2,
+                width,
+                height);
+
+            SpriteBatchUtil.Restart(spriteBatch, BlendState.AlphaBlend, SamplerState.PointClamp, Matrix.Identity);
+
+            spriteBatch.Draw(background, destination, Color.White);
         }
 
         private static void DrawVignette(SpriteBatch spriteBatch)
         {
             spriteBatch.Draw(
                 TextureAssets.MagicPixel.Value,
-                new Rectangle(0, 0, Main.screenWidth, Main.screenHeight),
+                SpriteBatchUtil.ScreenBounds,
                 Color.Black * VignetteAlpha);
         }
 
@@ -152,15 +169,17 @@ namespace ShatteredIllusion.Assets.MainMenu
 
             Texture2D logoTex = Logo.Value;
 
-            float logoScale = LogoBaseScale * MathHelper.Lerp(IntroLogoScaleStart, IntroLogoScaleEnd, introEase);
+            float layoutScale = SpriteBatchUtil.LayoutScale;
+
+            float logoScale = LogoBaseScale * layoutScale * MathHelper.Lerp(IntroLogoScaleStart, IntroLogoScaleEnd, introEase);
 
             Vector2 logoSize = new Vector2(logoTex.Width, logoTex.Height) * logoScale;
 
             float x = buttonsOnLeft
-                ? Main.screenWidth - LogoPaddingX - logoSize.X / 2f
-                : LogoPaddingX + logoSize.X / 2f;
+                ? SpriteBatchUtil.UiWidth - LogoPaddingX * layoutScale - logoSize.X / 2f
+                : LogoPaddingX * layoutScale + logoSize.X / 2f;
 
-            float y = LogoPaddingY + logoSize.Y / 2f;
+            float y = LogoPaddingY * layoutScale + logoSize.Y / 2f;
 
             Vector2 logoPosition = new(x, y);
 

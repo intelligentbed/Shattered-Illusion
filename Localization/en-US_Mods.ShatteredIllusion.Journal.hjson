@@ -1,0 +1,461 @@
+// Journal text. (File name prefix 'Mods.ShatteredIllusion.Journal' is added to every key below by tModLoader,
+// so keys here start directly at UI / Unlocks / Chapters.)
+//
+// Journal text. Everything the journal displays lives here; the structure (which chapters/pages exist and what
+// locks them) lives in Common/GUI/JournalUI/JournalContent.cs.
+//
+// Page text tips:
+//   - A blank line starts a new paragraph. Text wraps by pixel width, there is no character limit,
+//     but a page fits about 15 lines. Overflow is cut off and logged: make another page instead.
+//   - Start a paragraph with [[UnlockId]] to keep just that paragraph sealed until that unlock opens.
+UI: {
+	BookTitle: BOOK NAME HERE
+	SymbolLabel: SYMBOL HERE
+	Contents: TABLE OF CONTENTS
+	Journal: Journal
+	JournalNews: Journal (something new!)
+	TocTooltip: Table of contents
+	NextPages: Next pages
+	PreviousPages: Previous pages
+	DefaultHint: Something about this page is still hidden from you.
+	Continued: "{0} (cont.)"
+	New: NEW
+	LockedChapter: ???
+	Updated: The journal has changed.
+	UpdatedChapter: Journal updated: {0}
+}
+
+// Optional hints shown on pages (and tooltips on paragraphs) locked behind a named unlock.
+Unlocks: {
+	KingSlime.Hint: The ink stays dry until the king of slimes has fallen.
+	SecretWord.Hint: Only the right word will open this.
+}
+
+Chapters: {
+	HowToRead: {
+		Title: How to read
+
+		Pages: {
+			Hello: {
+				Title: HELLO
+				Body: This page is wrapped by measured pixel width now, so there is no character limit to worry about.
+			}
+
+			Controls: {
+				Title: How to read
+				Body: Click the right page or press Right to turn forward. Click the left page or press Left to turn back. Click an entry on the contents page to jump to it.
+			}
+		}
+	}
+
+	Entry1: {
+		Title: Gameplay
+
+		Pages: {
+			Main.Body: I like Fargo's Sata mode
+
+			Parry: {
+				Title: Parry
+				Body: this is how you parry. BANG
+			}
+		}
+	}
+
+	Entry2: {
+		Title: Bosses
+
+		Pages: {
+			Main.Body: HELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT
+
+			KingSlime: {
+				Title: King Slime
+				LockedHint: Defeat King Slime.
+				Body:
+					'''
+					Summoned with a Slime Crown, or sometimes found when slime rain falls. A slow, bouncing mass that teleports when hurt and sheds smaller slimes as it falls.
+
+					A fine first test for any new adventurer.
+					'''
+			}
+
+			EyeOfCthulhu: {
+				Title: Eye of Cthulhu
+				LockedHint: Defeat the Eye of Cthulhu.
+				Body:
+					'''
+					Called by a Suspicious Looking Eye at night, or sometimes it simply arrives on its own once you are strong enough. It watches, circles, then at half strength tears open and charges.
+
+					Its defeat is the world's first great turning.
+					'''
+			}
+
+			EvilBoss: {
+				Title: Eater of Worlds / Brain of Cthulhu
+				LockedHint: Defeat the Eater of Worlds or the Brain of Cthulhu.
+				Body:
+					'''
+					Whichever evil your world chose, it keeps one great horror below. The Eater of Worlds is a segmented worm that splits as you cut it. The Brain of Cthulhu hides behind illusions until its creepers are gone.
+
+					Summon them with Worm Food or a Bloody Spine, or break enough of the world's evil.
+					'''
+			}
+
+			QueenBee: {
+				Title: Queen Bee
+				LockedHint: Defeat the Queen Bee.
+				Body:
+					'''
+					She waits in a Jungle hive. Break a Larva with an Abeemination to wake her. She darts, sprays stingers and calls her drones.
+
+					Her fall teaches the Witch Doctor to trust you.
+					'''
+			}
+
+			Skeletron: {
+				Title: Skeletron
+				LockedHint: Defeat Skeletron.
+				Body:
+					'''
+					The Dungeon's old guardian. Speak to the Old Man at its entrance at night and the curse takes him. Skeletron and his two spinning hands will test your footing.
+
+					Once he's gone, the Dungeon opens to you.
+					'''
+			}
+
+			Deerclops: {
+				Title: Deerclops
+				LockedHint: Defeat the Deerclops.
+				Body:
+					'''
+					A one-eyed winter terror drawn out by a Deer Thing, or by the cold itself. It claws, hurls debris from the ground and sends up shockwaves.
+
+					Give it room, and don't stand where the ice rises.
+					'''
+			}
+
+			WallOfFlesh: {
+				Title: Wall of Flesh
+				LockedHint: Defeat the Wall of Flesh.
+				Body:
+					'''
+					The Underworld's gatekeeper. Throw a Guide Voodoo Doll into lava and it wakes. It sweeps across the whole width of the world and cannot be outrun.
+
+					When it falls, the world itself changes. Nothing is the same after.
+					'''
+			}
+
+			Antlion: {
+				Title: The Great Antlion Charger
+				LockedHint: Defeat the Great Antlion Charger.
+				Body: PLACEHOLDER: the entry that only opens once the Great Antlion Charger is dead.
+			}
+		}
+	}
+
+	Entry3: {
+		Title: Townsfolk
+
+		Pages: {
+			Main.Body: ;iouahfbli;uhsdfgliuhsdfgliuhdfg
+
+			Guide: {
+				Title: The Guide
+				LockedHint: Already with you from the start.
+				Body:
+					'''
+					He was here before you were, and he knows more than he lets on. Hand him any item and he will tell you everything it can be made into.
+
+					A good first friend.
+					'''
+			}
+
+			Merchant: {
+				Title: The Merchant
+				LockedHint: Carry 50 silver coins.
+				Body:
+					'''
+					He arrives once a traveller is carrying a little money. He sells the basics: torches, rope, simple gear.
+
+					The village's first shopkeeper.
+					'''
+			}
+
+			Nurse: {
+				Title: The Nurse
+				LockedHint: Increase your maximum life above 100, with the Merchant living nearby.
+				Body:
+					'''
+					She heals your wounds for a fee, and a lot of your gold will end up with her. She only comes once you've grown tougher.
+
+					Worth every coin.
+					'''
+			}
+
+			Demolitionist: {
+				Title: The Demolitionist
+				LockedHint: Carry an explosive, with the Merchant living nearby.
+				Body:
+					'''
+					He smells the powder on you. He sells explosives and is happy to see things blown up.
+
+					Keep him away from candles.
+					'''
+			}
+
+			ArmsDealer: {
+				Title: The Arms Dealer
+				LockedHint: Carry bullets or a gun that fires them.
+				Body:
+					'''
+					He turns up as soon as you carry a gun or its ammunition. He sells firearms and ammo for the right price.
+
+					Nobody asks where he gets it.
+					'''
+			}
+
+			Dryad: {
+				Title: The Dryad
+				LockedHint: Defeat the Eye of Cthulhu, the Eater of Worlds or Brain of Cthulhu, or Skeletron.
+				Body:
+					'''
+					She appears when the world's darkness first stirs. She sells seeds and nature's gifts, and tells you how far the evil has spread.
+
+					She wants it cleansed.
+					'''
+			}
+
+			Angler: {
+				Title: The Angler
+				LockedHint: Rescue the sleeping Angler on the ocean shore.
+				Body:
+					'''
+					Found asleep on the beach. Wake him and he asks you for a fish every day.
+
+					He pays with strange rods and baits, and never says thank you.
+					'''
+			}
+
+			Stylist: {
+				Title: The Stylist
+				LockedHint: Rescue the webbed Stylist from a spider nest.
+				Body:
+					'''
+					Caught in webs deep in a spider nest. Free her and she'll cut your hair and mix your dyes.
+
+					Looking good matters.
+					'''
+			}
+
+			Golfer: {
+				Title: The Golfer
+				LockedHint: Rescue the Golfer in the Underground Desert.
+				Body:
+					'''
+					Found in the Underground Desert, of all places. He sells clubs, balls and a love of the green.
+
+					He's convinced there's a course down here somewhere.
+					'''
+			}
+
+			Zoologist: {
+				Title: The Zoologist
+				LockedHint: Fill at least 10% of the Bestiary.
+				Body:
+					'''
+					She appears once you have seen enough of the world's creatures. She deals in critters, and in what you've learned about them.
+
+					She loves every one of them.
+					'''
+			}
+
+			DyeTrader: {
+				Title: The Dye Trader
+				LockedHint: Carry a dye-related item, with at least four other town residents.
+				Body:
+					'''
+					He arrives from far away once the village is big enough, and once you are carrying something worth dyeing.
+
+					Colors, for the right price.
+					'''
+			}
+
+			Painter: {
+				Title: The Painter
+				LockedHint: Have at least eight other town residents.
+				Body:
+					'''
+					He shows up only when the village is a proper town. He sells paint, brushes and wallpaper.
+
+					To him a wall is only a canvas.
+					'''
+			}
+
+			Mechanic: {
+				Title: The Mechanic
+				LockedHint: Rescue the bound Mechanic in the Dungeon.
+				Body:
+					'''
+					Found bound in the Dungeon's depths. Free her and she sells wire, switches and everything else a tinkerer's dreams are built from.
+
+					She'll fix almost anything.
+					'''
+			}
+
+			GoblinTinkerer: {
+				Title: The Goblin Tinkerer
+				LockedHint: Defeat a Goblin Army, then rescue the bound Goblin in the caverns.
+				Body:
+					'''
+					After a goblin army is beaten, one of them is found bound in the caverns. He reforges your gear, and is sore about the war.
+
+					He keeps muttering about the Goblin Army.
+					'''
+			}
+
+			Tavernkeep: {
+				Title: The Tavernkeep
+				LockedHint: Defeat the Eater of Worlds or Brain of Cthulhu, then rescue the unconscious man.
+				Body:
+					'''
+					Found unconscious after the evil has fallen. He sells ale, and the tools to defend an ancient crystal.
+
+					He remembers things he'd rather not.
+					'''
+			}
+
+			WitchDoctor: {
+				Title: The Witch Doctor
+				LockedHint: Defeat the Queen Bee.
+				Body:
+					'''
+					He comes out of the Jungle once the Queen Bee falls. He sells jungle goods and summoning wares.
+
+					The bees seem to like him.
+					'''
+			}
+
+			Clothier: {
+				Title: The Clothier
+				LockedHint: Defeat Skeletron.
+				Body:
+					'''
+					With the Dungeon's curse lifted, he comes to town. He sells clothes and vanity, and is thankful.
+
+					He's glad to be himself again.
+					'''
+			}
+
+			PartyGirl: {
+				Title: The Party Girl
+				LockedHint: Have at least twenty other town residents.
+				Body:
+					'''
+					She turns up at last, when the town is big and lively enough. She sells party goods and parties anyway.
+
+					It's always a party.
+					'''
+			}
+		}
+	}
+
+	Entry4: {
+		Title: Entry IV
+		Pages.Main.Body: HELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.
+	}
+
+	Entry5: {
+		Title: Entry V
+		Pages.Main.Body: pioajgf[iopsjdfg[oisjdfgpoiuj
+	}
+
+	Entry6: {
+		Title: Entry VI
+		Pages.Main.Body: HELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.
+	}
+
+	Entry7: {
+		Title: Entry VII
+		Pages.Main.Body: sgoijsdhg;oijsdfg;oisjdfg
+	}
+
+	Entry8: {
+		Title: Entry VIII
+		Pages.Main.Body: HELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.
+	}
+
+	Entry9: {
+		Title: Entry IX
+		Pages.Main.Body: auahsdgliauhsflaisdfhasdff
+	}
+
+	Entry10: {
+		Title: Entry X
+		Pages.Main.Body: HELP I HAVE NOTHING TO SHOW THIS LOOKS STRAIGHT BUNS IMMA GET YELLED AT.
+	}
+
+	Credits: {
+		Title: Credits
+
+		Pages: {
+			Lead.Body:
+				'''
+				In recognition of those who contributed their time and talent
+
+				Project Lead
+				Pickle
+
+				Programmers
+				IntelligentBed
+				DR. House
+				BoredAsHell
+				Insomniac
+				'''
+
+			Artists: {
+				Title: Artists
+				Body:
+					'''
+					Carratusminimus
+					GenericTroubledArtist
+					H A Z I
+					Umbra
+					darkat
+					Yarrkrali
+					Mash
+					Lab
+					'''
+			}
+
+			Audio: {
+				Title: Music & Sound
+				Body:
+					'''
+					Music
+					Xyrix
+					Mash
+					Matt2AM
+
+					Audio Engineers
+					Xyrix
+					Mash
+					'''
+			}
+
+			Writers: {
+				Title: Writers & Thanks
+				Body:
+					'''
+					Writers
+					Pickle
+					GenericTroubledArtist
+					B4
+
+					Special Thanks
+					ScalarVector1
+					Snowystarfall
+					Eram
+					'''
+			}
+		}
+	}
+}

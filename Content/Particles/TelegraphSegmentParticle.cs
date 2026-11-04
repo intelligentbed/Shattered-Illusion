@@ -19,6 +19,9 @@ namespace ShatteredIllusion.Content.Particles
             info.Color = info.InitialColor * pulse;
             info.Scale = info.InitialScale * (0.7f + 0.3f * pulse);   // slight "breathing" size too
 
+            if (info.Time <= 1)
+                info.Scale = System.Numerics.Vector2.Zero;
+
             info.Time--;
         }
     }

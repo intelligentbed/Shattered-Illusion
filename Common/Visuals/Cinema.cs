@@ -44,7 +44,12 @@ namespace ShatteredIllusion.Common.Visuals
 
     public static partial class Cinema
     {
-        private const float LetterboxHeightFraction = 0.12f;
+        // Letterbox bars aim for a cinematic frame ratio instead of a fixed fraction of the screen height.
+        // The max matches the old fixed 12%, so 16:9 and narrower screens look exactly as before;
+        // ultrawide screens (already close to cinematic) get thinner bars.
+        private const float CinematicAspect = 2.39f;
+        private const float LetterboxMinFraction = 0.04f;
+        private const float LetterboxMaxFraction = 0.12f;
         private const float MaxZoom = 0.35f;
 
         private static float letterbox, letterboxTarget;
@@ -84,6 +89,31 @@ namespace ShatteredIllusion.Common.Visuals
         public static bool HitStopEnabled => Enabled && Cfg.HitStop;
         public static bool IntroEnabled => Enabled && Cfg.IntroEntrance;
         public static bool DeathCameraEnabled => Enabled && Cfg.DeathSequence;
+
+        // Whether the letterbox / vignette dressing is allowed by the player's config. Other UI that wants
+        // to match the cinematic look (e.g. the journal) should respect these.
+        public static bool LetterboxAllowed => Enabled && Cfg.Letterbox;
+        public static bool VignetteAllowed => Enabled && Cfg.Vignette;
+
+        // Height in UI pixels of one letterbox bar at full strength for a screen of the given UI-space size.
+        // Pass different min/max fractions for UI that wants thinner bars than a cutscene.
+        public static float LetterboxBarHeight(float uiWidth, float uiHeight, float minFraction = LetterboxMinFraction, float maxFraction = LetterboxMaxFraction)
+        {
+            if (uiWidth <= 0f || uiHeight <= 0f)
+                return 0f;
+
+            float needed = (uiHeight - uiWidth / CinematicAspect) * 0.5f;
+            return MathHelper.Clamp(needed, uiHeight * minFraction, uiHeight * maxFraction);
+        }
+
+        // Height in UI pixels of the letterbox bars being drawn right now (0 when none are showing).
+        public static float CurrentLetterboxHeight()
+        {
+            if (Main.dedServ || letterbox <= 0.005f)
+                return 0f;
+
+            return LetterboxBarHeight(Main.screenWidth / Main.UIScale, Main.screenHeight / Main.UIScale) * letterbox;
+        }
 
         public static float TotalZoom => 1f + MathHelper.Clamp(holdZoom + punchZoom, 0f, MaxZoom);
 
@@ -176,6 +206,9 @@ namespace ShatteredIllusion.Common.Visuals
 
             alpha *= Cfg.FlashIntensity;
 
+            if (Cfg.ScreenReduceFlashing)
+                alpha *= ScreenFX.ReduceFlashScale;
+
             if (alpha <= 0.01f)
                 return;
 
@@ -191,6 +224,7 @@ namespace ShatteredIllusion.Common.Visuals
             focusTarget = 0f;
             vignetteTarget = 0f;
             ReleaseCameraOffset();
+            ScreenFX.ReleaseGrade();
         }
 
         public static void HardReset()
@@ -278,6 +312,48 @@ namespace ShatteredIllusion.Common.Visuals
             Main.screenPosition = Vector2.Lerp(Main.screenPosition, desired, focusWeight);
         }
 
+        private static Texture2D vignetteTex;
+
+        // One smooth gradient texture stretched over the screen: no layered strips, so no banding lines.
+        private static Texture2D GetVignetteTexture()
+        {
+            if (vignetteTex != null && !vignetteTex.IsDisposed)
+                return vignetteTex;
+
+            const int size = 512;
+            var data = new Color[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = Math.Abs((x + 0.5f) / size * 2f - 1f);
+                    float v = Math.Abs((y + 0.5f) / size * 2f - 1f);
+
+                    float d = (float)Math.Pow(Math.Pow(u, 4) + Math.Pow(v, 4), 0.25);
+
+                    float t = MathHelper.Clamp((d - 0.5f) / 0.7f, 0f, 1f);
+                    t = t * t * (3f - 2f * t);
+
+                    byte a = (byte)(t * 0.75f * 255f + 0.5f);
+                    data[y * size + x] = new Color((byte)0, (byte)0, (byte)0, a);
+                }
+            }
+
+            vignetteTex = new Texture2D(Main.graphics.GraphicsDevice, size, size);
+            vignetteTex.SetData(data);
+            return vignetteTex;
+        }
+
+        internal static void DisposeVignette()
+        {
+            Main.QueueMainThreadAction(() =>
+            {
+                vignetteTex?.Dispose();
+                vignetteTex = null;
+            });
+        }
+
         internal static void DrawOverlay(SpriteBatch sb)
         {
             if (Main.dedServ || !Active)
@@ -290,37 +366,39 @@ namespace ShatteredIllusion.Common.Visuals
 
             if (vignette > 0.01f)
             {
-                const int layers = 12;
-                float step = Math.Min(w, h) * 0.035f;
-
-                for (int i = 0; i < layers; i++)
-                {
-                    float fall = 1f - i / (float)layers;
-                    Color c = Color.Black * (vignette * fall * fall * 0.75f);
-                    float o = i * step;
-
-                    sb.Draw(px, new Rectangle(0, (int)o, (int)w + 1, (int)step + 1), c);
-                    sb.Draw(px, new Rectangle(0, (int)(h - o - step), (int)w + 1, (int)step + 1), c);
-                    sb.Draw(px, new Rectangle((int)o, 0, (int)step + 1, (int)h + 1), c);
-                    sb.Draw(px, new Rectangle((int)(w - o - step), 0, (int)step + 1, (int)h + 1), c);
-                }
+                sb.Draw(GetVignetteTexture(),
+                    new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, (int)Math.Ceiling(h) + 2),
+                    Color.White * vignette);
             }
 
             if (letterbox > 0.005f)
             {
-                int barH = (int)(h * LetterboxHeightFraction * letterbox);
-                sb.Draw(px, new Rectangle(0, 0, (int)w + 1, barH), Color.Black);
-                sb.Draw(px, new Rectangle(0, (int)h - barH, (int)w + 1, barH + 1), Color.Black);
+                int barH = (int)(LetterboxBarHeight(w, h) * letterbox);
+                sb.Draw(px, new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, barH), Color.Black);
+                sb.Draw(px, new Rectangle(0, (int)Math.Ceiling(h) - barH, (int)Math.Ceiling(w) + 2, barH + 2), Color.Black);
             }
 
             if (titleTimer > 0 && titleDuration > 0)
                 DrawTitleCard(sb, px, w, h);
 
             if (flashAlpha > 0.01f)
-                sb.Draw(px, new Rectangle(0, 0, (int)w + 1, (int)h + 1), flashColor * flashAlpha);
+                sb.Draw(px, new Rectangle(0, 0, (int)Math.Ceiling(w) + 2, (int)Math.Ceiling(h) + 2), flashColor * flashAlpha);
         }
 
-        // Zoom punch, flash, ring, upward sparks, optional dust debris and ground skirt.
+        // Camera half of a heavy impact: zoom punch, flash, shake and screen ripple.
+        // Shared by Impact and Fx.BossLanding so the two can't drift apart.
+        public static void ImpactCamera(Vector2 pos, Vector2 shakeDir, float power, Color flash)
+        {
+            if (!Enabled)
+                return;
+
+            ZoomPunch(0.035f * power);
+            Flash(flash, 0.22f * power);
+            Shake(pos, shakeDir, 8f * power, 14f, 8 + (int)(14 * power));
+            ScreenFX.Ripple(pos, 520f * power, 28, 0.8f * power);
+        }
+
+        // Camera work, ring, upward sparks, optional dust debris and ground skirt.
         // ground = true flattens the ring into a ground-hugging ellipse; false gives a full circle.
         public static void Impact(Vector2 pos, float power, ImpactStyle style = null, bool ground = true)
         {
@@ -329,9 +407,7 @@ namespace ShatteredIllusion.Common.Visuals
 
             style ??= ImpactStyle.Default;
 
-            ZoomPunch(0.035f * power);
-            Flash(style.Flash, 0.22f * power);
-            Shake(pos, Main.rand.NextVector2Unit(), 8f * power, 14f, 8 + (int)(14 * power));
+            ImpactCamera(pos, Main.rand.NextVector2Unit(), power, style.Flash);
 
             if (style.Sound is SoundStyle sound)
                 SoundEngine.PlaySound(sound, pos);
@@ -342,46 +418,13 @@ namespace ShatteredIllusion.Common.Visuals
             float flatten = ground ? 0.28f : 1f;
             Vector2 ringPos = ground ? pos - new Vector2(0f, 3f) : pos;
 
-            BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                position: ringPos.ToNumerics(),
-                velocity: SystemVector2.Zero,
-                rotation: 0f,
-                scale: new SystemVector2(150f * power, 150f * power * flatten),
-                color: style.InnerRing,
-                duration: 20
-            ));
+            VisualFX.Ring(ringPos, 150f * power, style.InnerRing, 20, flatten);
 
             // Only the big moments get a second, wider ring.
             if (power >= 1.5f)
-            {
-                BossParticleSystem.Shockwaves.Create(new ParticleInfo(
-                    position: ringPos.ToNumerics(),
-                    velocity: SystemVector2.Zero,
-                    rotation: 0f,
-                    scale: new SystemVector2(250f * power, 250f * power * flatten),
-                    color: style.OuterRing,
-                    duration: 32
-                ));
-            }
+                VisualFX.Ring(ringPos, 250f * power, style.OuterRing, 32, flatten);
 
-            int sparks = (int)(8 * power);
-            for (int i = 0; i < sparks; i++)
-            {
-                float angle = ground
-                    ? Main.rand.NextFloat(-MathHelper.Pi * 0.9f, -MathHelper.Pi * 0.1f)
-                    : Main.rand.NextFloat(MathHelper.TwoPi);
-
-                Vector2 v = angle.ToRotationVector2() * Main.rand.NextFloat(2.5f, 7f);
-
-                BossParticleSystem.EmberBursts.Create(new ParticleInfo(
-                    position: pos.ToNumerics(),
-                    velocity: v.ToNumerics(),
-                    rotation: 0f,
-                    scale: new SystemVector2(9f, 9f),
-                    color: style.Spark,
-                    duration: Main.rand.Next(16, 26)
-                ));
-            }
+            VisualFX.Sparks(pos, -Vector2.UnitY, ground ? 1.26f : MathHelper.Pi, (int)(8 * power), 2.5f, 7f, style.Spark, 9f, 21);
 
             if (style.DebrisDust >= 0)
             {
