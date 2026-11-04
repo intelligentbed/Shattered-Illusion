@@ -119,7 +119,7 @@ namespace ShatteredIllusion.Common.Players.ParrySystem
             string line2 = $"Press [{assignedKey}] when the enemy flashes red.";
 
             var font = FontAssets.MouseText.Value;
-            Vector2 anchor = new Vector2(Main.screenWidth / 2f, 90f);
+            Vector2 anchor = new Vector2(Main.screenWidth / Main.UIScale / 2f, 90f);
 
             Vector2 size1 = font.MeasureString(line1);
             Vector2 size2 = font.MeasureString(line2);

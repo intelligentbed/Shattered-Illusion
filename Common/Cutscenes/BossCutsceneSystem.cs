@@ -64,8 +64,10 @@ namespace ShatteredIllusion.Common.Cutscenes
             if (!cp.Active) return;
 
             float blend = cp.Blend;
-            int w = Main.screenWidth;
-            int h = Main.screenHeight;
+            // PostDrawInterface draws under the UI scale matrix, so size everything in UI units or the bars
+            // stop short of the screen edge (UI scale < 1) or the title drifts off-center (UI scale > 1).
+            int w = (int)System.Math.Ceiling(Main.screenWidth / Main.UIScale) + 2;
+            int h = (int)System.Math.Ceiling(Main.screenHeight / Main.UIScale) + 2;
             Texture2D pixel = TextureAssets.MagicPixel.Value;
 
             spriteBatch.Draw(pixel, new Rectangle(0, 0, w, h), Color.Black * (0.25f * blend));
@@ -93,8 +95,8 @@ namespace ShatteredIllusion.Common.Cutscenes
                 data.IntroTicks + 10,
                 data.TotalTicks - data.OutroTicks - 20,
                 20f,
-                Main.screenWidth,
-                Main.screenHeight,
+                Main.screenWidth / Main.UIScale,
+                Main.screenHeight / Main.UIScale,
                 Accent);
         }
 

@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Terraria;
 using ShatteredIllusion.Common.Visuals;
+using ShatteredIllusion.Common.Visuals.Metaballs;
 using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.ID;
@@ -11,6 +12,10 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
 {
     public class SandBall : ModProjectile
     {
+        // Gooey spit: head, trail and impact droplets all merge into one blob shape (see Common/Visuals/Metaballs).
+        public static readonly MetaballLayer Goo = MetaballSystem.Register("AntlionSand",
+            new Color(120, 78, 38), new Color(214, 160, 84), new Color(255, 226, 150));
+
         public override void SetStaticDefaults()
         {
             ProjectileID.Sets.TrailCacheLength[Projectile.type] = 6;
@@ -32,6 +37,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
         public override void AI()
         {
             Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+            Goo.Enabled = Cinema.Enabled;
+            AddGoo();
             if (Cinema.Enabled)
                 Lighting.AddLight(Projectile.Center, 0.9f, 0.55f, 0.25f);
 
@@ -44,6 +51,20 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
                 );
                 sandDust.scale = Main.rand.NextFloat(1.2f, 1.8f);
                 sandDust.noGravity = true;
+            }
+        }
+
+        // Head blob plus a tapering chain of blobs along the old positions, so the trail stretches and pinches like liquid.
+        private void AddGoo()
+        {
+            Goo.Add(Projectile.Center, 15f);
+            Vector2 half = Projectile.Size * 0.5f;
+            for (int k = 1; k < Projectile.oldPos.Length; k++)
+            {
+                if (Projectile.oldPos[k] == Vector2.Zero)
+                    continue;
+                float fade = 1f - k / (float)Projectile.oldPos.Length;
+                Goo.Add(Projectile.oldPos[k] + half, 15f * (0.25f + 0.65f * fade));
             }
         }
 
@@ -66,6 +87,8 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
                 d.scale = Main.rand.NextFloat(1.4f, 2.2f);
             }
 
+            Goo.Burst(Projectile.Center, 9, 1.5f, 5.5f, 5f, 10f, 42, Projectile.velocity * 0.15f);
+
             AntlionFX.Ring(Projectile.Center, new Vector2(110f, 110f), new Color(255, 190, 110), 14);
             AntlionFX.Embers(Projectile.Center, 6, 2f, 6f, new Color(255, 190, 110), 8f);
         }
@@ -86,6 +109,11 @@ namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger //Lowkey thi
 
                 float fade = 1f - k / (float)Projectile.oldPos.Length;
                 Vector2 pos = Projectile.oldPos[k] + half - Main.screenPosition;
+                if (Goo.Enabled)
+                {
+                    AntlionFX.Glow(Main.spriteBatch, Projectile.oldPos[k] + half, new Color(255, 140, 60) * (fade * 0.2f), new Vector2(40f, 40f) * fade);
+                    continue;
+                }
 
                 Main.EntitySpriteDraw(texture, pos, null, new Color(255, 170, 90, 0) * (fade * 0.55f), Projectile.rotation, origin, Projectile.scale * (0.5f + 0.5f * fade), SpriteEffects.None, 0);
                 AntlionFX.Glow(Main.spriteBatch, Projectile.oldPos[k] + half, new Color(255, 140, 60) * (fade * 0.35f), new Vector2(40f, 40f) * fade);

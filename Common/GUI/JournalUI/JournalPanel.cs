@@ -167,7 +167,8 @@ namespace ShatteredIllusion.Common.GUI.JournalUI
             // The book takes this share of the free space; lower it to make the book smaller everywhere.
             const float ScreenFill = 0.76f;
             float fit = Math.Min(usableHeight * ScreenFill / designHeight, uiWidth * 0.8f / designWidth);
-            _fit = MathHelper.Clamp(fit, 0.5f, 1.5f);
+            // Low floor so the book still fits 720p / high UI scale; the cap keeps it from ballooning on 4K and ultrawide.
+            _fit = MathHelper.Clamp(fit, 0.25f, 1.5f);
         }
 
         private Vector2 ToDesignSpace(Vector2 uiPoint)

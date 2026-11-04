@@ -97,7 +97,11 @@ namespace ShatteredIllusion.Common.Cutscenes
             float scale = rawWidth > 0f
                 ? Math.Min(MaxScale, (width * MaxWidthFraction - maxTracking * gaps) / rawWidth)
                 : MaxScale;
-            scale = Math.Max(scale, 0.3f);
+            // Also bound by height so short screens (16:10, 4:3, 720p) don't get a title taller than its slot,
+            // and ultrawide (wide but not tall) doesn't stretch it past what the height can hold.
+            float k = MathHelper.Clamp(height / 1080f, 0.6f, 1.6f);
+            float heightCap = height * 0.16f / Math.Max(1f, titleFont.MeasureString("A").Y);
+            scale = Math.Max(Math.Min(scale, heightCap), 0.3f);
 
             float tracking = MathHelper.Lerp(TrackingStart, TrackingSettled, Ease(elapsed / 46f))
                            + Math.Min(Math.Max(0f, elapsed - 46f) * TrackingDriftPerTick, TrackingDriftMax);
@@ -111,9 +115,9 @@ namespace ShatteredIllusion.Common.Cutscenes
 
             // ---- layout ----
             float barHeight = height * BarFraction;
-            float bottom = height - barHeight - 56f;
+            float bottom = height - barHeight - 56f * k;
             float subtitleTop = bottom - subtitleHeight;
-            float titleTop = subtitleTop - 20f - titleHeight;
+            float titleTop = subtitleTop - 20f * k - titleHeight;
 
             float cx = CenterAligned ? width * 0.5f : width * 0.08f + blockWidth * 0.5f;
 
@@ -121,8 +125,8 @@ namespace ShatteredIllusion.Common.Cutscenes
             float backdropAlpha = Ease(elapsed / 16f) * globalAlpha;
             if (backdropAlpha > 0.01f)
             {
-                float bw = blockWidth + 560f;
-                float bh = (bottom - titleTop) + 260f;
+                float bw = blockWidth + 560f * k;
+                float bh = (bottom - titleTop) + 260f * k;
                 float by = (titleTop + bottom) * 0.5f;
 
                 spriteBatch.Draw(
