@@ -20,6 +20,7 @@ using ParticleLibrary.Core.V3.Particles;
 using ParticleLibrary.Utilities;
 using ShatteredIllusion.Core.Packets;
 using System.IO;
+using ShatteredIllusion.Common.Systems;
 using SystemVector2 = System.Numerics.Vector2;
 
 namespace ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger

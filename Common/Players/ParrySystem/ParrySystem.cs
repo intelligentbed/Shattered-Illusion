@@ -7,7 +7,7 @@ using ShatteredIllusion.Content.Buffs.StatBuffs;
 using ShatteredIllusion.Content.Particles;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
-using ShatteredIllusionKeybinds;
+using ShatteredIllusion.Common.Systems;
 using ParticleLibrary.Core.V3.Particles;
 using ParticleLibrary.Utilities;
 using Terraria;

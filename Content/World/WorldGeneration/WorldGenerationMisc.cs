@@ -8,7 +8,7 @@ using Terraria.IO;
 using Terraria.ModLoader;
 using Terraria.WorldBuilding;
 
-namespace ShatteredIllusion.World.WorldGeneration
+namespace ShatteredIllusion.Content.World.WorldGeneration
 {
     public class WorldGenerationMisc : ModSystem
     {

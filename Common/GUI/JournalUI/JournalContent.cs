@@ -2,6 +2,7 @@ using System;
 using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 using Terraria;
 using Terraria.ID;
+using ShatteredIllusion.Common.Systems;
 
 namespace ShatteredIllusion.Common.GUI.JournalUI
 {

@@ -11,7 +11,7 @@ using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
 using Terraria.WorldBuilding;
 
-namespace ShatteredIllusion.World.WorldGeneration
+namespace ShatteredIllusion.Content.World.WorldGeneration
 {
     public class HighwayGeneration : ModSystem
     {
@@ -389,74 +389,4 @@ namespace ShatteredIllusion.World.WorldGeneration
             HighwayArea = new Rectangle(x, y, width, height);
         }
     }
-
-    #region Highway Protection System
-
-    public class HighwayProtectionTile : GlobalTile
-    {
-        public override bool CanKillTile(
-            int i,
-            int j,
-            int type,
-            ref bool blockDamaged)
-        {
-            if (!HighwayGeneration.HighwayArea.IsEmpty &&
-                HighwayGeneration.HighwayArea.Contains(i, j))
-            {
-                return false;
-            }
-
-            return base.CanKillTile(
-                i,
-                j,
-                type,
-                ref blockDamaged);
-        }
-
-        public override bool CanExplode(
-            int i,
-            int j,
-            int type)
-        {
-            if (!HighwayGeneration.HighwayArea.IsEmpty &&
-                HighwayGeneration.HighwayArea.Contains(i, j))
-            {
-                return false;
-            }
-
-            return base.CanExplode(i, j, type);
-        }
-    }
-
-    public class HighwayProtectionWall : GlobalWall
-    {
-        public override void KillWall(
-            int i,
-            int j,
-            int type,
-            ref bool fail)
-        {
-            if (!HighwayGeneration.HighwayArea.IsEmpty &&
-                HighwayGeneration.HighwayArea.Contains(i, j))
-            {
-                fail = true;
-            }
-        }
-
-        public override bool CanExplode(
-            int i,
-            int j,
-            int type)
-        {
-            if (!HighwayGeneration.HighwayArea.IsEmpty &&
-                HighwayGeneration.HighwayArea.Contains(i, j))
-            {
-                return false;
-            }
-
-            return base.CanExplode(i, j, type);
-        }
-    }
-
-    #endregion
 }

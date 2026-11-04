@@ -4,7 +4,7 @@ using ShatteredIllusion.Content.NPCs.BossAI.GreatAntlionCharger;
 using ShatteredIllusion.Content.NPCs.BossAI.VanillaBosses.KingSlime;
 using ShatteredIllusion.Core.OverrideSystem;
 using ShatteredIllusion.Core.Packets;
-using ShatteredIllusionKeybinds;
+using ShatteredIllusion.Common.Systems;
 using System.IO;
 using System.Linq;
 using Terraria;

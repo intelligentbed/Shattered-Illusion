@@ -6,7 +6,7 @@ using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace ShatteredIllusion.Content.NPCs
+namespace ShatteredIllusion.Content.NPCs.NPCVanillaChanges
 {
     // oo shi moving like jelly
     public class SlimySludge : GlobalNPC

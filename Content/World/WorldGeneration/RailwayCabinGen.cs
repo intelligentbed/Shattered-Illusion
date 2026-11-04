@@ -5,9 +5,8 @@ using Terraria.DataStructures;
 using Terraria.GameContent.Generation;
 using Terraria.ModLoader;
 using Terraria.WorldBuilding;
-using ShatteredIllusion.World.WorldGeneration; 
 
-namespace ShatteredIllusion.World.WorldGeneration
+namespace ShatteredIllusion.Content.World.WorldGeneration
 {
     public class RailwayCabinGen : ModSystem
     {
